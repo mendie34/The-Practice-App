@@ -1066,6 +1066,105 @@ function RatingInsightCard({ title, subtitle, items, emptyText }) {
   );
 }
 
+// ===== Post-session feedback ("that was your 2nd best session ever") =====
+// Ranks the just-finished session against comparable past sessions on a single metric, and
+// turns that ranking into a short, honest headline. Ties (equal metric values) are ranked by
+// whichever comes first in the array, which is fine here since exact ties are rare with
+// floating-point SG/rating averages.
+function ordinal(n) {
+  const s = ["th", "st", "nd", "rd"];
+  const v = n % 100;
+  return n + (s[(v - 20) % 10] || s[v] || s[0]);
+}
+
+function rankSession(currentId, sessions, metricFn) {
+  const withMetrics = sessions
+    .map((s) => ({ id: s.id, metric: metricFn(s) }))
+    .filter((s) => typeof s.metric === "number" && !isNaN(s.metric));
+  if (withMetrics.length === 0) return null;
+
+  withMetrics.sort((a, b) => b.metric - a.metric); // descending — higher metric is better throughout this app
+  const rank = withMetrics.findIndex((s) => s.id === currentId) + 1;
+  if (rank === 0) return null; // current session's metric was invalid/filtered out
+
+  const current = withMetrics[rank - 1];
+  const others = withMetrics.filter((s) => s.id !== currentId);
+  const othersAvg = others.length ? avg(others.map((o) => o.metric)) : null;
+
+  return { rank, total: withMetrics.length, currentMetric: current.metric, othersAvg };
+}
+
+// valueFmt formats a raw metric number for display (e.g. formatSG, or `${x.toFixed(1)}/5`).
+function buildSessionFeedback(ranking, valueFmt) {
+  if (!ranking) return null;
+  const { rank, total, currentMetric, othersAvg } = ranking;
+
+  if (total === 1) {
+    return {
+      headline: "FIRST SESSION LOGGED",
+      detail: "This is your baseline — future sessions will be compared against it.",
+      tone: "neutral",
+    };
+  }
+  if (rank === 1) {
+    return {
+      headline: "★ BEST SESSION EVER",
+      detail: `Your best of ${total} sessions — ${valueFmt(currentMetric)}.`,
+      tone: "great",
+    };
+  }
+  if (rank <= 3) {
+    return {
+      headline: `★ ${ordinal(rank)} BEST SESSION`,
+      detail: `Out of ${total} sessions so far — ${valueFmt(currentMetric)}.`,
+      tone: "great",
+    };
+  }
+  if (othersAvg !== null && currentMetric > othersAvg) {
+    return {
+      headline: "BETTER THAN YOUR AVERAGE",
+      detail: `${valueFmt(currentMetric)} vs your average of ${valueFmt(othersAvg)} across ${total - 1} past sessions.`,
+      tone: "good",
+    };
+  }
+  if (othersAvg !== null && Math.abs(currentMetric - othersAvg) < 1e-9) {
+    return {
+      headline: "RIGHT AT YOUR AVERAGE",
+      detail: `${valueFmt(currentMetric)}, matching your average across ${total - 1} past sessions.`,
+      tone: "neutral",
+    };
+  }
+  return {
+    headline: "SESSION LOGGED",
+    detail:
+      othersAvg !== null
+        ? `${valueFmt(currentMetric)} vs your average of ${valueFmt(othersAvg)} — every session still adds data.`
+        : "Logged and saved.",
+    tone: "below",
+  };
+}
+
+function SessionFeedbackBanner({ feedback }) {
+  if (!feedback) return null;
+  const toneColors = {
+    great: { border: COLORS.fairwayLight, bg: `${COLORS.fairway}55` },
+    good: { border: COLORS.fairwayLight, bg: `${COLORS.fairway}33` },
+    neutral: { border: `${COLORS.creamDim}33`, bg: "transparent" },
+    below: { border: `${COLORS.creamDim}33`, bg: "transparent" },
+  };
+  const c = toneColors[feedback.tone] || toneColors.neutral;
+  return (
+    <Card style={{ marginBottom: 10, border: `1px solid ${c.border}`, background: c.bg }}>
+      <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 20, letterSpacing: 1, color: COLORS.cream }}>
+        {feedback.headline}
+      </div>
+      <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 4 }}>
+        {feedback.detail}
+      </div>
+    </Card>
+  );
+}
+
 export default function GolfPracticeApp({ onSwitchProfile, profileName, profileId }) {
   const [screen, setScreen] = useState("home"); // home | setup | practice | summary | analysis | shortgame | putting | puttingPractice | puttingSummary
   const [shotCount, setShotCount] = useState(10);
@@ -1073,6 +1172,7 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
   const [maxDist, setMaxDist] = useState(150);
   const [shots, setShots] = useState([]); // {target, actual, diff} or {target, rating}
   const [currentSessionMode, setCurrentSessionMode] = useState("distance"); // mode locked in when this session started
+  const [rangeSessionFeedback, setRangeSessionFeedback] = useState(null);
   const [currentTarget, setCurrentTarget] = useState(null);
   const [actualInput, setActualInput] = useState("");
   const [history, setHistory] = useState([]);
@@ -1091,6 +1191,7 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
   const [puttMinFt, setPuttMinFt] = useState(0);
   const [puttMaxFt, setPuttMaxFt] = useState(20);
   const [putts, setPutts] = useState([]); // {targetFt, strokes}
+  const [puttSessionFeedback, setPuttSessionFeedback] = useState(null);
   const [puttCurrentTarget, setPuttCurrentTarget] = useState(null);
   const [puttHistory, setPuttHistory] = useState([]);
   const [puttLoaded, setPuttLoaded] = useState(false);
@@ -1111,6 +1212,7 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
   const [shortLoaded, setShortLoaded] = useState(false);
   const [shortStorageError, setShortStorageError] = useState(false);
   const [shortActiveSaved, setShortActiveSaved] = useState(null);
+  const [shortSessionFeedback, setShortSessionFeedback] = useState(null);
   const [shortResultInput, setShortResultInput] = useState("");
 
   // load history + any saved in-progress session from persistent storage
@@ -1363,6 +1465,14 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
     };
     const newHistory = [session, ...history];
     setHistory(newHistory);
+
+    const comparable = newHistory.filter((s) => (isRatingMode ? s.mode === "rating" : s.mode !== "rating"));
+    const metricFn = isRatingMode
+      ? (s) => avg(s.shots.map((sh) => sh.rating))
+      : (s) => avg(s.shots.map((sh) => sgForApproachShot(sh.target, sh.actual)));
+    const valueFmt = isRatingMode ? (v) => `${v.toFixed(1)}/5` : formatSG;
+    setRangeSessionFeedback(buildSessionFeedback(rankSession(session.id, comparable, metricFn), valueFmt));
+
     setScreen("summary");
     try {
       await window.storage.set("golf:sessions", JSON.stringify(newHistory), false);
@@ -1476,6 +1586,11 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
     };
     const newHistory = [session, ...puttHistory];
     setPuttHistory(newHistory);
+
+    const comparable = newHistory.filter((s) => s.type !== "course");
+    const metricFn = (s) => avg(s.putts.map((p) => sgForPutt(p.targetFt, p.strokes)));
+    setPuttSessionFeedback(buildSessionFeedback(rankSession(session.id, comparable, metricFn), formatSG));
+
     setScreen("puttingSummary");
     try {
       await window.storage.set("putting:sessions", JSON.stringify(newHistory), false);
@@ -1544,6 +1659,11 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
     const newHistory = [session, ...puttHistory];
     setPuttHistory(newHistory);
     setPutts(finalPutts);
+
+    const comparable = newHistory.filter((s) => s.type === "course");
+    const metricFn = (s) => avg(s.putts.map((p) => sgForPutt(p.targetFt, p.strokes)));
+    setPuttSessionFeedback(buildSessionFeedback(rankSession(session.id, comparable, metricFn), formatSG));
+
     setScreen("puttingSummary");
     try {
       await window.storage.set("putting:sessions", JSON.stringify(newHistory), false);
@@ -1703,6 +1823,10 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
     };
     const newHistory = [session, ...shortHistory];
     setShortHistory(newHistory);
+
+    const metricFn = (s) => avg(s.shots.map((sh) => sgForShortGameShot(sh.lie, sh.target, sh.resultFt)));
+    setShortSessionFeedback(buildSessionFeedback(rankSession(session.id, newHistory, metricFn), formatSG));
+
     setScreen("shortGameSummary");
     try {
       await window.storage.set("shortgame:sessions", JSON.stringify(newHistory), false);
@@ -1827,6 +1951,7 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
             onNewSession={resetToSetup}
             storageError={storageError}
             units={units}
+            feedback={rangeSessionFeedback}
           />
         )}
 
@@ -1908,6 +2033,7 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
             onNewSession={resetToShortGameSetup}
             storageError={shortStorageError}
             units={units}
+            feedback={shortSessionFeedback}
           />
         )}
 
@@ -1953,7 +2079,13 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
         )}
 
         {screen === "puttingSummary" && putts.length > 0 && (
-          <PuttingSummaryScreen putts={putts} onNewSession={resetToPuttingSetup} storageError={puttStorageError} units={units} />
+          <PuttingSummaryScreen
+            putts={putts}
+            onNewSession={resetToPuttingSetup}
+            storageError={puttStorageError}
+            units={units}
+            feedback={puttSessionFeedback}
+          />
         )}
       </div>
     </div>
@@ -2702,7 +2834,7 @@ function RatingLog({ shots, units }) {
   );
 }
 
-function SummaryScreen({ shots, minDist, maxDist, onNewSession, storageError, units }) {
+function SummaryScreen({ shots, minDist, maxDist, onNewSession, storageError, units, feedback }) {
   const isRating = shots.length > 0 && shots[0].rating !== undefined;
   const unitLabel = longUnitLabel(units);
 
@@ -2713,6 +2845,7 @@ function SummaryScreen({ shots, minDist, maxDist, onNewSession, storageError, un
 
     return (
       <div>
+        <SessionFeedbackBanner feedback={feedback} />
         <Card>
           <div style={{ textAlign: "center", marginBottom: 4 }}>
             <div style={{ fontSize: 11, color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", letterSpacing: 2 }}>
@@ -2774,6 +2907,7 @@ function SummaryScreen({ shots, minDist, maxDist, onNewSession, storageError, un
 
   return (
     <div>
+      <SessionFeedbackBanner feedback={feedback} />
       <Card>
         <div style={{ textAlign: "center", marginBottom: 4 }}>
           <div style={{ fontSize: 11, color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", letterSpacing: 2 }}>
@@ -4762,7 +4896,7 @@ function ShortGamePracticeScreen({ shots, shotCount, currentShot, resultInput, s
   );
 }
 
-function ShortGameSummaryScreen({ shots, onNewSession, storageError, units }) {
+function ShortGameSummaryScreen({ shots, onNewSession, storageError, units, feedback }) {
   const avgResultFt = avg(shots.map((s) => s.resultFt));
   const sgValues = shots.map((s) => ({ ...s, sg: sgForShortGameShot(s.lie, s.target, s.resultFt) }));
   const avgSG = avg(sgValues.map((s) => s.sg));
@@ -4773,6 +4907,7 @@ function ShortGameSummaryScreen({ shots, onNewSession, storageError, units }) {
 
   return (
     <div>
+      <SessionFeedbackBanner feedback={feedback} />
       <Card>
         <div style={{ textAlign: "center", marginBottom: 4 }}>
           <div style={{ fontSize: 11, color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", letterSpacing: 2 }}>
@@ -5454,7 +5589,7 @@ function PuttingPracticeScreen({ putts, puttCount, currentTarget, puttMinFt, put
   );
 }
 
-function PuttingSummaryScreen({ putts, onNewSession, storageError, units }) {
+function PuttingSummaryScreen({ putts, onNewSession, storageError, units, feedback }) {
   const avgStrokes = avg(putts.map((p) => p.strokes));
   const avgSG = avg(putts.map((p) => sgForPutt(p.targetFt, p.strokes)));
   const totalSG = putts.reduce((a, p) => a + sgForPutt(p.targetFt, p.strokes), 0);
@@ -5466,6 +5601,7 @@ function PuttingSummaryScreen({ putts, onNewSession, storageError, units }) {
 
   return (
     <div>
+      <SessionFeedbackBanner feedback={feedback} />
       <Card>
         <div style={{ textAlign: "center", marginBottom: 4 }}>
           <div style={{ fontSize: 11, color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", letterSpacing: 2 }}>
