@@ -3354,6 +3354,7 @@ function NumberField({ label, value, onChange }) {
       </div>
       <input
         type="number"
+        inputMode="numeric"
         value={value}
         onChange={(e) => onChange(parseInt(e.target.value || "0", 10))}
         style={{
@@ -3521,6 +3522,7 @@ function PracticeScreen({
               <input
                 ref={inputRef}
                 type="number"
+                inputMode="decimal"
                 value={actualInput}
                 onChange={(e) => setActualInput(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && onSubmit()}
@@ -6931,6 +6933,7 @@ function CompetePlayScreen({
               <div style={{ display: "flex", gap: 8 }}>
                 <input
                   type="number"
+                  inputMode="decimal"
                   value={distanceInput}
                   onChange={(e) => setDistanceInput(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && onSubmitDistance()}
@@ -7564,6 +7567,7 @@ function ShortGameCompetePlayScreen({
               <div style={{ display: "flex", gap: 8 }}>
                 <input
                   type="number"
+                  inputMode="decimal"
                   value={resultInput}
                   onChange={(e) => setResultInput(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && onSubmitDistance()}
@@ -8502,6 +8506,7 @@ function ShortGamePracticeScreen({ shots, shotCount, currentShot, resultInput, s
           <div style={{ display: "flex", gap: 8 }}>
             <input
               type="number"
+              inputMode="decimal"
               value={resultInput}
               onChange={(e) => setResultInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && onSubmit()}
@@ -8819,6 +8824,7 @@ function PuttingSetupScreen({
                 <input
                   autoFocus
                   type="number"
+                  inputMode="decimal"
                   value={courseDistanceInput}
                   onChange={(e) => setCourseDistanceInput(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && submitCourseDistance()}
@@ -10354,6 +10360,7 @@ export function ProfileSetupWizard({ onComplete }) {
             </div>
             <input
               type="number"
+              inputMode="decimal"
               value={handicap}
               onChange={(e) => setHandicap(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleHandicapNext()}
