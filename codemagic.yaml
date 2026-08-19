@@ -1,0 +1,54 @@
+workflows:
+  ios-capacitor-workflow:
+    name: The Practice App — iOS
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+    integrations:
+      app_store_connect: CodeMagicAPI # set this name to match whatever you name the API key integration in Codemagic's UI
+    environment:
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.thepracticeapp.golf
+      vars:
+        XCODE_WORKSPACE: "ios/App/App.xcodeproj/project.xcworkspace"
+        XCODE_SCHEME: "App"
+      node: latest
+      xcode: latest
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: main
+          include: true
+          source: true
+    scripts:
+      - name: Install npm dependencies
+        script: |
+          npm install
+      - name: Build the web app
+        script: |
+          npm run build
+      - name: Sync the build into the native iOS project
+        script: |
+          npx cap sync ios
+      - name: Set up code signing
+        script: |
+          xcode-project use-profiles
+      - name: Increment build number
+        script: |
+          cd $CM_BUILD_DIR/ios/App
+          LATEST_BUILD_NUMBER=$(app-store-connect get-latest-app-store-build-number "$APP_ID" || echo 0)
+          agvtool new-version -all $(($LATEST_BUILD_NUMBER + 1))
+      - name: Build the .ipa for distribution
+        script: |
+          xcode-project build-ipa \
+            --workspace "$XCODE_WORKSPACE" \
+            --scheme "$XCODE_SCHEME"
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+        submit_to_app_store: false # flip to true only once you're ready for a real release, not just TestFlight

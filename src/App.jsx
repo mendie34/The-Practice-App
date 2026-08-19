@@ -228,7 +228,7 @@ function flattenShots(sessions) {
 }
 
 // ===== TEMP TEST DATA — remove this whole block (through generateFakeSessions) when asked =====
-function generateFakeSessions() {
+function generateFakeSessions(count = 18) {
   const now = new Date();
   const rangeOptions = [
     [50, 100],
@@ -240,7 +240,7 @@ function generateFakeSessions() {
   ];
   const shotCountOptions = [10, 20, 50];
   const sessions = [];
-  const N = 18;
+  const N = count;
 
   for (let i = 0; i < N; i++) {
     const progress = i / (N - 1); // 0 = oldest, 1 = newest
@@ -294,7 +294,7 @@ function generateFakeSessions() {
 // ===== END TEMP TEST DATA =====
 
 // ===== TEMP PUTTING TEST DATA — remove this whole block when asked =====
-function generateFakePuttingSessions() {
+function generateFakePuttingSessions(count = 18) {
   const now = new Date();
   const rangeOptions = [
     [0, 10],
@@ -306,7 +306,7 @@ function generateFakePuttingSessions() {
   ];
   const puttCountOptions = [10, 20, 30];
   const sessions = [];
-  const N = 18;
+  const N = count;
 
   // Draws a putt outcome (1/2/3) given a mean-strokes target, biased toward whole outcomes.
   function drawStrokes(meanStrokes) {
@@ -370,9 +370,9 @@ function generateFakePuttingSessions() {
 // ===== END TEMP PUTTING TEST DATA =====
 
 // ===== TEMP ON-COURSE TEST DATA — remove this whole block when asked =====
-function generateFakeCourseRounds() {
+function generateFakeCourseRounds(count = 10) {
   const now = new Date();
-  const N = 10;
+  const N = count;
   const rounds = [];
 
   for (let i = 0; i < N; i++) {
@@ -427,9 +427,9 @@ function generateFakeCourseRounds() {
 // ===== END TEMP ON-COURSE TEST DATA =====
 
 // ===== TEMP SHORT GAME TEST DATA — remove this whole block when asked =====
-function generateFakeShortGameSessions() {
+function generateFakeShortGameSessions(count = 15) {
   const now = new Date();
-  const N = 15;
+  const N = count;
   const sessions = [];
   const shotCountOptions = [10, 20, 30];
   const lieOptions = [
@@ -479,6 +479,55 @@ function generateFakeShortGameSessions() {
   return sessions.sort((a, b) => new Date(b.date) - new Date(a.date));
 }
 // ===== END TEMP SHORT GAME TEST DATA =====
+
+// ===== TEMP TEE ACCURACY TEST DATA — remove this whole block when asked =====
+function generateFakeTeeSessions(count = 12) {
+  const now = new Date();
+  const N = count;
+  const sessions = [];
+  const shotCountOptions = [10, 20, 30];
+  const clubSetOptions = [
+    ["driver"],
+    ["driver", "fairway"],
+    ["driver", "fairway", "hybrid", "iron"],
+  ];
+
+  for (let i = 0; i < N; i++) {
+    const progress = i / (N - 1);
+    const monthsAgo = 5 - progress * 5;
+    const date = new Date(now);
+    date.setMonth(date.getMonth() - Math.floor(monthsAgo));
+    date.setDate(1 + Math.floor(Math.random() * 27));
+
+    const shotCount = shotCountOptions[Math.floor(Math.random() * shotCountOptions.length)];
+    const clubs = clubSetOptions[Math.floor(Math.random() * clubSetOptions.length)];
+    const fairwayWidth = 25 + Math.floor(Math.random() * 15);
+
+    const shots = [];
+    for (let s = 0; s < shotCount; s++) {
+      const club = clubs[Math.floor(Math.random() * clubs.length)];
+      // Amateur-level accuracy, gradually improving over time, worse with driver than irons.
+      const clubMissFactor = club === "driver" ? 1.3 : club === "fairway" ? 1.1 : club === "hybrid" ? 0.95 : 0.8;
+      const baseHitChance = (0.45 + progress * 0.25) / clubMissFactor;
+      shots.push({ club, hit: Math.random() < Math.min(0.9, baseHitChance) });
+    }
+
+    const hitCount = shots.filter((s) => s.hit).length;
+    sessions.push({
+      id: uid(),
+      date: date.toISOString(),
+      shotCount: shots.length,
+      fairwayWidth,
+      clubs,
+      shots,
+      hitCount,
+      hitPct: (hitCount / shots.length) * 100,
+    });
+  }
+
+  return sessions.sort((a, b) => new Date(b.date) - new Date(a.date));
+}
+// ===== END TEMP TEE ACCURACY TEST DATA =====
 
 const YARDAGE_PRESETS = [
   { label: "All", min: 0, max: 300 },
@@ -1277,7 +1326,7 @@ function computePuttCompeteTallies(players, holeResults) {
   return totals;
 }
 
-export default function GolfPracticeApp({ onSwitchProfile, profileName, profileId }) {
+export default function GolfPracticeApp({ onSwitchProfile, profileName, profileId, profileHandicap }) {
   const [screen, setScreen] = useState("home"); // home | setup | practice | summary | analysis | shortgame | putting | puttingPractice | puttingSummary
   const [shotCount, setShotCount] = useState(10);
   const [minDist, setMinDist] = useState(50);
@@ -1656,6 +1705,15 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
     }
   }
 
+  async function clearAllRangeSessions() {
+    setHistory([]);
+    try {
+      await window.storage.set("golf:sessions", JSON.stringify([]), false);
+    } catch (e) {
+      setStorageError(true);
+    }
+  }
+
   // ===== Putting handlers =====
   async function persistActivePutting(state) {
     setPuttActiveSaved(state);
@@ -1843,6 +1901,16 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
     }
   }
 
+  async function clearAllPuttingPracticeSessions() {
+    const kept = puttHistory.filter((s) => s.type === "course");
+    setPuttHistory(kept);
+    try {
+      await window.storage.set("putting:sessions", JSON.stringify(kept), false);
+    } catch (e) {
+      setPuttStorageError(true);
+    }
+  }
+
   // TEMP: loads generated sample on-course rounds for testing. Remove this handler when asked.
   async function loadTestCourseRounds() {
     const fake = generateFakeCourseRounds();
@@ -1850,6 +1918,16 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
     setPuttHistory(newHistory);
     try {
       await window.storage.set("putting:sessions", JSON.stringify(newHistory), false);
+    } catch (e) {
+      setPuttStorageError(true);
+    }
+  }
+
+  async function clearAllPuttingCourseSessions() {
+    const kept = puttHistory.filter((s) => s.type !== "course");
+    setPuttHistory(kept);
+    try {
+      await window.storage.set("putting:sessions", JSON.stringify(kept), false);
     } catch (e) {
       setPuttStorageError(true);
     }
@@ -2378,6 +2456,81 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
     }
   }
 
+  async function clearAllShortGameSessions() {
+    setShortHistory([]);
+    try {
+      await window.storage.set("shortgame:sessions", JSON.stringify([]), false);
+    } catch (e) {
+      setShortStorageError(true);
+    }
+  }
+
+  // TEMP: loads generated sample tee accuracy sessions for testing. Remove this handler when asked.
+  async function loadTestTeeSessions() {
+    const fake = generateFakeTeeSessions();
+    const newHistory = [...fake, ...teeHistory];
+    setTeeHistory(newHistory);
+    try {
+      await window.storage.set("tee:sessions", JSON.stringify(newHistory), false);
+    } catch (e) {
+      setTeeStorageError(true);
+    }
+  }
+
+  async function clearAllTeeSessions() {
+    setTeeHistory([]);
+    try {
+      await window.storage.set("tee:sessions", JSON.stringify([]), false);
+    } catch (e) {
+      setTeeStorageError(true);
+    }
+  }
+
+  // Adds 10 sample sessions to every section in one go, rather than loading each area separately.
+  async function loadSampleDataForAllSections() {
+    const newRangeHistory = [...generateFakeSessions(10), ...history];
+    setHistory(newRangeHistory);
+
+    const newTeeHistory = [...generateFakeTeeSessions(10), ...teeHistory];
+    setTeeHistory(newTeeHistory);
+
+    const newShortHistory = [...generateFakeShortGameSessions(10), ...shortHistory];
+    setShortHistory(newShortHistory);
+
+    const newPuttHistory = [...generateFakePuttingSessions(10), ...generateFakeCourseRounds(10), ...puttHistory];
+    setPuttHistory(newPuttHistory);
+
+    try {
+      await Promise.all([
+        window.storage.set("golf:sessions", JSON.stringify(newRangeHistory), false),
+        window.storage.set("tee:sessions", JSON.stringify(newTeeHistory), false),
+        window.storage.set("shortgame:sessions", JSON.stringify(newShortHistory), false),
+        window.storage.set("putting:sessions", JSON.stringify(newPuttHistory), false),
+      ]);
+    } catch (e) {
+      // non-fatal — sessions are still shown from local state even if a write failed
+    }
+  }
+
+  // Wipes every section's session history in one go — the counterpart to the "add 10 to every
+  // section" button above.
+  async function clearAllSampleDataForAllSections() {
+    setHistory([]);
+    setTeeHistory([]);
+    setShortHistory([]);
+    setPuttHistory([]);
+    try {
+      await Promise.all([
+        window.storage.set("golf:sessions", JSON.stringify([]), false),
+        window.storage.set("tee:sessions", JSON.stringify([]), false),
+        window.storage.set("shortgame:sessions", JSON.stringify([]), false),
+        window.storage.set("putting:sessions", JSON.stringify([]), false),
+      ]);
+    } catch (e) {
+      // non-fatal
+    }
+  }
+
   const runningTotal = shots.reduce((a, s) => a + s.diff, 0);
   const runningAvg = avg(shots.map((s) => s.diff));
   const puttRunningAvg = avg(putts.map((p) => p.strokes));
@@ -2398,7 +2551,6 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
       <div style={{ width: "100%", maxWidth: 420 }}>
         <Header
           screen={screen}
-          onAnalysis={() => setScreen("analysis")}
           onSettings={() => setScreen("settings")}
           onHome={goHome}
           onBack={() => setScreen(BACK_MAP[screen] || "home")}
@@ -2483,6 +2635,10 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
             teeLoaded={teeLoaded}
             onDeleteTeeSession={deleteTeeSession}
             onBack={goHome}
+            profileName={profileName}
+            profileHandicap={profileHandicap}
+            baselineHandicap={baselineHandicap}
+            units={units}
           />
         )}
 
@@ -2507,6 +2663,25 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
                 alert(e.message || "Couldn't import that file.");
               }
             }}
+            sampleDataAreas={[
+              { key: "range", label: "Range", count: history.length, onClear: clearAllRangeSessions },
+              { key: "teeaccuracy", label: "Tee Accuracy", count: teeHistory.length, onClear: clearAllTeeSessions },
+              { key: "shortgame", label: "Short Game", count: shortHistory.length, onClear: clearAllShortGameSessions },
+              {
+                key: "putting",
+                label: "Putting — Practice",
+                count: puttHistory.filter((s) => s.type !== "course").length,
+                onClear: clearAllPuttingPracticeSessions,
+              },
+              {
+                key: "puttingcourse",
+                label: "Putting — On Course",
+                count: puttHistory.filter((s) => s.type === "course").length,
+                onClear: clearAllPuttingCourseSessions,
+              },
+            ]}
+            onLoadAllSampleData={loadSampleDataForAllSections}
+            onClearAllSampleData={clearAllSampleDataForAllSections}
           />
         )}
 
@@ -2808,7 +2983,7 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
   );
 }
 
-function Header({ screen, onAnalysis, onSettings, onHome, onBack, backDestination }) {
+function Header({ screen, onSettings, onHome, onBack, backDestination }) {
   return (
     <div
       className="no-print"
@@ -2860,23 +3035,6 @@ function Header({ screen, onAnalysis, onSettings, onHome, onBack, backDestinatio
             }}
           >
             HOME
-          </button>
-        )}
-        {screen === "home" && (
-          <button
-            onClick={onAnalysis}
-            style={{
-              background: "none",
-              border: `1px solid ${COLORS.creamDim}55`,
-              color: COLORS.creamDim,
-              fontFamily: "'JetBrains Mono', monospace",
-              fontSize: 10,
-              padding: "4px 7px",
-              borderRadius: 6,
-              cursor: "pointer",
-            }}
-          >
-            ANALYSIS
           </button>
         )}
         {screen === "home" && (
@@ -3184,24 +3342,6 @@ function SetupScreen({
       >
         View range analysis
       </div>
-
-      {/* TEMP: test-data button — remove this block when asked */}
-      <div
-        onClick={onLoadTestData}
-        style={{
-          textAlign: "center",
-          marginTop: 8,
-          color: COLORS.sand,
-          fontFamily: "'JetBrains Mono', monospace",
-          fontSize: 10,
-          cursor: "pointer",
-          textDecoration: "underline",
-          textUnderlineOffset: 3,
-        }}
-      >
-        + Load sample sessions (test data)
-      </div>
-      {/* END TEMP */}
     </div>
   );
 }
@@ -3863,6 +4003,9 @@ function SettingsScreen({
   onSwitchProfile,
   onExportData,
   onImportData,
+  sampleDataAreas,
+  onLoadAllSampleData,
+  onClearAllSampleData,
 }) {
   return (
     <div>
@@ -4061,6 +4204,58 @@ function SettingsScreen({
         </button>
       </Card>
 
+      <Card style={{ marginTop: 12 }}>
+        <SectionLabel>Sample data</SectionLabel>
+        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 4, lineHeight: 1.5 }}>
+          Load 10 generated sample sessions into every section at once to try out Analysis, or
+          clear all of them to start fresh. Applies only to this profile.
+        </div>
+
+        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 12 }}>
+          {sampleDataAreas.reduce((a, area) => a + area.count, 0)} sample session
+          {sampleDataAreas.reduce((a, area) => a + area.count, 0) === 1 ? "" : "s"} across every section
+        </div>
+
+        <button
+          onClick={onLoadAllSampleData}
+          style={{
+            width: "100%",
+            marginTop: 10,
+            padding: "11px 0",
+            borderRadius: 10,
+            border: `1px solid ${COLORS.sand}66`,
+            background: "transparent",
+            color: COLORS.sand,
+            fontFamily: "'Bebas Neue', sans-serif",
+            fontSize: 15,
+            letterSpacing: 0.5,
+            cursor: "pointer",
+          }}
+        >
+          + ADD 10 SAMPLE SESSIONS TO EVERY SECTION
+        </button>
+
+        <button
+          onClick={onClearAllSampleData}
+          disabled={sampleDataAreas.every((area) => area.count === 0)}
+          style={{
+            width: "100%",
+            marginTop: 8,
+            padding: "11px 0",
+            borderRadius: 10,
+            border: `1px solid ${sampleDataAreas.every((area) => area.count === 0) ? COLORS.creamDim + "33" : COLORS.flag}`,
+            background: "transparent",
+            color: sampleDataAreas.every((area) => area.count === 0) ? COLORS.creamDim : COLORS.flag,
+            fontFamily: "'Bebas Neue', sans-serif",
+            fontSize: 15,
+            letterSpacing: 0.5,
+            cursor: sampleDataAreas.every((area) => area.count === 0) ? "not-allowed" : "pointer",
+          }}
+        >
+          CLEAR ALL SECTIONS
+        </button>
+      </Card>
+
       <button
         onClick={onBack}
         style={{
@@ -4083,6 +4278,214 @@ function SettingsScreen({
   );
 }
 
+function CoachSummaryScreen({ profileName, profileHandicap, baselineHandicap, rangeHistory, teeHistory, shortGameHistory, puttingHistory, units }) {
+  const [timescale, setTimescale] = useState("all");
+  const [printMode, triggerPrint] = usePrintMode();
+
+  const rangeDistanceHistory = rangeHistory.filter((s) => s.mode !== "rating");
+  const rangeRatingHistoryAll = rangeHistory.filter((s) => s.mode === "rating");
+  const puttingPracticeHistory = puttingHistory.filter((s) => s.type !== "course");
+  const puttingCourseHistory = puttingHistory.filter((s) => s.type === "course");
+
+  const filteredRangeDistance = filterByTimescale(rangeDistanceHistory, timescale);
+  const filteredRangeRating = filterByTimescale(rangeRatingHistoryAll, timescale);
+  const filteredTee = filterByTimescale(teeHistory, timescale);
+  const filteredShortGame = filterByTimescale(shortGameHistory, timescale);
+  const filteredPuttingPractice = filterByTimescale(puttingPracticeHistory, timescale);
+  const filteredPuttingCourse = filterByTimescale(puttingCourseHistory, timescale);
+
+  const rangeAnalysis = computeAnalysis(filteredRangeDistance);
+  const rangeRatingAnalysis = computeRangeRatingAnalysis(filteredRangeRating);
+  const teeAnalysis = computeTeeAccuracyAnalysis(filteredTee);
+  const shortGameAnalysis = computeShortGameAnalysis(filteredShortGame);
+  const puttingPracticeAnalysis = computePuttingAnalysis(filteredPuttingPractice);
+  const puttingCourseAnalysis = computePuttingAnalysis(filteredPuttingCourse);
+
+  const baselineLabel = BASELINE_OPTIONS.find((b) => b.key === baselineHandicap)?.label || "PGA TOUR";
+
+  function trendMark(delta, threshold) {
+    if (Math.abs(delta) < threshold) return { icon: "◆", color: COLORS.creamDim };
+    return delta > 0 ? { icon: "▲", color: COLORS.fairwayLight } : { icon: "▼", color: COLORS.flag };
+  }
+
+  const glanceRows = [];
+  if (rangeAnalysis) {
+    const t = trendMark(rangeAnalysis.trendDelta, 0.03);
+    glanceRows.push({
+      label: "Range — Distance",
+      sessions: rangeAnalysis.sessionCount,
+      metric: formatSG(rangeAnalysis.overallAvgSG),
+      metricColor: sgRagColor(rangeAnalysis.overallAvgSG),
+      trend: t,
+    });
+  }
+  if (rangeRatingAnalysis) {
+    const t = trendMark(rangeRatingAnalysis.trendDelta, 0.1);
+    glanceRows.push({
+      label: "Range — Self-Rated",
+      sessions: rangeRatingAnalysis.sessionCount,
+      metric: `${rangeRatingAnalysis.overallAvgRating.toFixed(1)}/5`,
+      metricColor: ratingRagColor(rangeRatingAnalysis.overallAvgRating),
+      trend: t,
+    });
+  }
+  if (teeAnalysis) {
+    const t = trendMark(teeAnalysis.trendDelta, 1);
+    glanceRows.push({
+      label: "Tee Accuracy",
+      sessions: filteredTee.length,
+      metric: `${teeAnalysis.overallHitPct.toFixed(0)}% fairways`,
+      metricColor: ratingRagColor(teeAnalysis.overallHitPct / 20),
+      trend: t,
+    });
+  }
+  if (shortGameAnalysis) {
+    const t = trendMark(shortGameAnalysis.trendDelta, 0.03);
+    glanceRows.push({
+      label: "Short Game",
+      sessions: filteredShortGame.length,
+      metric: formatSG(shortGameAnalysis.overallAvgSG),
+      metricColor: sgRagColor(shortGameAnalysis.overallAvgSG),
+      trend: t,
+    });
+  }
+  if (puttingPracticeAnalysis) {
+    const t = trendMark(puttingPracticeAnalysis.trendDelta, 0.03);
+    glanceRows.push({
+      label: "Putting — Practice",
+      sessions: puttingPracticeAnalysis.sessionCount,
+      metric: formatSG(puttingPracticeAnalysis.overallAvgSG),
+      metricColor: sgRagColor(puttingPracticeAnalysis.overallAvgSG),
+      trend: t,
+    });
+  }
+  if (puttingCourseAnalysis) {
+    const t = trendMark(puttingCourseAnalysis.trendDelta, 0.03);
+    glanceRows.push({
+      label: "Putting — On Course",
+      sessions: puttingCourseAnalysis.sessionCount,
+      metric: formatSG(puttingCourseAnalysis.overallAvgSG),
+      metricColor: sgRagColor(puttingCourseAnalysis.overallAvgSG),
+      trend: t,
+    });
+  }
+
+  // One condensed strength + focus line per area that has enough data to say something useful.
+  const highlightLines = [];
+  if (rangeAnalysis?.strengths.length) {
+    const s = rangeAnalysis.strengths[0];
+    highlightLines.push({ area: "Range", type: "strength", text: `${s.label}y band (${formatSG(s.avgSG)})` });
+  }
+  if (rangeAnalysis?.weaknesses.length) {
+    const w = rangeAnalysis.weaknesses[0];
+    highlightLines.push({ area: "Range", type: "focus", text: `${w.label}y band (${formatSG(w.avgSG)})` });
+  }
+  if (teeAnalysis?.buckets.filter((b) => b.count >= 3).length) {
+    const sorted = [...teeAnalysis.buckets].filter((b) => b.count >= 3).sort((a, b) => b.hitPct - a.hitPct);
+    if (sorted.length) highlightLines.push({ area: "Tee Accuracy", type: "strength", text: `${CLUB_LABELS[sorted[0].club]} (${sorted[0].hitPct.toFixed(0)}%)` });
+    if (sorted.length > 1) highlightLines.push({ area: "Tee Accuracy", type: "focus", text: `${CLUB_LABELS[sorted[sorted.length - 1].club]} (${sorted[sorted.length - 1].hitPct.toFixed(0)}%)` });
+  }
+  if (shortGameAnalysis?.strengths.length) {
+    const s = shortGameAnalysis.strengths[0];
+    highlightLines.push({ area: "Short Game", type: "strength", text: `${LIE_LABELS[s.lie]} (${formatSG(s.avgSG)})` });
+  }
+  if (shortGameAnalysis?.weaknesses.length) {
+    const w = shortGameAnalysis.weaknesses[0];
+    highlightLines.push({ area: "Short Game", type: "focus", text: `${LIE_LABELS[w.lie]} (${formatSG(w.avgSG)})` });
+  }
+  if (puttingPracticeAnalysis?.strengths.length) {
+    const s = puttingPracticeAnalysis.strengths[0];
+    highlightLines.push({ area: "Putting", type: "strength", text: `${s.label}ft band (${formatSG(s.avgSG)})` });
+  }
+  if (puttingPracticeAnalysis?.weaknesses.length) {
+    const w = puttingPracticeAnalysis.weaknesses[0];
+    highlightLines.push({ area: "Putting", type: "focus", text: `${w.label}ft band (${formatSG(w.avgSG)})` });
+  }
+
+  const totalSessions = glanceRows.reduce((a, r) => a + r.sessions, 0);
+  const rowStyle = { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "7px 0", borderTop: `1px solid ${COLORS.creamDim}15` };
+
+  return (
+    <div>
+      <div className="no-print" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+        <TimescalePicker value={timescale} onChange={setTimescale} />
+      </div>
+
+      <Card style={{ padding: "16px 16px" }}>
+        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 22, letterSpacing: 1, color: COLORS.cream }}>
+          THE PRACTICE APP — PLAYER SUMMARY
+        </div>
+        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 6, lineHeight: 1.6 }}>
+          {profileName || "Player"}
+          {profileHandicap !== null && profileHandicap !== undefined ? ` · ${profileHandicap} hcp` : ""} · SG baseline: {baselineLabel}
+          <br />
+          Generated {new Date().toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" })} · Period: {TIMESCALES.find((t) => t.key === timescale)?.label || "ALL"} · {totalSessions} total sessions
+        </div>
+      </Card>
+
+      {!totalSessions ? (
+        <div style={{ color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", fontSize: 13, marginTop: 14 }}>
+          No sessions logged in this period yet across any section. Log a few sessions, then come back here.
+        </div>
+      ) : (
+        <>
+          <Card style={{ marginTop: 10 }}>
+            <SectionLabel>At a glance</SectionLabel>
+            <div style={{ marginTop: 6 }}>
+              {glanceRows.map((r) => (
+                <div key={r.label} style={rowStyle}>
+                  <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 13, color: COLORS.cream }}>
+                    {r.label}
+                    <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginLeft: 6 }}>
+                      {r.sessions} sess.
+                    </span>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <span style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 16, color: r.metricColor }}>{r.metric}</span>
+                    <span style={{ color: r.trend.color, fontSize: 12 }}>{r.trend.icon}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Card>
+
+          {highlightLines.length > 0 && (
+            <Card style={{ marginTop: 10 }}>
+              <SectionLabel>Strengths &amp; focus areas</SectionLabel>
+              <div style={{ marginTop: 6 }}>
+                {highlightLines.map((h, i) => (
+                  <div key={i} style={rowStyle}>
+                    <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim }}>{h.area}</div>
+                    <div
+                      style={{
+                        fontFamily: "'Inter', sans-serif",
+                        fontSize: 12,
+                        color: h.type === "strength" ? COLORS.fairwayLight : COLORS.flag,
+                        textAlign: "right",
+                      }}
+                    >
+                      {h.type === "strength" ? "★ " : "→ "}
+                      {h.text}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
+
+          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: COLORS.creamDim, marginTop: 12, lineHeight: 1.5 }}>
+            ▲/▼ = trending better/worse across this period · ◆ = steady · Strokes gained figures are
+            approximations based on the selected baseline, not precise tour-calibrated numbers for
+            every category.
+          </div>
+        </>
+      )}
+
+      <SendReportButton onClick={triggerPrint} />
+    </div>
+  );
+}
+
 function AnalysisScreen({
   section,
   onSectionChange,
@@ -4099,6 +4502,10 @@ function AnalysisScreen({
   teeLoaded,
   onDeleteTeeSession,
   onBack,
+  profileName,
+  profileHandicap,
+  baselineHandicap,
+  units,
 }) {
   return (
     <div>
@@ -4109,7 +4516,27 @@ function AnalysisScreen({
         </div>
       </div>
 
-      <div style={{ display: "flex", gap: 6, marginBottom: 18 }}>
+      <button
+        onClick={() => onSectionChange("coach")}
+        className="no-print"
+        style={{
+          width: "100%",
+          marginBottom: 14,
+          padding: "12px 0",
+          borderRadius: 10,
+          border: section === "coach" ? `2px solid ${COLORS.fairwayLight}` : `1px solid ${COLORS.sand}88`,
+          background: section === "coach" ? COLORS.fairway : "transparent",
+          color: section === "coach" ? COLORS.cream : COLORS.sand,
+          fontFamily: "'Bebas Neue', sans-serif",
+          fontSize: 16,
+          letterSpacing: 1,
+          cursor: "pointer",
+        }}
+      >
+        ★ COACH SUMMARY — ONE-PAGE OVERVIEW
+      </button>
+
+      <div className="no-print" style={{ display: "flex", gap: 6, marginBottom: 18 }}>
         {ANALYSIS_SECTIONS.map((s) => (
           <button
             key={s.key}
@@ -4131,6 +4558,19 @@ function AnalysisScreen({
           </button>
         ))}
       </div>
+
+      {section === "coach" && (
+        <CoachSummaryScreen
+          profileName={profileName}
+          profileHandicap={profileHandicap}
+          baselineHandicap={baselineHandicap}
+          rangeHistory={rangeHistory}
+          teeHistory={teeHistory}
+          shortGameHistory={shortGameHistory}
+          puttingHistory={puttingHistory}
+          units={units}
+        />
+      )}
 
       {section === "range" && (
         <RangeAnalysisHub history={rangeHistory} loaded={rangeLoaded} onDeleteSession={onDeleteRangeSession} />
@@ -4361,6 +4801,7 @@ function teeAccuracySessionTrendData(sessions) {
 
 function TeeAccuracyAnalysisBody({ history, loaded, onDeleteSession }) {
   const [tab, setTab] = useState("insights"); // insights | graphs
+  const [printMode, triggerPrint] = usePrintMode();
   const [timescale, setTimescale] = useState("all");
 
   if (!loaded) {
@@ -4425,7 +4866,7 @@ function TeeAccuracyAnalysisBody({ history, loaded, onDeleteSession }) {
 
       <TimescalePicker value={timescale} onChange={setTimescale} />
 
-      {tab === "insights" && (
+      {(tab === "insights" || printMode) && (
         <>
           <Card style={{ marginBottom: 14 }}>
             <SectionLabel>Overview</SectionLabel>
@@ -4498,7 +4939,7 @@ function TeeAccuracyAnalysisBody({ history, loaded, onDeleteSession }) {
         </>
       )}
 
-      {tab === "graphs" && (
+      {(tab === "graphs" || printMode) && (
         <>
           <Card style={{ marginBottom: 14 }}>
             <SectionLabel>Fairways hit over time</SectionLabel>
@@ -4573,13 +5014,14 @@ function TeeAccuracyAnalysisBody({ history, loaded, onDeleteSession }) {
         </>
       )}
 
-      <SendReportButton onClick={sendReport} />
+      <SendReportButton onClick={triggerPrint} />
     </div>
   );
 }
 
 function ShortGameAnalysisBody({ history, loaded, onDeleteSession }) {
   const [tab, setTab] = useState("insights"); // insights | graphs
+  const [printMode, triggerPrint] = usePrintMode();
   const [timescale, setTimescale] = useState("all");
 
   if (!loaded) {
@@ -4647,7 +5089,7 @@ function ShortGameAnalysisBody({ history, loaded, onDeleteSession }) {
 
       <TimescalePicker value={timescale} onChange={setTimescale} />
 
-      {tab === "insights" && (
+      {(tab === "insights" || printMode) && (
         <>
           <Card style={{ marginBottom: 14 }}>
             <SectionLabel>Overview</SectionLabel>
@@ -4753,7 +5195,7 @@ function ShortGameAnalysisBody({ history, loaded, onDeleteSession }) {
         </>
       )}
 
-      {tab === "graphs" && (
+      {(tab === "graphs" || printMode) && (
         <>
           <Card style={{ marginBottom: 14 }}>
             <SectionLabel>Strokes gained over time</SectionLabel>
@@ -4826,7 +5268,7 @@ function ShortGameAnalysisBody({ history, loaded, onDeleteSession }) {
         </>
       )}
 
-      <SendReportButton onClick={sendReport} />
+      <SendReportButton onClick={triggerPrint} />
     </div>
   );
 }
@@ -4884,6 +5326,7 @@ function RangeAnalysisHub({ history, loaded, onDeleteSession }) {
 
 function RangeRatingAnalysisBody({ history, loaded, onDeleteSession }) {
   const [timescale, setTimescale] = useState("all");
+  const [printMode, triggerPrint] = usePrintMode();
 
   if (!loaded) {
     return <div style={{ color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace" }}>Loading sessions…</div>;
@@ -5027,7 +5470,7 @@ function RangeRatingAnalysisBody({ history, loaded, onDeleteSession }) {
             })}
           </CollapsibleSection>
 
-          <SendReportButton onClick={sendReport} />
+          <SendReportButton onClick={triggerPrint} />
         </>
       )}
     </div>
@@ -5036,6 +5479,7 @@ function RangeRatingAnalysisBody({ history, loaded, onDeleteSession }) {
 
 function RangeAnalysisBody({ history, loaded, onDeleteSession }) {
   const [tab, setTab] = useState("insights"); // insights | graphs
+  const [printMode, triggerPrint] = usePrintMode();
   const [timescale, setTimescale] = useState("all");
   const [minYds, setMinYds] = useState(0);
   const [maxYds, setMaxYds] = useState(300);
@@ -5112,7 +5556,7 @@ function RangeAnalysisBody({ history, loaded, onDeleteSession }) {
         </div>
       )}
 
-      {analysis && tab === "insights" && (
+      {analysis && (tab === "insights" || printMode) && (
         <>
           <Card style={{ marginBottom: 14 }}>
             <SectionLabel>Overview</SectionLabel>
@@ -5201,7 +5645,7 @@ function RangeAnalysisBody({ history, loaded, onDeleteSession }) {
         </>
       )}
 
-      {analysis && tab === "graphs" && (
+      {analysis && (tab === "graphs" || printMode) && (
         <div>
           <YardagePicker
             min={minYds}
@@ -5311,7 +5755,7 @@ function RangeAnalysisBody({ history, loaded, onDeleteSession }) {
         </div>
       )}
 
-      <SendReportButton onClick={sendReport} />
+      <SendReportButton onClick={triggerPrint} />
     </div>
   );
 }
@@ -5738,9 +6182,11 @@ function HomeScreen({ onNavigate }) {
                   fontSize: 9,
                   color: COLORS.creamDim,
                   marginTop: 2,
+                  lineHeight: 1.35,
+                  display: "-webkit-box",
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: "vertical",
                   overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
                 }}
               >
                 {t.subtitle}
@@ -7975,24 +8421,6 @@ function ShortGameSetupScreen({
         START SESSION
       </button>
 
-      {/* TEMP: test-data button — remove this block when asked */}
-      <div
-        onClick={onLoadTestData}
-        style={{
-          textAlign: "center",
-          marginTop: 8,
-          color: COLORS.sand,
-          fontFamily: "'JetBrains Mono', monospace",
-          fontSize: 10,
-          cursor: "pointer",
-          textDecoration: "underline",
-          textUnderlineOffset: 3,
-        }}
-      >
-        + Load sample short game sessions (test data)
-      </div>
-      {/* END TEMP */}
-
       <div
         onClick={onViewAnalysis}
         style={{
@@ -8484,24 +8912,6 @@ function PuttingSetupScreen({
             FINISH ROUND
           </button>
 
-          {/* TEMP: test-data button — remove this block when asked */}
-          <div
-            onClick={onLoadTestCourseData}
-            style={{
-              textAlign: "center",
-              marginTop: 6,
-              color: COLORS.sand,
-              fontFamily: "'JetBrains Mono', monospace",
-              fontSize: 10,
-              cursor: "pointer",
-              textDecoration: "underline",
-              textUnderlineOffset: 3,
-            }}
-          >
-            + Load sample on-course rounds (test data)
-          </div>
-          {/* END TEMP */}
-
           {courseCompletedWithNumbers.length > 0 && (
             <div style={{ marginTop: 16 }}>
               <SectionLabel>This round</SectionLabel>
@@ -8650,24 +9060,6 @@ function PuttingSetupScreen({
           >
             START SESSION
           </button>
-
-          {/* TEMP: test-data button — remove this block when asked */}
-          <div
-            onClick={onLoadTestData}
-            style={{
-              textAlign: "center",
-              marginTop: 8,
-              color: COLORS.sand,
-              fontFamily: "'JetBrains Mono', monospace",
-              fontSize: 10,
-              cursor: "pointer",
-              textDecoration: "underline",
-              textUnderlineOffset: 3,
-            }}
-          >
-            + Load sample putting sessions (test data)
-          </div>
-          {/* END TEMP */}
         </div>
       )}
 
@@ -8967,12 +9359,30 @@ function PrintHeader({ title, timescale }) {
   );
 }
 
-// Opens the browser's print dialog; on mobile, "Save as PDF" is one of the destination options,
-// and the resulting PDF can then be shared/emailed from the device's own share sheet. There's no
-// backend here to generate and send a PDF automatically, so this is the closest equivalent that
-// works without one — print-to-PDF, then hand off to the OS share/mail flow.
-function sendReport() {
-  window.print();
+// Print flow: rather than relying on window.print() capturing whatever's currently visible,
+// this flips a "printMode" flag that makes the component render BOTH Insights and Graphs
+// content together (not just whichever tab is selected), waits two animation frames for the
+// browser to actually lay that out, then prints. The double-wait matters — Recharts measures its
+// own container size to draw a chart, and a chart that was never actually visible on screen
+// (e.g. sitting in a display:none block waiting for print) reports zero size and renders blank.
+// Making the content genuinely visible first, even briefly, avoids that entirely.
+function usePrintMode() {
+  const [printMode, setPrintMode] = useState(false);
+  useEffect(() => {
+    if (!printMode) return;
+    let raf2;
+    const raf1 = requestAnimationFrame(() => {
+      raf2 = requestAnimationFrame(() => {
+        window.print();
+        setPrintMode(false);
+      });
+    });
+    return () => {
+      cancelAnimationFrame(raf1);
+      if (raf2) cancelAnimationFrame(raf2);
+    };
+  }, [printMode]);
+  return [printMode, () => setPrintMode(true)];
 }
 
 function DeleteConfirmBar({ onConfirm, onCancel, style }) {
@@ -9291,6 +9701,7 @@ function PuttingAnalysisHub({ history, loaded, onDeleteSession }) {
 
 function OnCourseAnalysisBody({ history, loaded, onDeleteSession }) {
   const [timescale, setTimescale] = useState("all");
+  const [printMode, triggerPrint] = usePrintMode();
 
   if (!loaded) {
     return <div style={{ color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace" }}>Loading rounds…</div>;
@@ -9478,13 +9889,14 @@ function OnCourseAnalysisBody({ history, loaded, onDeleteSession }) {
         </div>
       </CollapsibleSection>
 
-      <SendReportButton onClick={sendReport} />
+      <SendReportButton onClick={triggerPrint} />
     </div>
   );
 }
 
 function PuttingAnalysisBody({ history, loaded, onDeleteSession }) {
   const [tab, setTab] = useState("insights");
+  const [printMode, triggerPrint] = usePrintMode();
   const [timescale, setTimescale] = useState("all");
   const [minFt, setMinFt] = useState(0);
   const [maxFt, setMaxFt] = useState(100);
@@ -9562,7 +9974,7 @@ function PuttingAnalysisBody({ history, loaded, onDeleteSession }) {
         </div>
       )}
 
-      {analysis && tab === "insights" && (
+      {analysis && (tab === "insights" || printMode) && (
         <>
           <Card style={{ marginBottom: 14 }}>
             <SectionLabel>Overview</SectionLabel>
@@ -9655,7 +10067,7 @@ function PuttingAnalysisBody({ history, loaded, onDeleteSession }) {
         </>
       )}
 
-      {analysis && tab === "graphs" && (
+      {analysis && (tab === "graphs" || printMode) && (
         <div>
           <FeetPicker
             min={minFt}
@@ -9765,7 +10177,7 @@ function PuttingAnalysisBody({ history, loaded, onDeleteSession }) {
         </div>
       )}
 
-      <SendReportButton onClick={sendReport} />
+      <SendReportButton onClick={triggerPrint} />
     </div>
   );
 }

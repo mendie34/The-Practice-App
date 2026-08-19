@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Xcode — user-specific state, not project config. Safe and correct to exclude.
+ios/App/App.xcodeproj/xcuserdata/
+ios/App/App.xcodeproj/project.xcworkspace/xcuserdata/
+ios/App/*.xcworkspace/xcshareddata/
+ios/App/Pods/
+ios/App/build/
+ios/DerivedData/
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# macOS
+.DS_Store
+
+# Env / secrets — never commit signing keys or API tokens
+.env
+.env.local
+*.p8
+*.p12
+*.mobileprovision

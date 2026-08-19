@@ -61,6 +61,32 @@ All three have free tiers that comfortably cover this.
 That's the whole list — no database provider, no auth service, no email service, since the
 app never talks to a server.
 
+## Building for iOS (no Mac required)
+
+This project is wrapped with [Capacitor](https://capacitorjs.com), which lets the exact same
+web app run inside a native iOS shell. The `ios/` folder is a real Xcode project — but you don't
+need Xcode or a Mac to build and ship it, thanks to [Codemagic](https://codemagic.io) (config
+already in `codemagic.yaml`) building on real Mac hardware in the cloud.
+
+```bash
+npm run ios:sync   # builds the web app, copies it into the native iOS project
+npm run ios:open   # same, then opens Xcode (only works if you do have a Mac)
+```
+
+To ship without a Mac:
+1. Sign up for the [Apple Developer Program](https://developer.apple.com/programs/) ($99/year)
+   — required for code signing regardless of build method.
+2. Once approved, join the **Small Business Program** in App Store Connect (free) — drops your
+   subscription commission from 30% to 15%.
+3. Sign up for [Codemagic](https://codemagic.io), connect this GitHub repo, and connect your
+   Apple Developer account via an App Store Connect API key (generated in App Store Connect →
+   Users and Access → Integrations — never share your actual Apple ID password with a build tool).
+4. Push to `main` — Codemagic picks up `codemagic.yaml` automatically, builds, signs, and
+   uploads a build to TestFlight.
+
+Uses Swift Package Manager rather than CocoaPods, so there's no `pod install` step — the whole
+`ios/` folder is small (~1MB) and safe to commit directly to the repo.
+
 ## Known limitations of this architecture
 
 - **No cross-device sync.** A profile's data lives only in that browser's IndexedDB. Opening
