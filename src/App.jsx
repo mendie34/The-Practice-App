@@ -1332,6 +1332,7 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
   const [minDist, setMinDist] = useState(50);
   const [maxDist, setMaxDist] = useState(150);
   const [shots, setShots] = useState([]); // {target, actual, diff} or {target, rating}
+  const [editingShotIndex, setEditingShotIndex] = useState(null);
   const [currentSessionMode, setCurrentSessionMode] = useState("distance"); // mode locked in when this session started
   const [rangeSessionFeedback, setRangeSessionFeedback] = useState(null);
   const [currentTarget, setCurrentTarget] = useState(null);
@@ -1343,7 +1344,7 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
   const [analysisSection, setAnalysisSection] = useState("range"); // range | shortgame | putting
 
   // ===== Compete (Range) state =====
-  const [competePlayers, setCompetePlayers] = useState(["", ""]);
+  const [competePlayers, setCompetePlayers] = useState(() => [profileName || "", ""]);
   const [competeRounds, setCompeteRounds] = useState(5);
   const [competeMinDist, setCompeteMinDist] = useState(75);
   const [competeMaxDist, setCompeteMaxDist] = useState(150);
@@ -1357,9 +1358,10 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
   const [competeRoundStandings, setCompeteRoundStandings] = useState([]); // this round's ranked results, for the confirmation screen
   const [competeHistory, setCompeteHistory] = useState([]);
   const [competeLoaded, setCompeteLoaded] = useState(false);
+  const [competeEditingIndex, setCompeteEditingIndex] = useState(null); // which past round is being amended, if any
 
   // ===== Compete (Short Game) state =====
-  const [sgCompetePlayers, setSgCompetePlayers] = useState(["", ""]);
+  const [sgCompetePlayers, setSgCompetePlayers] = useState(() => [profileName || "", ""]);
   const [sgCompeteRounds, setSgCompeteRounds] = useState(5);
   const [sgCompeteMinYds, setSgCompeteMinYds] = useState(10);
   const [sgCompeteMaxYds, setSgCompeteMaxYds] = useState(30);
@@ -1374,9 +1376,10 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
   const [sgCompeteRoundStandings, setSgCompeteRoundStandings] = useState([]);
   const [sgCompeteHistory, setSgCompeteHistory] = useState([]);
   const [sgCompeteLoaded, setSgCompeteLoaded] = useState(false);
+  const [sgCompeteEditingIndex, setSgCompeteEditingIndex] = useState(null);
 
   // ===== Compete (Putting) state — tally of putts taken, no per-hole points =====
-  const [puttCompetePlayers, setPuttCompetePlayers] = useState(["", ""]);
+  const [puttCompetePlayers, setPuttCompetePlayers] = useState(() => [profileName || "", ""]);
   const [puttCompeteHoles, setPuttCompeteHoles] = useState(9);
   const [puttCompeteMinFt, setPuttCompeteMinFt] = useState(3);
   const [puttCompeteMaxFt, setPuttCompeteMaxFt] = useState(20);
@@ -1387,6 +1390,7 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
   const [puttCompeteHoleComplete, setPuttCompeteHoleComplete] = useState(false);
   const [puttCompeteHistory, setPuttCompeteHistory] = useState([]);
   const [puttCompeteLoaded, setPuttCompeteLoaded] = useState(false);
+  const [puttCompeteEditingIndex, setPuttCompeteEditingIndex] = useState(null);
   const [baselineHandicap, setBaselineHandicapRaw] = useState("tour");
   const [units, setUnitsRaw] = useState("imperial"); // imperial | metric
   const [rangeTrackingMode, setRangeTrackingModeRaw] = useState(null); // null (unanswered) | distance | rating
@@ -1609,6 +1613,10 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
     const newShots = [...shots, { target: currentTarget, actual, diff }];
     setShots(newShots);
     setActualInput("");
+    // Keep the numeric keypad open for the next shot rather than making the user tap the
+    // field again every time — refocus happens synchronously within this same tap/click, which
+    // is what lets mobile browsers keep the keyboard up instead of dismissing it.
+    if (inputRef.current) inputRef.current.focus();
 
     if (newShots.length >= shotCount) {
       finishSession(newShots);
@@ -1630,6 +1638,20 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
       setCurrentTarget(nextTarget);
       persistActiveSession({ shotCount, minDist, maxDist, shots: newShots, currentTarget: nextTarget, mode: "rating" });
     }
+  }
+
+  function saveShotEdit(updatedShot) {
+    const newShots = shots.map((s, i) => (i === editingShotIndex ? updatedShot : s));
+    setShots(newShots);
+    setEditingShotIndex(null);
+    persistActiveSession({
+      shotCount,
+      minDist,
+      maxDist,
+      shots: newShots,
+      currentTarget,
+      mode: updatedShot.rating !== undefined ? "rating" : "distance",
+    });
   }
 
   function exitToMenu() {
@@ -2187,6 +2209,11 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
     }
   }
 
+  function saveCompeteRoundEdit(updatedRound) {
+    setCompeteRoundResults((prev) => prev.map((r, i) => (i === competeEditingIndex ? updatedRound : r)));
+    setCompeteEditingIndex(null);
+  }
+
   // ===== Compete (Short Game) handlers =====
   function updateSgCompetePlayerName(idx, name) {
     setSgCompetePlayers((prev) => prev.map((p, i) => (i === idx ? name : p)));
@@ -2297,6 +2324,11 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
     }
   }
 
+  function saveSgCompeteRoundEdit(updatedRound) {
+    setSgCompeteRoundResults((prev) => prev.map((r, i) => (i === sgCompeteEditingIndex ? updatedRound : r)));
+    setSgCompeteEditingIndex(null);
+  }
+
   // ===== Compete (Putting) handlers — tally of putts taken, SG shown only at the end =====
   function updatePuttCompetePlayerName(idx, name) {
     setPuttCompetePlayers((prev) => prev.map((p, i) => (i === idx ? name : p)));
@@ -2379,6 +2411,11 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
     } catch (e) {
       // non-fatal
     }
+  }
+
+  function savePuttCompeteHoleEdit(updatedHole) {
+    setPuttCompeteHoleResults((prev) => prev.map((h, i) => (i === puttCompeteEditingIndex ? updatedHole : h)));
+    setPuttCompeteEditingIndex(null);
   }
 
   // ===== Tee Accuracy handlers =====
@@ -2601,6 +2638,10 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
             onExit={exitToMenu}
             units={units}
             mode={currentSessionMode}
+            editingShotIndex={editingShotIndex}
+            onStartEditShot={setEditingShotIndex}
+            onSaveEditShot={saveShotEdit}
+            onCancelEditShot={() => setEditingShotIndex(null)}
           />
         )}
 
@@ -2768,6 +2809,10 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
             onNextRound={nextCompeteRound}
             onExitEarly={exitCompeteEarly}
             units={units}
+            editingIndex={competeEditingIndex}
+            onStartEdit={setCompeteEditingIndex}
+            onSaveEdit={saveCompeteRoundEdit}
+            onCancelEdit={() => setCompeteEditingIndex(null)}
           />
         )}
 
@@ -2824,6 +2869,10 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
             onNextRound={nextSgCompeteRound}
             onExitEarly={exitSgCompeteEarly}
             units={units}
+            editingIndex={sgCompeteEditingIndex}
+            onStartEdit={setSgCompeteEditingIndex}
+            onSaveEdit={saveSgCompeteRoundEdit}
+            onCancelEdit={() => setSgCompeteEditingIndex(null)}
           />
         )}
 
@@ -2869,6 +2918,10 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
             onNextHole={nextPuttCompeteHole}
             onExitEarly={exitPuttCompeteEarly}
             units={units}
+            editingIndex={puttCompeteEditingIndex}
+            onStartEdit={setPuttCompeteEditingIndex}
+            onSaveEdit={savePuttCompeteHoleEdit}
+            onCancelEdit={() => setPuttCompeteEditingIndex(null)}
           />
         )}
 
@@ -3441,6 +3494,10 @@ function PracticeScreen({
   onExit,
   units,
   mode,
+  editingShotIndex,
+  onStartEditShot,
+  onSaveEditShot,
+  onCancelEditShot,
 }) {
   const shotNum = shots.length + 1;
   const unitLabel = longUnitLabel(units);
@@ -3583,11 +3640,25 @@ function PracticeScreen({
 
       {shots.length > 0 && (
         <div style={{ marginTop: 10 }}>
-          <SectionLabel>This session</SectionLabel>
+          <SectionLabel>This session — tap a shot to amend</SectionLabel>
           <div style={{ marginTop: 4 }}>
-            {isRating ? <RatingLog shots={shots} units={units} /> : <ShotLog shots={shots} units={units} />}
+            {isRating ? (
+              <RatingLog shots={shots} units={units} onEditShot={onStartEditShot} />
+            ) : (
+              <ShotLog shots={shots} units={units} onEditShot={onStartEditShot} />
+            )}
           </div>
         </div>
+      )}
+
+      {editingShotIndex !== null && (
+        <ShotEditModal
+          shot={shots[editingShotIndex]}
+          mode={mode}
+          units={units}
+          onSave={onSaveEditShot}
+          onCancel={onCancelEditShot}
+        />
       )}
     </div>
   );
@@ -3614,7 +3685,7 @@ function StatBox({ label, value, valueColor }) {
   );
 }
 
-function ShotLog({ shots, units }) {
+function ShotLog({ shots, units, onEditShot }) {
   const unitLabel = longUnitLabel(units);
   return (
     <div
@@ -3639,11 +3710,13 @@ function ShotLog({ shots, units }) {
           return (
             <div
               key={i}
+              onClick={() => onEditShot && onEditShot(i)}
               style={{
                 display: "flex",
                 padding: "7px 12px",
                 borderTop: `1px solid ${COLORS.creamDim}11`,
                 color: COLORS.cream,
+                cursor: onEditShot ? "pointer" : "default",
               }}
             >
               <div style={{ width: 24, color: COLORS.creamDim }}>{i + 1}</div>
@@ -3668,7 +3741,7 @@ function ShotLog({ shots, units }) {
   );
 }
 
-function RatingLog({ shots, units }) {
+function RatingLog({ shots, units, onEditShot }) {
   const unitLabel = longUnitLabel(units);
   return (
     <div
@@ -3689,11 +3762,13 @@ function RatingLog({ shots, units }) {
         {shots.map((s, i) => (
           <div
             key={i}
+            onClick={() => onEditShot && onEditShot(i)}
             style={{
               display: "flex",
               padding: "7px 12px",
               borderTop: `1px solid ${COLORS.creamDim}11`,
               color: COLORS.cream,
+              cursor: onEditShot ? "pointer" : "default",
             }}
           >
             <div style={{ width: 24, color: COLORS.creamDim }}>{i + 1}</div>
@@ -6107,6 +6182,410 @@ function HomeInfoModal({ infoKey, onClose }) {
   );
 }
 
+// Lets someone correct a past Range/Short Game Compete round after the fact — same underlying
+// data shape for both (distance-mode entries + ranked standings, or a flat closest-only winner),
+// so one modal covers both modes.
+function CompeteRoundEditModal({ round, players, mode, units, valueKind, onSave, onCancel }) {
+  const isYds = valueKind === "yds";
+  const unitLabel = isYds ? longUnitLabel(units) : shortUnitLabel(units);
+  const valueKey = isYds ? "distance" : "resultFt";
+
+  const [values, setValues] = useState(() => {
+    const initial = {};
+    players.forEach((p) => {
+      const entry = (round.entries || []).find((e) => e.player === p);
+      const raw = entry ? entry[valueKey] : null;
+      initial[p] = raw !== null ? fmt1(isYds ? ydsToUnit(raw, units) : ftToUnit(raw, units)) : "";
+    });
+    return initial;
+  });
+  const [winner, setWinner] = useState(round.winner || null);
+
+  function handleSave() {
+    if (mode === "distance") {
+      const entries = players.map((p) => ({
+        player: p,
+        [valueKey]: isYds ? unitToYds(parseFloat(values[p]) || 0, units) : unitToFt(parseFloat(values[p]) || 0, units),
+      }));
+      const standings = rankCompeteByProximity(entries, valueKey);
+      onSave({ ...round, entries, standings });
+    } else {
+      const standings = players.map((p) => ({ player: p, points: p === winner ? 1 : 0, rank: p === winner ? 1 : null }));
+      onSave({ ...round, winner, standings });
+    }
+  }
+
+  return (
+    <div
+      onClick={onCancel}
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(10,22,15,0.75)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 24,
+        zIndex: 50,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: COLORS.turf,
+          border: `1px solid ${COLORS.creamDim}33`,
+          borderRadius: 14,
+          padding: 20,
+          maxWidth: 360,
+          width: "100%",
+        }}
+      >
+        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 20, letterSpacing: 1, color: COLORS.cream }}>
+          EDIT ROUND
+        </div>
+        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 4 }}>
+          Target {isYds ? ydsToUnitRound(round.target, units) : ftToUnitRound(round.target, units)}
+          {unitLabel}
+        </div>
+
+        <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 10 }}>
+          {mode === "distance"
+            ? players.map((p) => (
+                <div key={p}>
+                  <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginBottom: 4 }}>
+                    {p}
+                  </div>
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    value={values[p]}
+                    onChange={(e) => setValues({ ...values, [p]: e.target.value })}
+                    style={{
+                      width: "100%",
+                      background: COLORS.turfDark,
+                      border: `1px solid ${COLORS.creamDim}33`,
+                      borderRadius: 8,
+                      color: COLORS.cream,
+                      fontFamily: "'Bebas Neue', sans-serif",
+                      fontSize: 18,
+                      padding: "8px 10px",
+                      boxSizing: "border-box",
+                    }}
+                  />
+                </div>
+              ))
+            : players.map((p) => (
+                <button
+                  key={p}
+                  onClick={() => setWinner(p)}
+                  style={{
+                    padding: "10px 0",
+                    borderRadius: 8,
+                    border: winner === p ? `2px solid ${COLORS.fairwayLight}` : `1px solid ${COLORS.creamDim}33`,
+                    background: winner === p ? COLORS.fairway : "transparent",
+                    color: COLORS.cream,
+                    fontFamily: "'Bebas Neue', sans-serif",
+                    fontSize: 16,
+                    cursor: "pointer",
+                  }}
+                >
+                  {p}
+                </button>
+              ))}
+        </div>
+
+        <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
+          <button
+            onClick={onCancel}
+            style={{
+              flex: 1,
+              padding: "11px 0",
+              borderRadius: 10,
+              border: `1px solid ${COLORS.creamDim}33`,
+              background: "transparent",
+              color: COLORS.creamDim,
+              fontFamily: "'Bebas Neue', sans-serif",
+              fontSize: 15,
+              cursor: "pointer",
+            }}
+          >
+            CANCEL
+          </button>
+          <button
+            onClick={handleSave}
+            style={{
+              flex: 1,
+              padding: "11px 0",
+              borderRadius: 10,
+              border: "none",
+              background: COLORS.fairway,
+              color: COLORS.cream,
+              fontFamily: "'Bebas Neue', sans-serif",
+              fontSize: 15,
+              cursor: "pointer",
+            }}
+          >
+            SAVE
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Same idea for Putting Compete — just putts-taken per player instead of a distance/closest pick.
+function PuttingCompeteHoleEditModal({ hole, players, units, onSave, onCancel }) {
+  const [putts, setPutts] = useState(() => {
+    const initial = {};
+    players.forEach((p) => {
+      const entry = hole.putts.find((e) => e.player === p);
+      initial[p] = entry ? entry.strokes : 2;
+    });
+    return initial;
+  });
+
+  function handleSave() {
+    const newPutts = players.map((p) => ({ player: p, strokes: putts[p] }));
+    onSave({ ...hole, putts: newPutts });
+  }
+
+  return (
+    <div
+      onClick={onCancel}
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(10,22,15,0.75)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 24,
+        zIndex: 50,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: COLORS.turf,
+          border: `1px solid ${COLORS.creamDim}33`,
+          borderRadius: 14,
+          padding: 20,
+          maxWidth: 360,
+          width: "100%",
+        }}
+      >
+        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 20, letterSpacing: 1, color: COLORS.cream }}>
+          EDIT HOLE
+        </div>
+        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 4 }}>
+          Distance {ftToUnitRound(hole.target, units)}
+          {shortUnitLabel(units)}
+        </div>
+
+        <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 12 }}>
+          {players.map((p) => (
+            <div key={p}>
+              <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginBottom: 6 }}>
+                {p}
+              </div>
+              <div style={{ display: "flex", gap: 6 }}>
+                {[1, 2, 3, 4].map((n) => (
+                  <button
+                    key={n}
+                    onClick={() => setPutts({ ...putts, [p]: n })}
+                    style={{
+                      flex: 1,
+                      padding: "10px 0",
+                      borderRadius: 8,
+                      border: putts[p] === n ? `2px solid ${COLORS.fairwayLight}` : `1px solid ${COLORS.creamDim}33`,
+                      background: putts[p] === n ? COLORS.fairway : "transparent",
+                      color: COLORS.cream,
+                      fontFamily: "'Bebas Neue', sans-serif",
+                      fontSize: 16,
+                      cursor: "pointer",
+                    }}
+                  >
+                    {n === 4 ? "4+" : n}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
+          <button
+            onClick={onCancel}
+            style={{
+              flex: 1,
+              padding: "11px 0",
+              borderRadius: 10,
+              border: `1px solid ${COLORS.creamDim}33`,
+              background: "transparent",
+              color: COLORS.creamDim,
+              fontFamily: "'Bebas Neue', sans-serif",
+              fontSize: 15,
+              cursor: "pointer",
+            }}
+          >
+            CANCEL
+          </button>
+          <button
+            onClick={handleSave}
+            style={{
+              flex: 1,
+              padding: "11px 0",
+              borderRadius: 10,
+              border: "none",
+              background: COLORS.fairway,
+              color: COLORS.cream,
+              fontFamily: "'Bebas Neue', sans-serif",
+              fontSize: 15,
+              cursor: "pointer",
+            }}
+          >
+            SAVE
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Lets someone correct a previous Range practice shot — covers both distance-mode (re-enter the
+// actual carry, recompute miss/SG) and rating-mode (re-pick the 1-5 rating).
+function ShotEditModal({ shot, mode, units, onSave, onCancel }) {
+  const isRating = mode === "rating";
+  const unitLabel = longUnitLabel(units);
+  const [actualValue, setActualValue] = useState(() => (shot.actual !== undefined ? fmt1(ydsToUnit(shot.actual, units)) : ""));
+  const [ratingValue, setRatingValue] = useState(shot.rating || null);
+
+  function handleSave() {
+    if (isRating) {
+      onSave({ ...shot, rating: ratingValue });
+    } else {
+      const actual = unitToYds(parseFloat(actualValue) || 0, units);
+      const diff = Math.abs(actual - shot.target);
+      onSave({ ...shot, actual, diff });
+    }
+  }
+
+  return (
+    <div
+      onClick={onCancel}
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(10,22,15,0.75)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 24,
+        zIndex: 50,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: COLORS.turf,
+          border: `1px solid ${COLORS.creamDim}33`,
+          borderRadius: 14,
+          padding: 20,
+          maxWidth: 360,
+          width: "100%",
+        }}
+      >
+        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 20, letterSpacing: 1, color: COLORS.cream }}>
+          EDIT SHOT
+        </div>
+        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 4 }}>
+          Target {ydsToUnitRound(shot.target, units)}
+          {unitLabel}
+        </div>
+
+        <div style={{ marginTop: 14 }}>
+          {isRating ? (
+            <div style={{ display: "flex", gap: 6 }}>
+              {[1, 2, 3, 4, 5].map((n) => (
+                <button
+                  key={n}
+                  onClick={() => setRatingValue(n)}
+                  style={{
+                    flex: 1,
+                    padding: "12px 0",
+                    borderRadius: 10,
+                    border: ratingValue === n ? `2px solid ${ratingRagColor(n)}` : `1px solid ${COLORS.creamDim}33`,
+                    background: ratingValue === n ? COLORS.fairway : "transparent",
+                    color: COLORS.cream,
+                    fontFamily: "'Bebas Neue', sans-serif",
+                    fontSize: 18,
+                    cursor: "pointer",
+                  }}
+                >
+                  {n}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <input
+              type="number"
+              inputMode="decimal"
+              value={actualValue}
+              onChange={(e) => setActualValue(e.target.value)}
+              style={{
+                width: "100%",
+                background: COLORS.turfDark,
+                border: `1px solid ${COLORS.creamDim}33`,
+                borderRadius: 8,
+                color: COLORS.cream,
+                fontFamily: "'Bebas Neue', sans-serif",
+                fontSize: 22,
+                padding: "10px 12px",
+                boxSizing: "border-box",
+              }}
+            />
+          )}
+        </div>
+
+        <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
+          <button
+            onClick={onCancel}
+            style={{
+              flex: 1,
+              padding: "11px 0",
+              borderRadius: 10,
+              border: `1px solid ${COLORS.creamDim}33`,
+              background: "transparent",
+              color: COLORS.creamDim,
+              fontFamily: "'Bebas Neue', sans-serif",
+              fontSize: 15,
+              cursor: "pointer",
+            }}
+          >
+            CANCEL
+          </button>
+          <button
+            onClick={handleSave}
+            style={{
+              flex: 1,
+              padding: "11px 0",
+              borderRadius: 10,
+              border: "none",
+              background: COLORS.fairway,
+              color: COLORS.cream,
+              fontFamily: "'Bebas Neue', sans-serif",
+              fontSize: 15,
+              cursor: "pointer",
+            }}
+          >
+            SAVE
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function HomeScreen({ onNavigate }) {
   const [infoKey, setInfoKey] = useState(null);
 
@@ -6855,6 +7334,10 @@ function CompetePlayScreen({
   onNextRound,
   onExitEarly,
   units,
+  editingIndex,
+  onStartEdit,
+  onSaveEdit,
+  onCancelEdit,
 }) {
   const roundNumber = roundResults.length + 1;
   const isLastRound = roundResults.length >= totalRounds;
@@ -7059,6 +7542,50 @@ function CompetePlayScreen({
             {isLastRound ? "FINISH COMPETITION" : "NEXT ROUND"}
           </button>
         </Card>
+      )}
+
+      {roundResults.length > 0 && (
+        <div style={{ marginTop: 14 }}>
+          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, letterSpacing: 1, marginBottom: 6 }}>
+            PAST ROUNDS — TAP TO AMEND
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {roundResults.map((r, i) => (
+              <div
+                key={i}
+                onClick={() => onStartEdit(i)}
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  padding: "8px 12px",
+                  borderRadius: 8,
+                  background: COLORS.turf,
+                  border: `1px solid ${COLORS.creamDim}22`,
+                  cursor: "pointer",
+                }}
+              >
+                <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.cream }}>
+                  Round {i + 1} · {ydsToUnitRound(r.target, units)}
+                  {unitLabel} · ★ {r.standings?.find((s) => s.rank === 1)?.player}
+                </div>
+                <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.sand }}>EDIT</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {editingIndex !== null && (
+        <CompeteRoundEditModal
+          round={roundResults[editingIndex]}
+          players={players}
+          mode={mode}
+          units={units}
+          valueKind="yds"
+          onSave={onSaveEdit}
+          onCancel={onCancelEdit}
+        />
       )}
     </div>
   );
@@ -7503,6 +8030,10 @@ function ShortGameCompetePlayScreen({
   onNextRound,
   onExitEarly,
   units,
+  editingIndex,
+  onStartEdit,
+  onSaveEdit,
+  onCancelEdit,
 }) {
   const roundNumber = roundResults.length + 1;
   const isLastRound = roundResults.length >= totalRounds;
@@ -7691,6 +8222,49 @@ function ShortGameCompetePlayScreen({
             {isLastRound ? "FINISH COMPETITION" : "NEXT ROUND"}
           </button>
         </Card>
+      )}
+
+      {roundResults.length > 0 && (
+        <div style={{ marginTop: 14 }}>
+          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, letterSpacing: 1, marginBottom: 6 }}>
+            PAST ROUNDS — TAP TO AMEND
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {roundResults.map((r, i) => (
+              <div
+                key={i}
+                onClick={() => onStartEdit(i)}
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  padding: "8px 12px",
+                  borderRadius: 8,
+                  background: COLORS.turf,
+                  border: `1px solid ${COLORS.creamDim}22`,
+                  cursor: "pointer",
+                }}
+              >
+                <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.cream }}>
+                  Round {i + 1} · {LIE_LABELS[r.lie]} · ★ {r.standings?.find((s) => s.rank === 1)?.player}
+                </div>
+                <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.sand }}>EDIT</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {editingIndex !== null && (
+        <CompeteRoundEditModal
+          round={roundResults[editingIndex]}
+          players={players}
+          mode={mode}
+          units={units}
+          valueKind="ft"
+          onSave={onSaveEdit}
+          onCancel={onCancelEdit}
+        />
       )}
     </div>
   );
@@ -7948,6 +8522,10 @@ function PuttingCompetePlayScreen({
   onNextHole,
   onExitEarly,
   units,
+  editingIndex,
+  onStartEdit,
+  onSaveEdit,
+  onCancelEdit,
 }) {
   const holeNumber = holeResults.length + 1;
   const isLastHole = holeResults.length >= totalHoles;
@@ -8084,6 +8662,49 @@ function PuttingCompetePlayScreen({
             {isLastHole ? "FINISH COMPETITION" : "NEXT HOLE"}
           </button>
         </Card>
+      )}
+
+      {holeResults.length > 0 && (
+        <div style={{ marginTop: 14 }}>
+          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, letterSpacing: 1, marginBottom: 6 }}>
+            PAST HOLES — TAP TO AMEND
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {holeResults.map((h, i) => (
+              <div
+                key={i}
+                onClick={() => onStartEdit(i)}
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  padding: "8px 12px",
+                  borderRadius: 8,
+                  background: COLORS.turf,
+                  border: `1px solid ${COLORS.creamDim}22`,
+                  cursor: "pointer",
+                }}
+              >
+                <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.cream }}>
+                  Hole {i + 1} · {ftToUnitRound(h.target, units)}
+                  {unitLabel} ·{" "}
+                  {h.putts.map((e) => `${e.player} ${e.strokes}`).join(", ")}
+                </div>
+                <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.sand }}>EDIT</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {editingIndex !== null && (
+        <PuttingCompeteHoleEditModal
+          hole={holeResults[editingIndex]}
+          players={players}
+          units={units}
+          onSave={onSaveEdit}
+          onCancel={onCancelEdit}
+        />
       )}
     </div>
   );
