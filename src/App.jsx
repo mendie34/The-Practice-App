@@ -217,6 +217,8 @@ function flattenShots(sessions) {
         rows.push({
           date: s.date,
           target: sh.target,
+          actual: sh.actual,
+          signedMiss: sh.actual - sh.target, // negative = short of pin, positive = long
           diff: sh.diff,
           missPct: sh.target ? (sh.diff / sh.target) * 100 : 0,
           sg: sgForApproachShot(sh.target, sh.actual),
@@ -403,7 +405,12 @@ function generateFakeCourseRounds(count = 10) {
       else if (rnd > missChance * 0.12) strokes = 2;
       else strokes = 3;
 
-      putts.push({ targetFt, strokes });
+      // For sample data only: approximate the final putt distance so "feet made" has something
+      // realistic to show — a made 1-putt is obviously from the target distance itself, and a
+      // multi-putt clean-up is typically a short putt.
+      const holedFromFt = strokes === 1 ? targetFt : 1 + Math.floor(Math.random() * 4);
+
+      putts.push({ targetFt, strokes, holedFromFt });
     }
 
     const totalStrokes = putts.reduce((a, p) => a + p.strokes, 0);
@@ -902,10 +909,28 @@ function sgRagColor(avgSG) {
   return COLORS.flag;
 }
 
+// A hole is complete once its most recent putt attempt actually went in — everything before
+// that in the array was a miss that needed a follow-up putt. A hole explicitly marked "no putt"
+// (chipped in from off the green) is also complete, with no putt data attached at all.
+function isHoleComplete(hole) {
+  if (hole.noPutt) return true;
+  return hole.putts && hole.putts.length > 0 && hole.putts[hole.putts.length - 1].made === true;
+}
+
 // ===== On-course round stats (kept separate from practice-session analysis) =====
 function courseRoundStats(session) {
-  const totalPutts = session.putts.length;
-  const ftMade = session.putts.filter((p) => p.strokes === 1).reduce((a, p) => a + p.targetFt, 0);
+  // session.putts has one entry PER HOLE ({targetFt, strokes, holedFromFt}) — session.putts.length
+  // is the number of holes played, not the number of putts taken. The actual total is the sum of
+  // strokes across every hole.
+  const totalPutts = session.putts.reduce((a, p) => a + p.strokes, 0);
+  const ftMade = session.putts.reduce((a, p) => {
+    // holedFromFt is the exact distance of whichever putt actually went in — recorded for every
+    // round logged with the per-putt entry flow. Older rounds recorded before that existed only
+    // have a single distance+strokes pair, so they fall back to the old approximation (only
+    // counting holes that went in on the very first putt).
+    if (p.holedFromFt != null) return a + p.holedFromFt;
+    return a + (p.strokes === 1 ? p.targetFt : 0);
+  }, 0);
   const totalSG = session.putts.reduce((a, p) => a + sgForPutt(p.targetFt, p.strokes), 0);
   const avgSG = totalPutts ? totalSG / totalPutts : 0;
   return { totalPutts, ftMade, totalSG, avgSG };
@@ -1403,6 +1428,8 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
   const [puttMaxFt, setPuttMaxFt] = useState(20);
   const [putts, setPutts] = useState([]); // {targetFt, strokes}
   const [puttSessionFeedback, setPuttSessionFeedback] = useState(null);
+  const [puttSummaryIsOnCourse, setPuttSummaryIsOnCourse] = useState(false);
+  const [puttSummaryChipIns, setPuttSummaryChipIns] = useState(0);
   const [puttCurrentTarget, setPuttCurrentTarget] = useState(null);
   const [puttHistory, setPuttHistory] = useState([]);
   const [puttLoaded, setPuttLoaded] = useState(false);
@@ -1410,7 +1437,7 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
   const [puttActiveSaved, setPuttActiveSaved] = useState(null);
 
   // ===== On-course putting tracker state =====
-  const [onCourseHoles, setOnCourseHoles] = useState(() => Array.from({ length: 18 }, () => ({ distanceFt: null, strokes: null })));
+  const [onCourseHoles, setOnCourseHoles] = useState(() => Array.from({ length: 18 }, () => ({ putts: [] })));
 
   // ===== Short Game section state =====
   // ===== Tee Accuracy state =====
@@ -1468,7 +1495,17 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
       }
       if (data["putting:activeRound"]) {
         try {
-          setOnCourseHoles(JSON.parse(data["putting:activeRound"]));
+          const parsed = JSON.parse(data["putting:activeRound"]);
+          // Guard against stale data saved before the on-course entry format changed to
+          // per-putt tracking — old rounds had {distanceFt, strokes} per hole instead of a
+          // putts array. Rather than crash on the shape mismatch, just discard it: it's only
+          // an in-progress round, nothing in permanent history is at risk.
+          const looksCurrent = Array.isArray(parsed) && parsed.every((h) => Array.isArray(h.putts));
+          if (looksCurrent) {
+            setOnCourseHoles(parsed);
+          } else {
+            window.storage.delete("putting:activeRound", false).catch(() => {});
+          }
         } catch (e) {}
       }
       setPuttLoaded(true);
@@ -1812,6 +1849,7 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
     const comparable = newHistory.filter((s) => s.type !== "course");
     const metricFn = (s) => avg(s.putts.map((p) => sgForPutt(p.targetFt, p.strokes)));
     setPuttSessionFeedback(buildSessionFeedback(rankSession(session.id, comparable, metricFn), formatSG));
+    setPuttSummaryIsOnCourse(false);
 
     setScreen("puttingSummary");
     try {
@@ -1844,7 +1882,7 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
   }
 
   async function clearOnCourseRound() {
-    const fresh = Array.from({ length: 18 }, () => ({ distanceFt: null, strokes: null }));
+    const fresh = Array.from({ length: 18 }, () => ({ putts: [] }));
     setOnCourseHoles(fresh);
     try {
       await window.storage.delete("putting:activeRound", false);
@@ -1853,20 +1891,17 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
     }
   }
 
-  async function editCourseHole(index) {
-    const next = onCourseHoles.map((h, i) => (i === index ? { distanceFt: null, strokes: null } : h));
-    setOnCourseHoles(next);
-    try {
-      await window.storage.set("putting:activeRound", JSON.stringify(next), false);
-    } catch (e) {
-      // non-fatal
-    }
-  }
-
   async function finishOnCourseRound() {
-    const completed = onCourseHoles.filter((h) => h.distanceFt != null && h.strokes != null);
+    const completed = onCourseHoles.filter(isHoleComplete);
     if (completed.length === 0) return;
-    const finalPutts = completed.map((h) => ({ targetFt: h.distanceFt, strokes: h.strokes }));
+    const puttedHoles = completed.filter((h) => !h.noPutt);
+    const chipIns = completed.filter((h) => h.noPutt).length;
+    if (puttedHoles.length === 0) return; // every completed hole was a chip-in — nothing to compute putting stats from
+    const finalPutts = puttedHoles.map((h) => ({
+      targetFt: h.putts[0].distanceFt,
+      strokes: h.putts.length,
+      holedFromFt: h.putts[h.putts.length - 1].distanceFt,
+    }));
     const session = {
       id: uid(),
       date: new Date().toISOString(),
@@ -1877,6 +1912,8 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
       putts: finalPutts,
       totalStrokes: finalPutts.reduce((a, p) => a + p.strokes, 0),
       avgStrokes: avg(finalPutts.map((p) => p.strokes)),
+      chipIns, // holes chipped in from off the green — tracked separately, not part of putt stats
+      holesPlayed: completed.length, // puttedHoles + chipIns, for context
     };
     const newHistory = [session, ...puttHistory];
     setPuttHistory(newHistory);
@@ -1885,6 +1922,8 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
     const comparable = newHistory.filter((s) => s.type === "course");
     const metricFn = (s) => avg(s.putts.map((p) => sgForPutt(p.targetFt, p.strokes)));
     setPuttSessionFeedback(buildSessionFeedback(rankSession(session.id, comparable, metricFn), formatSG));
+    setPuttSummaryIsOnCourse(true);
+    setPuttSummaryChipIns(chipIns);
 
     setScreen("puttingSummary");
     try {
@@ -1892,7 +1931,7 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
     } catch (e) {
       setPuttStorageError(true);
     }
-    const fresh = Array.from({ length: 18 }, () => ({ distanceFt: null, strokes: null }));
+    const fresh = Array.from({ length: 18 }, () => ({ putts: [] }));
     setOnCourseHoles(fresh);
     try {
       await window.storage.delete("putting:activeRound", false);
@@ -3002,7 +3041,6 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
             onUpdateCourseHole={updateOnCourseHole}
             onFinishOnCourse={finishOnCourseRound}
             onClearOnCourse={clearOnCourseRound}
-            onEditCourseHole={editCourseHole}
             onLoadTestCourseData={loadTestCourseRounds}
             units={units}
           />
@@ -3029,6 +3067,8 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
             storageError={puttStorageError}
             units={units}
             feedback={puttSessionFeedback}
+            isOnCourse={puttSummaryIsOnCourse}
+            chipIns={puttSummaryChipIns}
           />
         )}
       </div>
@@ -3887,6 +3927,17 @@ function SummaryScreen({ shots, minDist, maxDist, onNewSession, storageError, un
         </div>
       </Card>
 
+      <Card style={{ marginTop: 10 }}>
+        <SectionLabel>Short vs long of the pin</SectionLabel>
+        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginTop: 2, marginBottom: 10 }}>
+          Each dot is one shot, colored by its own strokes gained
+        </div>
+        <ShotDispersionChart
+          rows={shots.map((s) => ({ target: s.target, signedMiss: s.actual - s.target, sg: sgForApproachShot(s.target, s.actual), bucket: bucketFor(s.target) }))}
+          units={units}
+        />
+      </Card>
+
       <div style={{ marginTop: 10 }}>
         <SectionLabel>Full log</SectionLabel>
         <div style={{ marginTop: 4 }}>
@@ -3974,6 +4025,96 @@ function BucketRow({ bucket, showImprovement }) {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+// One horizontal strip per distance band: every shot in that band plotted as a dot, positioned
+// short (left) or long (right) of the pin at center, each dot colored by that individual shot's
+// own strokes gained — so a band that's consistently red on one side reveals a real tendency,
+// not just an average that could be hiding a mix of good and bad shots.
+function ShotDispersionStrip({ label, rows, units }) {
+  const width = 300;
+  const height = 60;
+  const midX = width / 2;
+  const padX = 22;
+  const plotCenterY = 26;
+  const unitLabel = longUnitLabel(units);
+
+  // Always show at least the 5/10/15y reference lines so the scale is readable even when every
+  // shot in this band is tight — only extend further if an actual miss goes beyond 15.
+  const dataMax = Math.max(0, ...rows.map((r) => Math.abs(r.signedMiss)));
+  const gridMax = Math.max(15, Math.ceil(dataMax / 5) * 5);
+  const gridValues = [];
+  for (let g = 5; g <= gridMax; g += 5) gridValues.push(g);
+
+  function xFor(signedMiss) {
+    return midX + (signedMiss / gridMax) * (midX - padX);
+  }
+  // Small deterministic vertical jitter so overlapping dots at similar misses are still visible.
+  function yFor(i) {
+    return plotCenterY + (((i * 37) % 13) - 6);
+  }
+
+  return (
+    <div style={{ marginBottom: 16 }}>
+      <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim }}>
+        {label}
+        {unitLabel} · {rows.length} shot{rows.length === 1 ? "" : "s"}
+      </div>
+      <svg viewBox={`0 0 ${width} ${height}`} style={{ width: "100%", height, marginTop: 4, display: "block" }}>
+        <line x1={padX} y1={plotCenterY} x2={width - padX} y2={plotCenterY} stroke={COLORS.creamDim} strokeOpacity={0.25} strokeWidth={1} />
+        {gridValues.map((g) => (
+          <g key={g}>
+            <line x1={xFor(-g)} y1={8} x2={xFor(-g)} y2={44} stroke={COLORS.creamDim} strokeOpacity={0.2} strokeWidth={1} strokeDasharray="2 2" />
+            <line x1={xFor(g)} y1={8} x2={xFor(g)} y2={44} stroke={COLORS.creamDim} strokeOpacity={0.2} strokeWidth={1} strokeDasharray="2 2" />
+            <text x={xFor(-g)} y={54} fontSize={7} fill={COLORS.creamDim} textAnchor="middle" fontFamily="'JetBrains Mono', monospace">
+              {ydsToUnitRound(g, units)}
+            </text>
+            <text x={xFor(g)} y={54} fontSize={7} fill={COLORS.creamDim} textAnchor="middle" fontFamily="'JetBrains Mono', monospace">
+              {ydsToUnitRound(g, units)}
+            </text>
+          </g>
+        ))}
+        <line x1={midX} y1={6} x2={midX} y2={44} stroke={COLORS.sand} strokeWidth={2} />
+        {rows.map((r, i) => (
+          <circle key={i} cx={xFor(r.signedMiss)} cy={yFor(i)} r={5} fill={sgRagColor(r.sg)} fillOpacity={0.88} />
+        ))}
+      </svg>
+      <div style={{ display: "flex", justifyContent: "space-between", fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: COLORS.creamDim, marginTop: 2 }}>
+        <span>← SHORT</span>
+        <span>PIN</span>
+        <span>LONG →</span>
+      </div>
+    </div>
+  );
+}
+
+// rows must include {target, signedMiss, sg, bucket} — either flattened session rows (Analysis
+// screens) or a single session's raw shots mapped to that shape (post-session Summary screen).
+function ShotDispersionChart({ rows, units }) {
+  const byBucket = {};
+  rows.forEach((r) => {
+    if (!byBucket[r.bucket]) byBucket[r.bucket] = [];
+    byBucket[r.bucket].push(r);
+  });
+  const bands = Object.entries(byBucket)
+    .filter(([, bandRows]) => bandRows.length >= 2)
+    .sort((a, b) => bucketSortKey(a[0]) - bucketSortKey(b[0]));
+
+  if (bands.length === 0) {
+    return (
+      <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: COLORS.creamDim }}>
+        Need at least 2 shots in a single distance band to plot this.
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      {bands.map(([label, bandRows]) => (
+        <ShotDispersionStrip key={label} label={label} rows={bandRows} units={units} />
+      ))}
     </div>
   );
 }
@@ -4650,11 +4791,11 @@ function AnalysisScreen({
       )}
 
       {section === "range" && (
-        <RangeAnalysisHub history={rangeHistory} loaded={rangeLoaded} onDeleteSession={onDeleteRangeSession} />
+        <RangeAnalysisHub history={rangeHistory} loaded={rangeLoaded} onDeleteSession={onDeleteRangeSession} units={units} />
       )}
 
       {section === "putting" && (
-        <PuttingAnalysisHub history={puttingHistory} loaded={puttingLoaded} onDeleteSession={onDeletePuttingSession} />
+        <PuttingAnalysisHub history={puttingHistory} loaded={puttingLoaded} onDeleteSession={onDeletePuttingSession} units={units} />
       )}
 
       {section === "shortgame" && (
@@ -5350,7 +5491,7 @@ function ShortGameAnalysisBody({ history, loaded, onDeleteSession }) {
   );
 }
 
-function RangeAnalysisHub({ history, loaded, onDeleteSession }) {
+function RangeAnalysisHub({ history, loaded, onDeleteSession, units }) {
   const [subTab, setSubTab] = useState("distance"); // distance | rating
 
   const distanceHistory = history.filter((s) => s.mode !== "rating");
@@ -5395,7 +5536,7 @@ function RangeAnalysisHub({ history, loaded, onDeleteSession }) {
         </button>
       </div>
 
-      {subTab === "distance" && <RangeAnalysisBody history={distanceHistory} loaded={loaded} onDeleteSession={onDeleteSession} />}
+      {subTab === "distance" && <RangeAnalysisBody history={distanceHistory} loaded={loaded} onDeleteSession={onDeleteSession} units={units} />}
       {subTab === "rating" && <RangeRatingAnalysisBody history={ratingHistory} loaded={loaded} onDeleteSession={onDeleteSession} />}
     </div>
   );
@@ -5554,7 +5695,7 @@ function RangeRatingAnalysisBody({ history, loaded, onDeleteSession }) {
   );
 }
 
-function RangeAnalysisBody({ history, loaded, onDeleteSession }) {
+function RangeAnalysisBody({ history, loaded, onDeleteSession, units }) {
   const [tab, setTab] = useState("insights"); // insights | graphs
   const [printMode, triggerPrint] = usePrintMode();
   const [timescale, setTimescale] = useState("all");
@@ -5692,6 +5833,14 @@ function RangeAnalysisBody({ history, loaded, onDeleteSession }) {
               emptyText=""
             />
           )}
+
+          <Card style={{ marginBottom: 14 }}>
+            <SectionLabel>Short vs long of the pin</SectionLabel>
+            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginTop: 2, marginBottom: 10 }}>
+              Each dot is one shot, colored by its own strokes gained
+            </div>
+            <ShotDispersionChart rows={flattenShots(filtered)} units={units} />
+          </Card>
 
           <CollapsibleSection title="All sessions" count={filtered.length}>
             {filtered.length === 0 ? (
@@ -6447,6 +6596,100 @@ function PuttingCompeteHoleEditModal({ hole, players, units, onSave, onCancel })
             SAVE
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// Full detail view for a single on-course round, opened by tapping it in "All rounds" — same
+// stat layout as the post-round Summary screen, plus the full hole-by-hole log.
+function RoundSummaryModal({ session, units, onClose }) {
+  const stats = courseRoundStats(session);
+  const onePutts = session.putts.filter((p) => p.strokes <= 1).length;
+  const onePuttPct = (onePutts / session.putts.length) * 100;
+  const threePutts = session.putts.filter((p) => p.strokes >= 3).length;
+  const avgStrokes = avg(session.putts.map((p) => p.strokes));
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(10,22,15,0.75)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 24,
+        zIndex: 50,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: COLORS.turf,
+          border: `1px solid ${COLORS.creamDim}33`,
+          borderRadius: 14,
+          padding: 20,
+          maxWidth: 380,
+          width: "100%",
+          maxHeight: "85vh",
+          overflowY: "auto",
+        }}
+      >
+        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 20, letterSpacing: 1, color: COLORS.cream }}>
+          ROUND SUMMARY
+        </div>
+        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 4 }}>
+          {new Date(session.date).toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" })} ·{" "}
+          {session.putts.length} holes putted
+        </div>
+
+        <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
+          <StatBox label="TOTAL SG" value={formatSG(stats.totalSG)} valueColor={sgRagColor(stats.avgSG)} />
+          <StatBox label="AVG SG / PUTT" value={formatSG(stats.avgSG)} valueColor={sgRagColor(stats.avgSG)} />
+        </div>
+        <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
+          <StatBox label="AVG PUTTS" value={avgStrokes.toFixed(2)} />
+          <StatBox label="TOTAL PUTTS" value={stats.totalPutts} />
+        </div>
+        <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
+          <StatBox label="1-PUTTS" value={`${onePutts} (${onePuttPct.toFixed(0)}%)`} valueColor={COLORS.fairwayLight} />
+          <StatBox label="3+ PUTTS" value={threePutts} valueColor={threePutts > 0 ? COLORS.flag : COLORS.cream} />
+        </div>
+        <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
+          <StatBox label="FT MADE" value={`${fmt1(ftToUnit(stats.ftMade, units))}${shortUnitLabel(units)}`} valueColor={COLORS.sand} />
+        </div>
+        {session.chipIns > 0 && (
+          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginTop: 8 }}>
+            + {session.chipIns} hole{session.chipIns === 1 ? "" : "s"} chipped in, no putt taken
+          </div>
+        )}
+
+        <div style={{ marginTop: 16 }}>
+          <SectionLabel>Hole by hole</SectionLabel>
+          <div style={{ marginTop: 6 }}>
+            <PuttLog putts={session.putts} units={units} />
+          </div>
+        </div>
+
+        <button
+          onClick={onClose}
+          style={{
+            width: "100%",
+            marginTop: 16,
+            padding: "11px 0",
+            borderRadius: 10,
+            border: `1px solid ${COLORS.creamDim}33`,
+            background: "transparent",
+            color: COLORS.creamDim,
+            fontFamily: "'Bebas Neue', sans-serif",
+            fontSize: 15,
+            cursor: "pointer",
+          }}
+        >
+          CLOSE
+        </button>
       </div>
     </div>
   );
@@ -9275,40 +9518,63 @@ function PuttingSetupScreen({
   onUpdateCourseHole,
   onFinishOnCourse,
   onClearOnCourse,
-  onEditCourseHole,
   onLoadTestCourseData,
   units,
 }) {
   const [mode, setMode] = useState("practice"); // practice | course
   const [courseDistanceInput, setCourseDistanceInput] = useState("");
+  const courseInputRef = useRef(null);
   const invalidRange = puttMinFt >= puttMaxFt || puttMinFt < 3;
-  const courseCompleted = onCourseHoles.filter((h) => h.distanceFt != null && h.strokes != null);
+  const courseCompleted = onCourseHoles.filter(isHoleComplete);
   const courseCompletedWithNumbers = onCourseHoles
-    .map((h, i) => ({ ...h, hole: i + 1 }))
-    .filter((h) => h.distanceFt != null && h.strokes != null);
+    .map((h, i) => ({
+      hole: i + 1,
+      distanceFt: h.putts[0]?.distanceFt,
+      strokes: h.putts.length,
+      holedFromFt: h.putts[h.putts.length - 1]?.distanceFt,
+      noPutt: h.noPutt || false,
+    }))
+    .filter((h) => isHoleComplete(onCourseHoles[h.hole - 1]));
   const onCourseInProgress = courseCompleted.length > 0;
-  const courseCurrentIndex = onCourseHoles.findIndex((h) => h.strokes == null);
-  const coursePhase = courseCurrentIndex === -1 || onCourseHoles[courseCurrentIndex].distanceFt == null ? "distance" : "putts";
-  const lastCompletedIndex = onCourseHoles.reduce((acc, h, i) => (h.strokes != null ? i : acc), -1);
+  const courseCurrentIndex = onCourseHoles.findIndex((h) => !isHoleComplete(h));
+  const lastTouchedIndex = onCourseHoles.reduce((acc, h, i) => (h.putts.length > 0 || h.noPutt ? i : acc), -1);
   const unitLabel = shortUnitLabel(units);
 
-  function submitCourseDistance() {
+  function recordPutt(made) {
     const val = unitToFt(parseFloat(courseDistanceInput), units);
     if (isNaN(val) || val < 0) return;
-    onUpdateCourseHole(courseCurrentIndex, "distanceFt", val);
+    const hole = onCourseHoles[courseCurrentIndex];
+    const newPutts = [...hole.putts, { distanceFt: val, made }];
+    onUpdateCourseHole(courseCurrentIndex, "putts", newPutts);
+    setCourseDistanceInput("");
+    // Keep the numeric keypad open between putts rather than making the user tap the field
+    // again every time — same fix as Range practice, and just as valuable here since a full
+    // round is 18+ separate entries in a row.
+    if (courseInputRef.current) courseInputRef.current.focus();
+  }
+
+  // Rare case: chipped in from off the green, so there's no putt at all to record for this hole.
+  function markNoPutt() {
+    onUpdateCourseHole(courseCurrentIndex, "noPutt", true);
     setCourseDistanceInput("");
   }
 
-  function submitCoursePutts(n) {
-    onUpdateCourseHole(courseCurrentIndex, "strokes", n);
+  // Undoes the single most recent putt entry — whether that's a putt already recorded on the
+  // hole currently in progress, the last (made) putt of the hole before it, or a "no putt"
+  // chip-in marking — in each case, that hole reopens for continued entry.
+  function undoLastPutt() {
     setCourseDistanceInput("");
-  }
-
-  function editLastCourseHole() {
-    if (lastCompletedIndex === -1) return;
-    const prevDistance = onCourseHoles[lastCompletedIndex].distanceFt;
-    onEditCourseHole(lastCompletedIndex);
-    setCourseDistanceInput(prevDistance != null ? String(fmt1(ftToUnit(prevDistance, units))) : "");
+    if (courseCurrentIndex !== -1 && onCourseHoles[courseCurrentIndex].putts.length > 0) {
+      onUpdateCourseHole(courseCurrentIndex, "putts", onCourseHoles[courseCurrentIndex].putts.slice(0, -1));
+    } else if (lastTouchedIndex !== -1) {
+      const prev = onCourseHoles[lastTouchedIndex];
+      if (prev.noPutt) {
+        onUpdateCourseHole(lastTouchedIndex, "noPutt", false);
+      } else {
+        onUpdateCourseHole(lastTouchedIndex, "putts", prev.putts.slice(0, -1));
+      }
+    }
+    if (courseInputRef.current) courseInputRef.current.focus();
   }
 
   return (
@@ -9378,9 +9644,9 @@ function PuttingSetupScreen({
               {courseCompleted.length} OF 18 HOLES LOGGED
             </div>
             <div style={{ display: "flex", gap: 10 }}>
-              {lastCompletedIndex !== -1 && (
+              {lastTouchedIndex !== -1 && (
                 <div
-                  onClick={editLastCourseHole}
+                  onClick={undoLastPutt}
                   style={{
                     fontFamily: "'JetBrains Mono', monospace",
                     fontSize: 10,
@@ -9390,7 +9656,7 @@ function PuttingSetupScreen({
                     textUnderlineOffset: 3,
                   }}
                 >
-                  EDIT LAST HOLE
+                  UNDO LAST PUTT
                 </div>
               )}
               {onCourseInProgress && (
@@ -9414,14 +9680,17 @@ function PuttingSetupScreen({
           <div style={{ display: "flex", gap: 10, marginBottom: 8 }}>
             <StatBox
               label="TOTAL SG"
-              value={formatSG(courseCompleted.reduce((a, h) => a + sgForPutt(h.distanceFt, h.strokes), 0))}
+              value={formatSG(
+                courseCompletedWithNumbers.filter((h) => !h.noPutt).reduce((a, h) => a + sgForPutt(h.distanceFt, h.strokes), 0)
+              )}
               valueColor={sgRagColor(
-                courseCompleted.length
-                  ? courseCompleted.reduce((a, h) => a + sgForPutt(h.distanceFt, h.strokes), 0) / courseCompleted.length
+                courseCompletedWithNumbers.filter((h) => !h.noPutt).length
+                  ? courseCompletedWithNumbers.filter((h) => !h.noPutt).reduce((a, h) => a + sgForPutt(h.distanceFt, h.strokes), 0) /
+                      courseCompletedWithNumbers.filter((h) => !h.noPutt).length
                   : 0
               )}
             />
-            <StatBox label="TOTAL PUTTS" value={courseCompleted.reduce((a, h) => a + h.strokes, 0)} />
+            <StatBox label="TOTAL PUTTS" value={courseCompletedWithNumbers.reduce((a, h) => a + h.strokes, 0)} />
           </div>
 
           {courseCurrentIndex === -1 ? (
@@ -9433,89 +9702,93 @@ function PuttingSetupScreen({
                 Tap Finish Round below to save.
               </div>
             </Card>
-          ) : coursePhase === "distance" ? (
+          ) : (
             <Card>
               <div style={{ fontSize: 11, color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", letterSpacing: 1 }}>
-                HOLE {courseCurrentIndex + 1} OF 18
+                HOLE {courseCurrentIndex + 1} OF 18 · PUTT {onCourseHoles[courseCurrentIndex].putts.length + 1}
               </div>
               <div style={{ fontSize: 10, color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", marginTop: 8 }}>
-                FIRST PUTT DISTANCE ({unitLabel.toUpperCase()})
+                {onCourseHoles[courseCurrentIndex].putts.length === 0 ? "FIRST PUTT DISTANCE" : "NEXT PUTT DISTANCE"} ({unitLabel.toUpperCase()})
               </div>
-              <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
-                <input
-                  autoFocus
-                  type="number"
-                  inputMode="decimal"
-                  value={courseDistanceInput}
-                  onChange={(e) => setCourseDistanceInput(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && submitCourseDistance()}
-                  placeholder="0"
-                  style={{
-                    flex: 1,
-                    background: COLORS.turfDark,
-                    border: `1px solid ${COLORS.creamDim}33`,
-                    borderRadius: 8,
-                    color: COLORS.cream,
-                    fontFamily: "'Bebas Neue', sans-serif",
-                    fontSize: 32,
-                    padding: "8px 14px",
-                    boxSizing: "border-box",
-                  }}
-                />
+              <input
+                ref={courseInputRef}
+                autoFocus
+                type="number"
+                inputMode="decimal"
+                value={courseDistanceInput}
+                onChange={(e) => setCourseDistanceInput(e.target.value)}
+                placeholder="0"
+                style={{
+                  width: "100%",
+                  marginTop: 6,
+                  background: COLORS.turfDark,
+                  border: `1px solid ${COLORS.creamDim}33`,
+                  borderRadius: 8,
+                  color: COLORS.cream,
+                  fontFamily: "'Bebas Neue', sans-serif",
+                  fontSize: 32,
+                  padding: "8px 14px",
+                  boxSizing: "border-box",
+                }}
+              />
+              <div style={{ fontSize: 10, color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", marginTop: 12, marginBottom: 6, textAlign: "center" }}>
+                DID IT GO IN?
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
                 <button
-                  onClick={submitCourseDistance}
+                  onClick={() => recordPutt(true)}
                   disabled={courseDistanceInput === ""}
                   style={{
-                    padding: "0 20px",
-                    borderRadius: 8,
+                    flex: 1,
+                    padding: "16px 0",
+                    borderRadius: 10,
                     border: "none",
                     background: courseDistanceInput === "" ? `${COLORS.fairway}66` : COLORS.fairway,
                     color: COLORS.cream,
                     fontFamily: "'Bebas Neue', sans-serif",
-                    fontSize: 18,
+                    fontSize: 20,
                     letterSpacing: 1,
                     cursor: courseDistanceInput === "" ? "not-allowed" : "pointer",
                   }}
                 >
-                  NEXT
+                  MAKE
+                </button>
+                <button
+                  onClick={() => recordPutt(false)}
+                  disabled={courseDistanceInput === ""}
+                  style={{
+                    flex: 1,
+                    padding: "16px 0",
+                    borderRadius: 10,
+                    border: `2px solid ${courseDistanceInput === "" ? COLORS.creamDim + "55" : COLORS.flag}`,
+                    background: "transparent",
+                    color: courseDistanceInput === "" ? COLORS.creamDim : COLORS.cream,
+                    fontFamily: "'Bebas Neue', sans-serif",
+                    fontSize: 20,
+                    letterSpacing: 1,
+                    cursor: courseDistanceInput === "" ? "not-allowed" : "pointer",
+                  }}
+                >
+                  MISS
                 </button>
               </div>
-            </Card>
-          ) : (
-            <Card>
-              <div style={{ fontSize: 11, color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", letterSpacing: 1 }}>
-                HOLE {courseCurrentIndex + 1} OF 18
-              </div>
-              <div style={{ textAlign: "center", marginTop: 4 }}>
-                <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 48, lineHeight: 1, color: COLORS.flag }}>
-                  {ftToUnitRound(onCourseHoles[courseCurrentIndex].distanceFt, units)}
-                  <span style={{ fontSize: 18, marginLeft: 6, color: COLORS.creamDim }}>{unitLabel}</span>
+              {onCourseHoles[courseCurrentIndex].putts.length === 0 && (
+                <div
+                  onClick={markNoPutt}
+                  style={{
+                    textAlign: "center",
+                    marginTop: 10,
+                    fontFamily: "'JetBrains Mono', monospace",
+                    fontSize: 10,
+                    color: COLORS.creamDim,
+                    cursor: "pointer",
+                    textDecoration: "underline",
+                    textUnderlineOffset: 3,
+                  }}
+                >
+                  No putt taken (chipped in)
                 </div>
-              </div>
-              <div style={{ fontSize: 10, color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", marginTop: 10, marginBottom: 6 }}>
-                PUTTS TAKEN
-              </div>
-              <div style={{ display: "flex", gap: 8 }}>
-                {[1, 2, 3].map((n) => (
-                  <button
-                    key={n}
-                    onClick={() => submitCoursePutts(n)}
-                    style={{
-                      flex: 1,
-                      padding: "14px 0",
-                      borderRadius: 10,
-                      border: `2px solid ${ragColor(ragStatusForPutts(n))}`,
-                      background: "transparent",
-                      color: COLORS.cream,
-                      fontFamily: "'Bebas Neue', sans-serif",
-                      fontSize: 26,
-                      cursor: "pointer",
-                    }}
-                  >
-                    {n}
-                  </button>
-                ))}
-              </div>
+              )}
             </Card>
           )}
 
@@ -9559,6 +9832,24 @@ function PuttingSetupScreen({
                   <div style={{ width: 55, textAlign: "right" }}>SG</div>
                 </div>
                 {courseCompletedWithNumbers.map((h, i) => {
+                  if (h.noPutt) {
+                    return (
+                      <div
+                        key={h.hole}
+                        style={{
+                          display: "flex",
+                          padding: "7px 12px",
+                          borderTop: i > 0 ? `1px solid ${COLORS.creamDim}11` : "none",
+                          color: COLORS.creamDim,
+                        }}
+                      >
+                        <div style={{ width: 40, color: COLORS.creamDim }}>{h.hole}</div>
+                        <div style={{ flex: 1, fontStyle: "italic" }}>Chipped in</div>
+                        <div style={{ width: 55, textAlign: "right" }}>—</div>
+                        <div style={{ width: 55, textAlign: "right" }}>—</div>
+                      </div>
+                    );
+                  }
                   const sg = sgForPutt(h.distanceFt, h.strokes);
                   return (
                     <div
@@ -9847,12 +10138,17 @@ function PuttingPracticeScreen({ putts, puttCount, currentTarget, puttMinFt, put
   );
 }
 
-function PuttingSummaryScreen({ putts, onNewSession, storageError, units, feedback }) {
+function PuttingSummaryScreen({ putts, onNewSession, storageError, units, feedback, isOnCourse, chipIns }) {
   const avgStrokes = avg(putts.map((p) => p.strokes));
   const avgSG = avg(putts.map((p) => sgForPutt(p.targetFt, p.strokes)));
   const totalSG = putts.reduce((a, p) => a + sgForPutt(p.targetFt, p.strokes), 0);
   const onePutts = putts.filter((p) => p.strokes <= 1).length;
+  const onePuttPct = (onePutts / putts.length) * 100;
   const threePutts = putts.filter((p) => p.strokes >= 3).length;
+  const ftMade = putts.reduce((a, p) => {
+    if (p.holedFromFt != null) return a + p.holedFromFt;
+    return a + (p.strokes === 1 ? p.targetFt : 0);
+  }, 0);
   const distMin = Math.min(...putts.map((p) => p.targetFt));
   const distMax = Math.max(...putts.map((p) => p.targetFt));
   const unitLabel = shortUnitLabel(units);
@@ -9863,7 +10159,7 @@ function PuttingSummaryScreen({ putts, onNewSession, storageError, units, feedba
       <Card>
         <div style={{ textAlign: "center", marginBottom: 4 }}>
           <div style={{ fontSize: 11, color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", letterSpacing: 2 }}>
-            SESSION COMPLETE — {putts.length} PUTTS · {ftToUnitRound(distMin, units)}-{ftToUnitRound(distMax, units)}
+            {isOnCourse ? "ROUND COMPLETE" : "SESSION COMPLETE"} — {putts.length} PUTTS · {ftToUnitRound(distMin, units)}-{ftToUnitRound(distMax, units)}
             {unitLabel.toUpperCase()}
           </div>
         </div>
@@ -9871,14 +10167,37 @@ function PuttingSummaryScreen({ putts, onNewSession, storageError, units, feedba
           <StatBox label="TOTAL SG" value={formatSG(totalSG)} valueColor={sgRagColor(avgSG)} />
           <StatBox label="AVG SG / PUTT" value={formatSG(avgSG)} valueColor={sgRagColor(avgSG)} />
         </div>
-        <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
-          <StatBox label="AVG PUTTS" value={avgStrokes.toFixed(2)} />
-          <StatBox label="1-PUTT %" value={`${((onePutts / putts.length) * 100).toFixed(0)}%`} />
-        </div>
-        <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
-          <StatBox label="1-PUTTS" value={onePutts} valueColor={COLORS.fairwayLight} />
-          <StatBox label="3+ PUTTS" value={threePutts} valueColor={threePutts > 0 ? COLORS.flag : COLORS.cream} />
-        </div>
+        {isOnCourse ? (
+          <>
+            <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
+              <StatBox label="AVG PUTTS" value={avgStrokes.toFixed(2)} />
+              <StatBox label="TOTAL PUTTS" value={putts.reduce((a, p) => a + p.strokes, 0)} />
+            </div>
+            <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
+              <StatBox label="1-PUTTS" value={`${onePutts} (${onePuttPct.toFixed(0)}%)`} valueColor={COLORS.fairwayLight} />
+              <StatBox label="3+ PUTTS" value={threePutts} valueColor={threePutts > 0 ? COLORS.flag : COLORS.cream} />
+            </div>
+            <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
+              <StatBox label="FT MADE" value={`${fmt1(ftToUnit(ftMade, units))}${unitLabel}`} valueColor={COLORS.sand} />
+            </div>
+            {chipIns > 0 && (
+              <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginTop: 8 }}>
+                + {chipIns} hole{chipIns === 1 ? "" : "s"} chipped in, no putt taken
+              </div>
+            )}
+          </>
+        ) : (
+          <>
+            <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
+              <StatBox label="AVG PUTTS" value={avgStrokes.toFixed(2)} />
+              <StatBox label="1-PUTT %" value={`${onePuttPct.toFixed(0)}%`} />
+            </div>
+            <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
+              <StatBox label="1-PUTTS" value={onePutts} valueColor={COLORS.fairwayLight} />
+              <StatBox label="3+ PUTTS" value={threePutts} valueColor={threePutts > 0 ? COLORS.flag : COLORS.cream} />
+            </div>
+          </>
+        )}
       </Card>
 
       <div style={{ marginTop: 10 }}>
@@ -10124,7 +10443,7 @@ function SwipeToDelete({ onDelete, children, style }) {
 
 // ===== On-course putting tracker =====
 
-function CourseRoundRow({ session, isFirst, onDelete }) {
+function CourseRoundRow({ session, isFirst, onDelete, onView }) {
   const [confirming, setConfirming] = useState(false);
   const touchStartX = useRef(null);
   const stats = courseRoundStats(session);
@@ -10157,12 +10476,14 @@ function CourseRoundRow({ session, isFirst, onDelete }) {
     <div
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
+      onClick={onView}
       style={{
         display: "flex",
         alignItems: "center",
         padding: "7px 12px",
         borderTop: isFirst ? "none" : `1px solid ${COLORS.creamDim}11`,
         color: COLORS.cream,
+        cursor: "pointer",
       }}
     >
       <div style={{ flex: 1.3, color: COLORS.creamDim }}>
@@ -10172,7 +10493,10 @@ function CourseRoundRow({ session, isFirst, onDelete }) {
       <div style={{ width: 55, textAlign: "right" }}>{stats.totalPutts}</div>
       <div style={{ width: 60, textAlign: "right" }}>{stats.ftMade}ft</div>
       <div
-        onClick={() => setConfirming(true)}
+        onClick={(e) => {
+          e.stopPropagation();
+          setConfirming(true);
+        }}
         title="Delete"
         style={{
           width: 20,
@@ -10275,7 +10599,7 @@ function FeetPicker({ min, max, onMin, onMax, onPreset, activePresetLabel }) {
   );
 }
 
-function PuttingAnalysisHub({ history, loaded, onDeleteSession }) {
+function PuttingAnalysisHub({ history, loaded, onDeleteSession, units }) {
   const [subTab, setSubTab] = useState("practice"); // practice | course
 
   const practiceHistory = history.filter((s) => s.type !== "course");
@@ -10320,15 +10644,16 @@ function PuttingAnalysisHub({ history, loaded, onDeleteSession }) {
         </button>
       </div>
 
-      {subTab === "practice" && <PuttingAnalysisBody history={practiceHistory} loaded={loaded} onDeleteSession={onDeleteSession} />}
-      {subTab === "course" && <OnCourseAnalysisBody history={courseHistory} loaded={loaded} onDeleteSession={onDeleteSession} />}
+      {subTab === "practice" && <PuttingAnalysisBody history={practiceHistory} loaded={loaded} onDeleteSession={onDeleteSession} units={units} />}
+      {subTab === "course" && <OnCourseAnalysisBody history={courseHistory} loaded={loaded} onDeleteSession={onDeleteSession} units={units} />}
     </div>
   );
 }
 
-function OnCourseAnalysisBody({ history, loaded, onDeleteSession }) {
+function OnCourseAnalysisBody({ history, loaded, onDeleteSession, units }) {
   const [timescale, setTimescale] = useState("all");
   const [printMode, triggerPrint] = usePrintMode();
+  const [selectedRound, setSelectedRound] = useState(null);
 
   if (!loaded) {
     return <div style={{ color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace" }}>Loading rounds…</div>;
@@ -10510,13 +10835,17 @@ function OnCourseAnalysisBody({ history, loaded, onDeleteSession }) {
             {[...filtered]
               .sort((a, b) => new Date(b.date) - new Date(a.date))
               .map((s, i) => (
-                <CourseRoundRow key={s.id} session={s} isFirst={i === 0} onDelete={() => onDeleteSession(s.id)} />
+                <CourseRoundRow key={s.id} session={s} isFirst={i === 0} onDelete={() => onDeleteSession(s.id)} onView={() => setSelectedRound(s)} />
               ))}
           </div>
         </div>
       </CollapsibleSection>
 
       <SendReportButton onClick={triggerPrint} />
+
+      {selectedRound && (
+        <RoundSummaryModal session={selectedRound} units={units} onClose={() => setSelectedRound(null)} />
+      )}
     </div>
   );
 }
