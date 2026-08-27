@@ -152,4 +152,21 @@ export async function importProfileData(profileId, file) {
   const entries = Object.entries(payload.data);
   await Promise.all(entries.map(([key, value]) => db.put(STORE, value, namespacedKey(profileId, key))));
   return entries.length;
+
+  
+export async function loadAllAppData() {
+  const profileId = getActiveProfileId();
+  if (!profileId) return {};
+  const db = await getDB();
+  const allKeys = await db.getAllKeys(STORE);
+  const ns = `${profileId}::`;
+  const entries = {};
+  for (const k of allKeys) {
+    if (typeof k === "string" && k.startsWith(ns)) {
+      const shortKey = k.slice(ns.length);
+      entries[shortKey] = await db.get(STORE, k);
+    }
+  }
+  return entries;
+}
 }
