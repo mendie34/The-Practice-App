@@ -152,7 +152,7 @@ export async function importProfileData(profileId, file) {
   const entries = Object.entries(payload.data);
   await Promise.all(entries.map(([key, value]) => db.put(STORE, value, namespacedKey(profileId, key))));
   return entries.length;
-
+}
   
 export async function loadAllAppData() {
   const profileId = getActiveProfileId();
@@ -169,4 +169,4 @@ export async function loadAllAppData() {
   }
   return entries;
 }
-}
+
