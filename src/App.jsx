@@ -11,42 +11,9 @@ import {
   ResponsiveContainer,
   ReferenceLine,
 } from "recharts";
-import { exportProfileData, importProfileData } from "./storage.js";
+import { loadAllAppData, exportProfileData, importProfileData } from "./storage.js";
 
-// Every key this app stores, fetched in one parallel batch on mount rather than each section
-// loading its own key one at a time. window.storage here is the real IndexedDB-backed API
-// (installed by ProfileGate.jsx before this component ever renders), so unlike the Claude-artifact
-// demo build, there's no proxy/race-condition layer needed — just call it directly.
-const APP_DATA_KEYS = [
-  "golf:sessions",
-  "golf:activeSession",
-  "putting:sessions",
-  "putting:activeSession",
-  "putting:activeRound",
-  "shortgame:sessions",
-  "shortgame:activeSession",
-  "tee:sessions",
-  "compete:sessions",
-  "compete:shortgame:sessions",
-  "compete:putting:sessions",
-  "settings:preferences",
-];
-
-async function loadAllAppData() {
-  const results = await Promise.all(
-    APP_DATA_KEYS.map(async (key) => {
-      try {
-        const result = await window.storage.get(key, false);
-        return [key, result && result.value ? result.value : null];
-      } catch (e) {
-        return [key, null];
-      }
-    })
-  );
-  return Object.fromEntries(results);
-}
-
-const FONT_IMPORT = `@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
+export const FONT_IMPORT = `@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
 @media print {
   .no-print { display: none !important; }
   .print-only { display: block !important; }
@@ -61,7 +28,7 @@ const FONT_IMPORT = `@import url('https://fonts.googleapis.com/css2?family=Bebas
   .home-info-btn:hover .home-info-tooltip { display: block; }
 }`;
 
-const COLORS = {
+export const COLORS = {
   turfDark: "#14291F",
   turf: "#1D3A2B",
   fairway: "#2F6B4F",
@@ -160,6 +127,13 @@ const BACK_MAP = {
   teeaccuracy: "rangeChoose",
   teeAccuracyPractice: "teeaccuracy",
   teeAccuracySummary: "teeaccuracy",
+  yardagesChoose: "home",
+  wedgeMatrixSetup: "yardagesChoose",
+  wedgeMatrixPractice: "wedgeMatrixSetup",
+  wedgeMatrixResult: "wedgeMatrixSetup",
+  gappingSetup: "yardagesChoose",
+  gappingPractice: "gappingSetup",
+  gappingResult: "gappingSetup",
   shortgame: "home",
   shortGamePractice: "shortgame",
   shortGameSummary: "shortgame",
@@ -306,7 +280,7 @@ function generateFakePuttingSessions(count = 18) {
     [20, 40],
     [10, 40],
   ];
-  const puttCountOptions = [10, 20, 30];
+  const puttCountOptions = [9, 18, 27];
   const sessions = [];
   const N = count;
 
@@ -438,7 +412,7 @@ function generateFakeShortGameSessions(count = 15) {
   const now = new Date();
   const N = count;
   const sessions = [];
-  const shotCountOptions = [10, 20, 30];
+  const shotCountOptions = [9, 18, 27];
   const lieOptions = [
     ["fairway"],
     ["rough"],
@@ -835,6 +809,284 @@ function pgaBaselineSand(yds) {
 
 const LIE_LABELS = { fairway: "FAIRWAY", rough: "ROUGH", bunker: "BUNKER" };
 const CLUB_LABELS = { driver: "DRIVER", fairway: "FAIRWAY WOOD", hybrid: "HYBRID", iron: "IRON" };
+
+// Fixed list, in shortest-to-longest order — this is both the selection order on setup and the
+// order the guided practice flow works through, so it deliberately isn't alphabetical.
+const WEDGE_CLUBS = [
+  { key: "LW", label: "LOB WEDGE (LW)" },
+  { key: "SW", label: "SAND WEDGE (SW)" },
+  { key: "GW", label: "GAP WEDGE (GW)" },
+  { key: "AW", label: "APPROACH WEDGE (AW)" },
+  { key: "PW", label: "PITCHING WEDGE (PW)" },
+  { key: "9I", label: "9 IRON" },
+];
+const WEDGE_SWINGS = [
+  { key: "half", label: "1/2 SWING" },
+  { key: "threeQuarter", label: "3/4 SWING" },
+  { key: "full", label: "FULL SWING" },
+];
+
+// Builds the club × swing sequence the guided practice walks through, in the fixed shortest-to-
+// longest order regardless of the order the user tapped the checkboxes in.
+function buildWedgeComboSequence(selectedClubs, selectedSwings) {
+  const sequence = [];
+  WEDGE_CLUBS.filter((c) => selectedClubs.includes(c.key)).forEach((club) => {
+    WEDGE_SWINGS.filter((s) => selectedSwings.includes(s.key)).forEach((swing) => {
+      sequence.push({ clubKey: club.key, clubLabel: club.label, swingKey: swing.key, swingLabel: swing.label });
+    });
+  });
+  return sequence;
+}
+
+// 5 shots: drop the single shortest and longest, average the remaining 3.
+// 10 shots: drop the two shortest and two longest, average the remaining 6.
+// Keeps the middle 60% of shots, dropping the rest split evenly between the shortest and longest
+// ends (an odd leftover drops from the long side). Works for any shot count the user picks — with
+// fewer than 3 shots there isn't enough data to trim meaningfully, so everything is kept. Returns
+// shots in original entry order, each flagged included/excluded, so the result can be manually
+// edited afterward without losing track of what the automatic pass decided.
+function trimWedgeOutliersAndAverage(shots) {
+  const n = shots.length;
+  const keepCount = n < 3 ? n : Math.max(1, Math.round(n * 0.6));
+  const dropTotal = n - keepCount;
+  const dropLow = Math.floor(dropTotal / 2);
+  const dropHigh = dropTotal - dropLow;
+
+  const withIndex = shots.map((value, i) => ({ value, i }));
+  const sortedByValue = [...withIndex].sort((a, b) => a.value - b.value);
+  const droppedIndices = new Set([
+    ...sortedByValue.slice(0, dropLow).map((s) => s.i),
+    ...sortedByValue.slice(sortedByValue.length - dropHigh).map((s) => s.i),
+  ]);
+
+  const shotObjs = shots.map((value, i) => ({ value, included: !droppedIndices.has(i) }));
+  const average = avg(shotObjs.filter((s) => s.included).map((s) => s.value));
+  return { shots: shotObjs, average };
+}
+
+// Same keep/drop math as trimWedgeOutliersAndAverage, but count-only — used to show a live
+// preview on the setup screen before any shots exist yet.
+// NOTE: both this and trimWedgeOutliersAndAverage above are pure functions over a shot count /
+// shot-value array — nothing about them is actually wedge-specific despite the name — so Gapping
+// (full-swing clubs) reuses them as-is rather than duplicating the same trim math.
+function wedgeTrimPreview(n) {
+  const keepCount = n < 3 ? n : Math.max(1, Math.round(n * 0.6));
+  const dropTotal = n - keepCount;
+  const dropLow = Math.floor(dropTotal / 2);
+  const dropHigh = dropTotal - dropLow;
+  return { keepCount, dropLow, dropHigh };
+}
+
+// Fixed list, shortest-to-longest (9 Iron up through Driver) — this is the order the guided
+// practice flow works through (test the short clubs first, finish on Driver) and, separately, the
+// order results/PDF/PNG display in. 9 Wood was removed entirely per explicit user decision (no
+// longer offered — old completed charts that already tested it keep their saved data untouched,
+// since a finished chart stores each club's label as a literal snapshot, not a live lookup here).
+// Wedges are deliberately excluded — they live in the Wedge Matrix, since wedges need
+// half/three-quarter swing tracking that full-swing clubs here don't.
+// Woods/irons/hybrids use short codes (3W, 4I, 3HY, ...) rather than spelled-out "3 WOOD" —
+// deliberately compact so the selection grid on setup can run 3 columns and stay small.
+const GAPPING_CLUBS = [
+  { key: "9i", label: "9I", group: "iron" },
+  { key: "8i", label: "8I", group: "iron" },
+  { key: "7i", label: "7I", group: "iron" },
+  { key: "6i", label: "6I", group: "iron" },
+  { key: "5i", label: "5I", group: "iron" },
+  { key: "4i", label: "4I", group: "iron" },
+  { key: "3i", label: "3I", group: "iron" },
+  { key: "2i", label: "2I", group: "iron" },
+  { key: "1i", label: "1I", group: "iron" },
+  { key: "4hy", label: "4HY", group: "hybrid" },
+  { key: "3hy", label: "3HY", group: "hybrid" },
+  { key: "2hy", label: "2HY", group: "hybrid" },
+  { key: "7w", label: "7W", group: "wood" },
+  { key: "5w", label: "5W", group: "wood" },
+  { key: "4w", label: "4W", group: "wood" },
+  { key: "3w", label: "3W", group: "wood" },
+  { key: "minidriver", label: "MINI DR", group: "wood" },
+  { key: "driver", label: "DRIVER", group: "driver" },
+];
+
+// The setup screen's selection grid is laid out by explicit hand-picked column groupings rather
+// than derived from GAPPING_CLUBS' order above — that array's order is about practice/results
+// sequence (shortest to longest), which the user deliberately wants decoupled from how the
+// selection grid reads (e.g. Driver sits at the TOP of column 1 here, even though it practices
+// LAST). Column contents per explicit user request; each key must exist in GAPPING_CLUBS.
+const GAPPING_GRID_COLUMNS = [
+  ["driver", "minidriver", "3w", "4w", "5w", "7w"],
+  ["2hy", "3hy", "4hy", "1i", "2i", "3i"],
+  ["4i", "5i", "6i", "7i", "8i", "9i"],
+];
+
+// Builds the guided practice sequence: fixed clubs first, shortest-to-longest in the order above
+// (regardless of tap order — so practice always starts at 9 Iron and finishes at Driver), then
+// any custom clubs appended afterward in the order they were added — position doesn't matter for
+// a custom club, per explicit user decision.
+function buildGappingSequence(selectedClubKeys, customClubs) {
+  const fixed = GAPPING_CLUBS.filter((c) => selectedClubKeys.includes(c.key)).map((c) => ({
+    clubKey: c.key,
+    clubLabel: c.label,
+  }));
+  const custom = customClubs
+    .filter((c) => selectedClubKeys.includes(c.key))
+    .map((c) => ({ clubKey: c.key, clubLabel: c.label }));
+  return [...fixed, ...custom];
+}
+
+// Builds the matrix as a standalone SVG string (generic fonts only, so nothing depends on the
+// app's custom web fonts having loaded — canvas rasterization doesn't reliably wait for those).
+function buildWedgeMatrixSVG(matrix, units) {
+  const clubs = WEDGE_CLUBS.filter((c) => matrix.selectedClubs.includes(c.key));
+  const swings = WEDGE_SWINGS.filter((s) => matrix.selectedSwings.includes(s.key));
+  const unitLabel = longUnitLabel(units);
+
+  const labelColW = 170;
+  const colW = 120;
+  const headerH = 54;
+  const rowH = 58;
+  const padding = 28;
+  const titleH = 64;
+
+  const width = padding * 2 + labelColW + colW * swings.length;
+  const height = padding * 2 + titleH + headerH + rowH * clubs.length;
+
+  const TURF_DARK = "#14291F";
+  const TURF = "#1D3A2B";
+  const CREAM = "#F1EAD6";
+  const CREAM_DIM = "#E4DBC2";
+  const FLAG = "#C1440E";
+
+  let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">`;
+  svg += `<rect width="${width}" height="${height}" fill="${TURF_DARK}"/>`;
+  svg += `<text x="${padding}" y="${padding + 24}" font-family="Georgia, serif" font-size="26" fill="${CREAM}" font-weight="bold">WEDGE MATRIX</text>`;
+  svg += `<text x="${padding}" y="${padding + 46}" font-family="monospace" font-size="12" fill="${CREAM_DIM}">${new Date(
+    matrix.date
+  ).toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" })} · ${unitLabel === "y" ? "yards" : "meters"}</text>`;
+
+  const gridTop = padding + titleH;
+  svg += `<rect x="${padding}" y="${gridTop}" width="${labelColW}" height="${headerH}" fill="${TURF}" stroke="${CREAM_DIM}33"/>`;
+  swings.forEach((s, si) => {
+    const x = padding + labelColW + si * colW;
+    svg += `<rect x="${x}" y="${gridTop}" width="${colW}" height="${headerH}" fill="${TURF}" stroke="${CREAM_DIM}33"/>`;
+    svg += `<text x="${x + colW / 2}" y="${gridTop + headerH / 2 + 5}" font-family="monospace" font-size="12" fill="${CREAM_DIM}" text-anchor="middle">${s.label}</text>`;
+  });
+
+  clubs.forEach((c, ci) => {
+    const y = gridTop + headerH + ci * rowH;
+    // Full descriptive name minus the trailing "(XX)" code, shown as a smaller subtitle line so
+    // the longer names (Approach Wedge, Pitching Wedge) never collide with the value columns.
+    const fullName = c.label.replace(/\s*\([^)]*\)$/, "");
+    svg += `<rect x="${padding}" y="${y}" width="${labelColW}" height="${rowH}" fill="${TURF}" stroke="${CREAM_DIM}33"/>`;
+    svg += `<text x="${padding + 12}" y="${y + rowH / 2 - 5}" font-family="Georgia, serif" font-size="17" fill="${CREAM}" font-weight="bold">${c.key}</text>`;
+    svg += `<text x="${padding + 12}" y="${y + rowH / 2 + 14}" font-family="monospace" font-size="9" fill="${CREAM_DIM}">${fullName}</text>`;
+    swings.forEach((s, si) => {
+      const x = padding + labelColW + si * colW;
+      const key = `${c.key}-${s.key}`;
+      const result = matrix.results[key];
+      const value = result ? `${ydsToUnitRound(result.average, units)}${unitLabel}` : "—";
+      svg += `<rect x="${x}" y="${y}" width="${colW}" height="${rowH}" fill="none" stroke="${CREAM_DIM}33"/>`;
+      svg += `<text x="${x + colW / 2}" y="${y + rowH / 2 + 6}" font-family="Georgia, serif" font-size="18" fill="${FLAG}" text-anchor="middle" font-weight="bold">${value}</text>`;
+    });
+  });
+
+  svg += `</svg>`;
+  return { svg, width, height };
+}
+
+function downloadWedgeMatrixPNG(matrix, units) {
+  const { svg, width, height } = buildWedgeMatrixSVG(matrix, units);
+  const svgBlob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" });
+  const url = URL.createObjectURL(svgBlob);
+  const img = new Image();
+  img.onload = () => {
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(img, 0, 0, width, height);
+    URL.revokeObjectURL(url);
+    canvas.toBlob((blob) => {
+      const pngUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = pngUrl;
+      a.download = `wedge-matrix-${Date.now()}.png`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(pngUrl);
+    }, "image/png");
+  };
+  img.src = url;
+}
+
+// Single-column version of buildWedgeMatrixSVG — Gapping has no second dimension (no swing
+// lengths), so it's one row per club rather than a club × swing grid.
+function buildGappingChartSVG(chart, units) {
+  const clubs = chart.sequence; // [{clubKey, clubLabel}], already in the fixed display order
+  const unitLabel = longUnitLabel(units);
+
+  const labelColW = 260;
+  const valueColW = 140;
+  const rowH = 50;
+  const padding = 28;
+  const titleH = 64;
+
+  const width = padding * 2 + labelColW + valueColW;
+  const height = padding * 2 + titleH + rowH * clubs.length;
+
+  const TURF_DARK = "#14291F";
+  const TURF = "#1D3A2B";
+  const CREAM = "#F1EAD6";
+  const CREAM_DIM = "#E4DBC2";
+  const FLAG = "#C1440E";
+
+  let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">`;
+  svg += `<rect width="${width}" height="${height}" fill="${TURF_DARK}"/>`;
+  svg += `<text x="${padding}" y="${padding + 24}" font-family="Georgia, serif" font-size="26" fill="${CREAM}" font-weight="bold">GAPPING CHART</text>`;
+  svg += `<text x="${padding}" y="${padding + 46}" font-family="monospace" font-size="12" fill="${CREAM_DIM}">${new Date(
+    chart.date
+  ).toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" })} · ${unitLabel === "y" ? "yards" : "meters"}</text>`;
+
+  const gridTop = padding + titleH;
+  clubs.forEach((c, i) => {
+    const y = gridTop + i * rowH;
+    const result = chart.results[c.clubKey];
+    const value = result ? `${ydsToUnitRound(result.average, units)}${unitLabel}` : "—";
+    svg += `<rect x="${padding}" y="${y}" width="${labelColW}" height="${rowH}" fill="${TURF}" stroke="${CREAM_DIM}33"/>`;
+    svg += `<text x="${padding + 14}" y="${y + rowH / 2 + 6}" font-family="Georgia, serif" font-size="16" fill="${CREAM}" font-weight="bold">${c.clubLabel}</text>`;
+    svg += `<rect x="${padding + labelColW}" y="${y}" width="${valueColW}" height="${rowH}" fill="none" stroke="${CREAM_DIM}33"/>`;
+    svg += `<text x="${padding + labelColW + valueColW / 2}" y="${y + rowH / 2 + 6}" font-family="Georgia, serif" font-size="18" fill="${FLAG}" text-anchor="middle" font-weight="bold">${value}</text>`;
+  });
+
+  svg += `</svg>`;
+  return { svg, width, height };
+}
+
+function downloadGappingPNG(chart, units) {
+  const { svg, width, height } = buildGappingChartSVG(chart, units);
+  const svgBlob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" });
+  const url = URL.createObjectURL(svgBlob);
+  const img = new Image();
+  img.onload = () => {
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(img, 0, 0, width, height);
+    URL.revokeObjectURL(url);
+    canvas.toBlob((blob) => {
+      const pngUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = pngUrl;
+      a.download = `gapping-chart-${Date.now()}.png`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(pngUrl);
+    }, "image/png");
+  };
+  img.src = url;
+}
 
 function shortGameBaseline(lie, yds) {
   if (lie === "rough") return pgaBaselineRough(yds);
@@ -1384,13 +1636,18 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
   const [competeHistory, setCompeteHistory] = useState([]);
   const [competeLoaded, setCompeteLoaded] = useState(false);
   const [competeEditingIndex, setCompeteEditingIndex] = useState(null); // which past round is being amended, if any
+  // Tracks which competeHistory entry the just-finished CompeteSummaryScreen corresponds to, so an
+  // edit made there (after the competition is fully over) can be written back into the *saved*
+  // history entry too, not just the local in-memory round list.
+  const [competeSummarySessionId, setCompeteSummarySessionId] = useState(null);
+  const [competeSummaryEditingIndex, setCompeteSummaryEditingIndex] = useState(null);
 
   // ===== Compete (Short Game) state =====
   const [sgCompetePlayers, setSgCompetePlayers] = useState(() => [profileName || "", ""]);
-  const [sgCompeteRounds, setSgCompeteRounds] = useState(5);
+  const [sgCompeteRounds, setSgCompeteRounds] = useState(9);
   const [sgCompeteMinYds, setSgCompeteMinYds] = useState(10);
   const [sgCompeteMaxYds, setSgCompeteMaxYds] = useState(30);
-  const [sgCompeteLies, setSgCompeteLies] = useState(["fairway", "rough", "bunker"]);
+  const [sgCompeteLies, setSgCompeteLies] = useState([]);
   const [sgCompeteMode, setSgCompeteMode] = useState("distance"); // distance | closest
   const [sgCompeteRoundResults, setSgCompeteRoundResults] = useState([]);
   const [sgCompeteCurrentShot, setSgCompeteCurrentShot] = useState(null); // {lie, target}
@@ -1402,6 +1659,8 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
   const [sgCompeteHistory, setSgCompeteHistory] = useState([]);
   const [sgCompeteLoaded, setSgCompeteLoaded] = useState(false);
   const [sgCompeteEditingIndex, setSgCompeteEditingIndex] = useState(null);
+  const [sgCompeteSummarySessionId, setSgCompeteSummarySessionId] = useState(null);
+  const [sgCompeteSummaryEditingIndex, setSgCompeteSummaryEditingIndex] = useState(null);
 
   // ===== Compete (Putting) state — tally of putts taken, no per-hole points =====
   const [puttCompetePlayers, setPuttCompetePlayers] = useState(() => [profileName || "", ""]);
@@ -1416,6 +1675,8 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
   const [puttCompeteHistory, setPuttCompeteHistory] = useState([]);
   const [puttCompeteLoaded, setPuttCompeteLoaded] = useState(false);
   const [puttCompeteEditingIndex, setPuttCompeteEditingIndex] = useState(null);
+  const [puttCompeteSummarySessionId, setPuttCompeteSummarySessionId] = useState(null);
+  const [puttCompeteSummaryEditingIndex, setPuttCompeteSummaryEditingIndex] = useState(null);
   const [baselineHandicap, setBaselineHandicapRaw] = useState("tour");
   const [units, setUnitsRaw] = useState("imperial"); // imperial | metric
   const [rangeTrackingMode, setRangeTrackingModeRaw] = useState(null); // null (unanswered) | distance | rating
@@ -1423,10 +1684,11 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
   const inputRef = useRef(null);
 
   // ===== Putting section state =====
-  const [puttCount, setPuttCount] = useState(10);
+  const [puttCount, setPuttCount] = useState(9);
   const [puttMinFt, setPuttMinFt] = useState(3);
   const [puttMaxFt, setPuttMaxFt] = useState(20);
   const [putts, setPutts] = useState([]); // {targetFt, strokes}
+  const [puttEditingShotIndex, setPuttEditingShotIndex] = useState(null);
   const [puttSessionFeedback, setPuttSessionFeedback] = useState(null);
   const [puttSummaryIsOnCourse, setPuttSummaryIsOnCourse] = useState(false);
   const [puttSummaryChipIns, setPuttSummaryChipIns] = useState(0);
@@ -1443,18 +1705,53 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
   // ===== Tee Accuracy state =====
   const [teeShotCount, setTeeShotCount] = useState(10);
   const [teeFairwayWidth, setTeeFairwayWidth] = useState(30); // yds — a reasonable "average" estimate, adjustable
-  const [teeClubs, setTeeClubs] = useState(["driver", "fairway", "hybrid", "iron"]);
+  const [teeClubs, setTeeClubs] = useState([]);
   const [teeShots, setTeeShots] = useState([]); // {club, hit}
+  const [teeEditingShotIndex, setTeeEditingShotIndex] = useState(null);
   const [teeCurrentClub, setTeeCurrentClub] = useState(null);
   const [teeHistory, setTeeHistory] = useState([]);
   const [teeLoaded, setTeeLoaded] = useState(false);
   const [teeStorageError, setTeeStorageError] = useState(false);
 
-  const [shortShotCount, setShortShotCount] = useState(10);
+  // ===== Wedge Matrix state =====
+  const [wedgeSelectedClubs, setWedgeSelectedClubs] = useState([]);
+  const [wedgeSelectedSwings, setWedgeSelectedSwings] = useState([]);
+  const [wedgeShotsPerCombo, setWedgeShotsPerCombo] = useState(5);
+  const [wedgeSequence, setWedgeSequence] = useState([]); // built at start, fixed for the whole matrix
+  const [wedgeComboIndex, setWedgeComboIndex] = useState(0);
+  const [wedgeCurrentShots, setWedgeCurrentShots] = useState([]); // distances collected so far for the in-progress combo
+  const [wedgeDistanceInput, setWedgeDistanceInput] = useState("");
+  const [wedgeComboComplete, setWedgeComboComplete] = useState(false); // showing the just-finished combo's average before moving on
+  const [wedgeResults, setWedgeResults] = useState({}); // { "LW-half": {average, kept, excludedLow, excludedHigh}, ... }
+  const [wedgeActiveMatrix, setWedgeActiveMatrix] = useState(null); // in-progress matrix, for resume
+  const [wedgeMatrixHistory, setWedgeMatrixHistory] = useState([]); // every completed matrix, most recent first
+  const [wedgeViewingMatrix, setWedgeViewingMatrix] = useState(null); // whichever matrix the result screen is currently showing
+  const [wedgeLoaded, setWedgeLoaded] = useState(false);
+  const wedgeInputRef = useRef(null);
+
+  // ===== Gapping state (full-swing clubs — same process as Wedge Matrix, minus the swing-length
+  // dimension: one shot sequence per club, not per club × swing) =====
+  const [gappingSelectedClubs, setGappingSelectedClubs] = useState([]);
+  const [gappingCustomClubs, setGappingCustomClubs] = useState([]); // [{key, label}], user-added, persisted across sessions
+  const [gappingShotsPerClub, setGappingShotsPerClub] = useState(5);
+  const [gappingSequence, setGappingSequence] = useState([]); // built at start, fixed for the whole chart
+  const [gappingClubIndex, setGappingClubIndex] = useState(0);
+  const [gappingCurrentShots, setGappingCurrentShots] = useState([]); // distances collected so far for the in-progress club
+  const [gappingDistanceInput, setGappingDistanceInput] = useState("");
+  const [gappingClubComplete, setGappingClubComplete] = useState(false); // showing the just-finished club's average before moving on
+  const [gappingResults, setGappingResults] = useState({}); // { driver: {average, shots}, ... }
+  const [gappingActiveChart, setGappingActiveChart] = useState(null); // in-progress chart, for resume
+  const [gappingHistory, setGappingHistory] = useState([]); // every completed chart, most recent first
+  const [gappingViewingChart, setGappingViewingChart] = useState(null); // whichever chart the result screen is currently showing
+  const [gappingLoaded, setGappingLoaded] = useState(false);
+  const gappingInputRef = useRef(null);
+
+  const [shortShotCount, setShortShotCount] = useState(9);
   const [shortMinYds, setShortMinYds] = useState(10);
   const [shortMaxYds, setShortMaxYds] = useState(30);
-  const [shortLies, setShortLies] = useState(["fairway", "rough", "bunker"]);
+  const [shortLies, setShortLies] = useState([]);
   const [shortShots, setShortShots] = useState([]); // {lie, target, resultFt}
+  const [shortEditingShotIndex, setShortEditingShotIndex] = useState(null);
   const [shortCurrentShot, setShortCurrentShot] = useState(null); // {lie, target}
   const [shortHistory, setShortHistory] = useState([]);
   const [shortLoaded, setShortLoaded] = useState(false);
@@ -1516,6 +1813,42 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
         } catch (e) {}
       }
       setTeeLoaded(true);
+
+      if (data["wedgematrix:active"]) {
+        try {
+          const active = JSON.parse(data["wedgematrix:active"]);
+          setWedgeActiveMatrix(active);
+        } catch (e) {}
+      }
+      if (data["wedgematrix:completed"]) {
+        try {
+          const parsed = JSON.parse(data["wedgematrix:completed"]);
+          // Migrate gracefully from the earlier version, which stored one matrix object rather
+          // than a history array — wrap it so nothing already saved gets lost.
+          setWedgeMatrixHistory(Array.isArray(parsed) ? parsed : [parsed]);
+        } catch (e) {}
+      }
+      setWedgeLoaded(true);
+
+      if (data["gapping:active"]) {
+        try {
+          const active = JSON.parse(data["gapping:active"]);
+          setGappingActiveChart(active);
+        } catch (e) {}
+      }
+      if (data["gapping:completed"]) {
+        try {
+          const parsed = JSON.parse(data["gapping:completed"]);
+          setGappingHistory(Array.isArray(parsed) ? parsed : [parsed]);
+        } catch (e) {}
+      }
+      if (data["gapping:customClubs"]) {
+        try {
+          const parsed = JSON.parse(data["gapping:customClubs"]);
+          setGappingCustomClubs(Array.isArray(parsed) ? parsed : []);
+        } catch (e) {}
+      }
+      setGappingLoaded(true);
 
       if (data["shortgame:sessions"]) {
         try {
@@ -1752,6 +2085,33 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
     }
   }
 
+  // Corrects a shot within an already-completed (historical) Range session — either mode. Mirrors
+  // the cached-field formulas in finishSession() exactly so AVG SG/AVG MISS (distance mode) or AVG
+  // RATING (rating mode) never go stale after the edit.
+  async function editRangeSessionShot(sessionId, shotIndex, updatedShot) {
+    const newHistory = history.map((s) => {
+      if (s.id !== sessionId) return s;
+      const newShots = s.shots.map((sh, i) => (i === shotIndex ? updatedShot : sh));
+      const isRatingMode = s.mode === "rating";
+      return {
+        ...s,
+        shots: newShots,
+        ...(isRatingMode
+          ? { avgRating: avg(newShots.map((sh) => sh.rating)) }
+          : {
+              totalDiff: newShots.reduce((a, sh) => a + sh.diff, 0),
+              avgDiff: avg(newShots.map((sh) => sh.diff)),
+            }),
+      };
+    });
+    setHistory(newHistory);
+    try {
+      await window.storage.set("golf:sessions", JSON.stringify(newHistory), false);
+    } catch (e) {
+      setStorageError(true);
+    }
+  }
+
   // TEMP: loads generated sample sessions for testing. Remove this handler when asked.
   async function loadTestSessions() {
     const fake = generateFakeSessions();
@@ -1825,6 +2185,13 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
       setPuttCurrentTarget(nextTarget);
       persistActivePutting({ puttCount, puttMinFt, puttMaxFt, putts: newPutts, puttCurrentTarget: nextTarget });
     }
+  }
+
+  function savePuttShotEdit(updatedShot) {
+    const newPutts = putts.map((p, i) => (i === puttEditingShotIndex ? updatedShot : p));
+    setPutts(newPutts);
+    setPuttEditingShotIndex(null);
+    persistActivePutting({ puttCount, puttMinFt, puttMaxFt, putts: newPutts, puttCurrentTarget });
   }
 
   function exitPuttingToMenu() {
@@ -1950,6 +2317,45 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
     }
   }
 
+  // Corrects one putt/hole entry within an already-completed Putting session — used for BOTH
+  // practice sessions and on-course rounds, since both live in puttHistory and share the
+  // totalStrokes/avgStrokes cached fields (mirrors finishPuttingSession()/finishOnCourseRound()).
+  //
+  // On-course entries additionally carry `holedFromFt` (exact distance the ball actually went in
+  // from — only ever captured live, per-putt). The simple targetFt+strokes editor used here can't
+  // reconstruct that precisely after an edit, so: a 1-putt is unambiguous (holed from the target
+  // distance itself); anything else falls back to the same graceful approximation courseRoundStats
+  // already uses for pre-rework historical data (holedFromFt == null).
+  async function editPuttingSessionPutt(sessionId, puttIndex, updatedPutt) {
+    const newHistory = puttHistory.map((s) => {
+      if (s.id !== sessionId) return s;
+      const newPutts = s.putts.map((p, i) => {
+        if (i !== puttIndex) return p;
+        if (s.type === "course") {
+          return {
+            ...p,
+            targetFt: updatedPutt.targetFt,
+            strokes: updatedPutt.strokes,
+            holedFromFt: updatedPutt.strokes === 1 ? updatedPutt.targetFt : null,
+          };
+        }
+        return updatedPutt;
+      });
+      return {
+        ...s,
+        putts: newPutts,
+        totalStrokes: newPutts.reduce((a, p) => a + p.strokes, 0),
+        avgStrokes: avg(newPutts.map((p) => p.strokes)),
+      };
+    });
+    setPuttHistory(newHistory);
+    try {
+      await window.storage.set("putting:sessions", JSON.stringify(newHistory), false);
+    } catch (e) {
+      setPuttStorageError(true);
+    }
+  }
+
   // TEMP: loads generated sample putting sessions for testing. Remove this handler when asked.
   async function loadTestPuttingSessions() {
     const fake = generateFakePuttingSessions();
@@ -2064,8 +2470,8 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
     });
   }
 
-  function submitShortGameShot() {
-    const resultFt = unitToFt(parseFloat(shortResultInput), units);
+  function submitShortGameShot(overrideFt) {
+    const resultFt = overrideFt !== undefined ? overrideFt : unitToFt(parseFloat(shortResultInput), units);
     if (isNaN(resultFt) || resultFt < 0) return;
     const newShots = [...shortShots, { lie: shortCurrentShot.lie, target: shortCurrentShot.target, resultFt }];
     setShortShots(newShots);
@@ -2085,6 +2491,20 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
         shortCurrentShot: next,
       });
     }
+  }
+
+  function saveShortGameShotEdit(updatedShot) {
+    const newShots = shortShots.map((s, i) => (i === shortEditingShotIndex ? updatedShot : s));
+    setShortShots(newShots);
+    setShortEditingShotIndex(null);
+    persistActiveShortGame({
+      shortShotCount,
+      shortMinYds,
+      shortMaxYds,
+      shortLies,
+      shortShots: newShots,
+      shortCurrentShot,
+    });
   }
 
   function exitShortGameToMenu() {
@@ -2125,6 +2545,22 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
 
   async function deleteShortGameSession(id) {
     const newHistory = shortHistory.filter((s) => s.id !== id);
+    setShortHistory(newHistory);
+    try {
+      await window.storage.set("shortgame:sessions", JSON.stringify(newHistory), false);
+    } catch (e) {
+      setShortStorageError(true);
+    }
+  }
+
+  // Corrects a shot within an already-completed Short Game session — mirrors finishShortGameSession()'s
+  // avgResultFt formula so the cached stat never goes stale after the edit.
+  async function editShortGameSessionShot(sessionId, shotIndex, updatedShot) {
+    const newHistory = shortHistory.map((s) => {
+      if (s.id !== sessionId) return s;
+      const newShots = s.shots.map((sh, i) => (i === shotIndex ? updatedShot : sh));
+      return { ...s, shots: newShots, avgResultFt: avg(newShots.map((sh) => sh.resultFt)) };
+    });
     setShortHistory(newHistory);
     try {
       await window.storage.set("shortgame:sessions", JSON.stringify(newHistory), false);
@@ -2222,11 +2658,31 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
     };
     const newHistory = [session, ...competeHistory];
     setCompeteHistory(newHistory);
+    setCompeteSummarySessionId(session.id);
     setScreen("competeSummary");
     try {
       await window.storage.set("compete:sessions", JSON.stringify(newHistory), false);
     } catch (e) {
       // non-fatal — summary still shows from local state
+    }
+  }
+
+  // Amends a round from the *finished* Summary screen (as opposed to saveCompeteRoundEdit, which
+  // only ever runs mid-competition, before a history entry exists). Updates both the live round
+  // list this screen renders from and the saved competeHistory entry, so the correction survives —
+  // otherwise it would look fixed here but silently revert next time this competition was opened.
+  async function saveCompeteRoundEditFromSummary(updatedRound) {
+    const idx = competeSummaryEditingIndex;
+    const newRoundResults = competeRoundResults.map((r, i) => (i === idx ? updatedRound : r));
+    setCompeteRoundResults(newRoundResults);
+    setCompeteSummaryEditingIndex(null);
+    if (!competeSummarySessionId) return;
+    const newHistory = competeHistory.map((s) => (s.id === competeSummarySessionId ? { ...s, rounds: newRoundResults } : s));
+    setCompeteHistory(newHistory);
+    try {
+      await window.storage.set("compete:sessions", JSON.stringify(newHistory), false);
+    } catch (e) {
+      // non-fatal
     }
   }
 
@@ -2337,7 +2793,24 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
     };
     const newHistory = [session, ...sgCompeteHistory];
     setSgCompeteHistory(newHistory);
+    setSgCompeteSummarySessionId(session.id);
     setScreen("competeShortGameSummary");
+    try {
+      await window.storage.set("compete:shortgame:sessions", JSON.stringify(newHistory), false);
+    } catch (e) {
+      // non-fatal
+    }
+  }
+
+  // Same idea as saveCompeteRoundEditFromSummary, for Short Game Compete.
+  async function saveSgCompeteRoundEditFromSummary(updatedRound) {
+    const idx = sgCompeteSummaryEditingIndex;
+    const newRoundResults = sgCompeteRoundResults.map((r, i) => (i === idx ? updatedRound : r));
+    setSgCompeteRoundResults(newRoundResults);
+    setSgCompeteSummaryEditingIndex(null);
+    if (!sgCompeteSummarySessionId) return;
+    const newHistory = sgCompeteHistory.map((s) => (s.id === sgCompeteSummarySessionId ? { ...s, rounds: newRoundResults } : s));
+    setSgCompeteHistory(newHistory);
     try {
       await window.storage.set("compete:shortgame:sessions", JSON.stringify(newHistory), false);
     } catch (e) {
@@ -2426,7 +2899,24 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
     };
     const newHistory = [session, ...puttCompeteHistory];
     setPuttCompeteHistory(newHistory);
+    setPuttCompeteSummarySessionId(session.id);
     setScreen("competePuttingSummary");
+    try {
+      await window.storage.set("compete:putting:sessions", JSON.stringify(newHistory), false);
+    } catch (e) {
+      // non-fatal
+    }
+  }
+
+  // Same idea as saveCompeteRoundEditFromSummary, for Putting Compete (holes, not rounds).
+  async function savePuttCompeteHoleEditFromSummary(updatedHole) {
+    const idx = puttCompeteSummaryEditingIndex;
+    const newHoleResults = puttCompeteHoleResults.map((h, i) => (i === idx ? updatedHole : h));
+    setPuttCompeteHoleResults(newHoleResults);
+    setPuttCompeteSummaryEditingIndex(null);
+    if (!puttCompeteSummarySessionId) return;
+    const newHistory = puttCompeteHistory.map((s) => (s.id === puttCompeteSummarySessionId ? { ...s, holes: newHoleResults } : s));
+    setPuttCompeteHistory(newHistory);
     try {
       await window.storage.set("compete:putting:sessions", JSON.stringify(newHistory), false);
     } catch (e) {
@@ -2482,6 +2972,12 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
     }
   }
 
+  function saveTeeShotEdit(updatedShot) {
+    const newShots = teeShots.map((s, i) => (i === teeEditingShotIndex ? updatedShot : s));
+    setTeeShots(newShots);
+    setTeeEditingShotIndex(null);
+  }
+
   async function finishTeeSession(finalShots) {
     const hitCount = finalShots.filter((s) => s.hit).length;
     const session = {
@@ -2512,6 +3008,23 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
 
   async function deleteTeeSession(id) {
     const newHistory = teeHistory.filter((s) => s.id !== id);
+    setTeeHistory(newHistory);
+    try {
+      await window.storage.set("tee:sessions", JSON.stringify(newHistory), false);
+    } catch (e) {
+      setTeeStorageError(true);
+    }
+  }
+
+  // Corrects a shot within an already-completed Tee Accuracy session — mirrors finishTeeSession()'s
+  // hitCount/hitPct formula so the cached stats never go stale after the edit.
+  async function editTeeSessionShot(sessionId, shotIndex, updatedShot) {
+    const newHistory = teeHistory.map((s) => {
+      if (s.id !== sessionId) return s;
+      const newShots = s.shots.map((sh, i) => (i === shotIndex ? updatedShot : sh));
+      const hitCount = newShots.filter((sh) => sh.hit).length;
+      return { ...s, shots: newShots, hitCount, hitPct: (hitCount / newShots.length) * 100 };
+    });
     setTeeHistory(newHistory);
     try {
       await window.storage.set("tee:sessions", JSON.stringify(newHistory), false);
@@ -2560,6 +3073,559 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
     } catch (e) {
       setTeeStorageError(true);
     }
+  }
+
+  // ===== Wedge Matrix handlers =====
+  function toggleWedgeClub(key) {
+    setWedgeSelectedClubs((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
+  }
+
+  function toggleWedgeSwing(key) {
+    setWedgeSelectedSwings((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
+  }
+
+  async function persistActiveWedgeMatrix(state) {
+    setWedgeActiveMatrix(state);
+    try {
+      await window.storage.set("wedgematrix:active", JSON.stringify(state), false);
+    } catch (e) {
+      // non-fatal — progress just won't resume if the tab closes before the next save
+    }
+  }
+
+  async function clearActiveWedgeMatrixStorage() {
+    setWedgeActiveMatrix(null);
+    try {
+      await window.storage.delete("wedgematrix:active", false);
+    } catch (e) {
+      // nothing to clear
+    }
+  }
+
+  function startWedgeMatrix() {
+    const sequence = buildWedgeComboSequence(wedgeSelectedClubs, wedgeSelectedSwings);
+    if (sequence.length === 0) return;
+    setWedgeSequence(sequence);
+    setWedgeComboIndex(0);
+    setWedgeCurrentShots([]);
+    setWedgeDistanceInput("");
+    setWedgeComboComplete(false);
+    setWedgeResults({});
+    setScreen("wedgeMatrixPractice");
+    persistActiveWedgeMatrix({
+      selectedClubs: wedgeSelectedClubs,
+      selectedSwings: wedgeSelectedSwings,
+      shotsPerCombo: wedgeShotsPerCombo,
+      sequence,
+      comboIndex: 0,
+      currentShots: [],
+      results: {},
+    });
+  }
+
+  function resumeWedgeMatrix() {
+    if (!wedgeActiveMatrix) return;
+    setWedgeSelectedClubs(wedgeActiveMatrix.selectedClubs);
+    setWedgeSelectedSwings(wedgeActiveMatrix.selectedSwings);
+    setWedgeShotsPerCombo(wedgeActiveMatrix.shotsPerCombo);
+    setWedgeSequence(wedgeActiveMatrix.sequence);
+    setWedgeComboIndex(wedgeActiveMatrix.comboIndex);
+    setWedgeCurrentShots(wedgeActiveMatrix.currentShots);
+    setWedgeResults(wedgeActiveMatrix.results);
+    setWedgeDistanceInput("");
+    setWedgeComboComplete(false);
+    setScreen("wedgeMatrixPractice");
+  }
+
+  async function discardActiveWedgeMatrix() {
+    await clearActiveWedgeMatrixStorage();
+    setWedgeComboIndex(0);
+    setWedgeCurrentShots([]);
+    setWedgeResults({});
+    setWedgeSequence([]);
+  }
+
+  function submitWedgeShot() {
+    const val = unitToYds(parseFloat(wedgeDistanceInput), units);
+    if (isNaN(val) || val < 0) return;
+    const newShots = [...wedgeCurrentShots, val];
+    setWedgeCurrentShots(newShots);
+    setWedgeDistanceInput("");
+    if (wedgeInputRef.current) wedgeInputRef.current.focus();
+
+    if (newShots.length >= wedgeShotsPerCombo) {
+      const combo = wedgeSequence[wedgeComboIndex];
+      const comboKey = `${combo.clubKey}-${combo.swingKey}`;
+      const trimmed = trimWedgeOutliersAndAverage(newShots);
+      const newResults = { ...wedgeResults, [comboKey]: trimmed };
+      setWedgeResults(newResults);
+      setWedgeComboComplete(true);
+      persistActiveWedgeMatrix({
+        selectedClubs: wedgeSelectedClubs,
+        selectedSwings: wedgeSelectedSwings,
+        shotsPerCombo: wedgeShotsPerCombo,
+        sequence: wedgeSequence,
+        comboIndex: wedgeComboIndex,
+        currentShots: newShots,
+        results: newResults,
+      });
+    } else {
+      persistActiveWedgeMatrix({
+        selectedClubs: wedgeSelectedClubs,
+        selectedSwings: wedgeSelectedSwings,
+        shotsPerCombo: wedgeShotsPerCombo,
+        sequence: wedgeSequence,
+        comboIndex: wedgeComboIndex,
+        currentShots: newShots,
+        results: wedgeResults,
+      });
+    }
+  }
+
+  // Manually override which shots count toward a combo's average — lets someone override the
+  // automatic 60%-keep rule, e.g. to exclude a shot that was clearly mishit even if it wasn't
+  // the statistical shortest/longest, or to bring back one the automatic pass dropped.
+  function toggleWedgeShotIncluded(comboKey, shotIndex) {
+    const result = wedgeResults[comboKey];
+    if (!result) return;
+    const targetShot = result.shots[shotIndex];
+    const includedCount = result.shots.filter((s) => s.included).length;
+    // Never allow the last remaining included shot to be switched off — an average with zero
+    // shots behind it would misleadingly show as 0, not "no data".
+    if (targetShot.included && includedCount <= 1) return;
+    const newShots = result.shots.map((s, i) => (i === shotIndex ? { ...s, included: !s.included } : s));
+    const newAverage = avg(newShots.filter((s) => s.included).map((s) => s.value));
+    const newResults = { ...wedgeResults, [comboKey]: { shots: newShots, average: newAverage } };
+    setWedgeResults(newResults);
+    persistActiveWedgeMatrix({
+      selectedClubs: wedgeSelectedClubs,
+      selectedSwings: wedgeSelectedSwings,
+      shotsPerCombo: wedgeShotsPerCombo,
+      sequence: wedgeSequence,
+      comboIndex: wedgeComboIndex,
+      currentShots: wedgeCurrentShots,
+      results: newResults,
+    });
+  }
+
+  // Reopens shot entry for the combo that was JUST completed, in case the yardages hit so far
+  // don't look trustworthy and the user wants a bigger sample before moving on. Restores the raw
+  // values already hit (dropping any manual include/exclude — a fresh shot count means a fresh
+  // automatic trim) so submitWedgeShot()'s existing "length >= shotsPerCombo" check re-triggers
+  // immediately after the very next shot, re-running trimWedgeOutliersAndAverage over the whole,
+  // now-larger sample. No changes needed to submitWedgeShot() itself — this just puts the combo
+  // back into its "still collecting shots" state with a head start.
+  function addAnotherWedgeShot() {
+    const combo = wedgeSequence[wedgeComboIndex];
+    const comboKey = `${combo.clubKey}-${combo.swingKey}`;
+    const result = wedgeResults[comboKey];
+    if (!result) return;
+    const existingValues = result.shots.map((s) => s.value);
+    setWedgeCurrentShots(existingValues);
+    setWedgeComboComplete(false);
+    setWedgeDistanceInput("");
+    persistActiveWedgeMatrix({
+      selectedClubs: wedgeSelectedClubs,
+      selectedSwings: wedgeSelectedSwings,
+      shotsPerCombo: wedgeShotsPerCombo,
+      sequence: wedgeSequence,
+      comboIndex: wedgeComboIndex,
+      currentShots: existingValues,
+      results: wedgeResults,
+    });
+  }
+
+  async function nextWedgeCombo() {
+    if (wedgeComboIndex + 1 >= wedgeSequence.length) {
+      const completed = {
+        id: uid(),
+        date: new Date().toISOString(),
+        selectedClubs: wedgeSelectedClubs,
+        selectedSwings: wedgeSelectedSwings,
+        shotsPerCombo: wedgeShotsPerCombo,
+        sequence: wedgeSequence,
+        results: wedgeResults,
+      };
+      const newHistory = [completed, ...wedgeMatrixHistory];
+      setWedgeMatrixHistory(newHistory);
+      setWedgeViewingMatrix(completed);
+      try {
+        await window.storage.set("wedgematrix:completed", JSON.stringify(newHistory), false);
+      } catch (e) {
+        // non-fatal — the matrix is still shown from local state
+      }
+      await clearActiveWedgeMatrixStorage();
+      setScreen("wedgeMatrixResult");
+    } else {
+      const nextIndex = wedgeComboIndex + 1;
+      setWedgeComboIndex(nextIndex);
+      setWedgeCurrentShots([]);
+      setWedgeComboComplete(false);
+      setWedgeDistanceInput("");
+      persistActiveWedgeMatrix({
+        selectedClubs: wedgeSelectedClubs,
+        selectedSwings: wedgeSelectedSwings,
+        shotsPerCombo: wedgeShotsPerCombo,
+        sequence: wedgeSequence,
+        comboIndex: nextIndex,
+        currentShots: [],
+        results: wedgeResults,
+      });
+    }
+  }
+
+  function exitWedgeMatrixEarly() {
+    // progress is already autosaved after each shot — just leave the screen
+    setScreen("wedgeMatrixSetup");
+  }
+
+  function viewWedgeMatrixFromHistory(matrix) {
+    setWedgeViewingMatrix(matrix);
+    setScreen("wedgeMatrixResult");
+  }
+
+  // Shared plumbing for correcting a FINISHED matrix (whether just-completed or opened from
+  // history — by the time either is on screen it already lives in wedgeMatrixHistory, since
+  // nextWedgeCombo() adds it there before switching to the result screen). `updateFn` gets the
+  // target shot plus its combo's full shot list, and returns the replacement shot, or `null` to
+  // veto the change (used by the include/exclude guard below).
+  async function updateWedgeMatrixHistoryShot(matrixId, comboKey, shotIndex, updateFn) {
+    let blocked = false;
+    let updatedMatrixForViewing = null;
+    const newHistory = wedgeMatrixHistory.map((m) => {
+      if (m.id !== matrixId) return m;
+      const result = m.results[comboKey];
+      if (!result) return m;
+      const targetShot = result.shots[shotIndex];
+      const updated = updateFn(targetShot, result.shots);
+      if (updated === null) {
+        blocked = true;
+        return m;
+      }
+      const newShots = result.shots.map((s, i) => (i === shotIndex ? updated : s));
+      const newAverage = avg(newShots.filter((s) => s.included).map((s) => s.value));
+      const newMatrix = { ...m, results: { ...m.results, [comboKey]: { shots: newShots, average: newAverage } } };
+      updatedMatrixForViewing = newMatrix;
+      return newMatrix;
+    });
+    if (blocked) return;
+    setWedgeMatrixHistory(newHistory);
+    // Keep whatever's currently on screen in sync, whether it arrived via history or via just
+    // finishing the matrix — wedgeViewingMatrix is a snapshot, not looked up live from history.
+    if (wedgeViewingMatrix && wedgeViewingMatrix.id === matrixId && updatedMatrixForViewing) {
+      setWedgeViewingMatrix(updatedMatrixForViewing);
+    }
+    try {
+      await window.storage.set("wedgematrix:completed", JSON.stringify(newHistory), false);
+    } catch (e) {
+      // non-fatal
+    }
+  }
+
+  // Manual include/exclude override, same rule as the live toggleWedgeShotIncluded (never allow
+  // the last remaining included shot to be switched off), but for a matrix that's already finished.
+  function toggleWedgeHistoryShotIncluded(matrixId, comboKey, shotIndex) {
+    updateWedgeMatrixHistoryShot(matrixId, comboKey, shotIndex, (shot, allShots) => {
+      const includedCount = allShots.filter((s) => s.included).length;
+      if (shot.included && includedCount <= 1) return null;
+      return { ...shot, included: !shot.included };
+    });
+  }
+
+  // Corrects a shot's actual carry value after the matrix is finished (e.g. a mis-typed distance)
+  // — the piece that was missing before: the include/exclude toggle could hide a bad shot from the
+  // average, but there was no way to fix the value itself once the combo screen was left behind.
+  function editWedgeHistoryShotValue(matrixId, comboKey, shotIndex, newValue) {
+    updateWedgeMatrixHistoryShot(matrixId, comboKey, shotIndex, (shot) => ({ ...shot, value: newValue }));
+  }
+
+  async function deleteWedgeMatrixFromHistory(id) {
+    const newHistory = wedgeMatrixHistory.filter((m) => m.id !== id);
+    setWedgeMatrixHistory(newHistory);
+    try {
+      await window.storage.set("wedgematrix:completed", JSON.stringify(newHistory), false);
+    } catch (e) {
+      // non-fatal
+    }
+  }
+
+  function startNewWedgeMatrix() {
+    setScreen("wedgeMatrixSetup");
+  }
+
+  // ===== Gapping handlers (same shape as the Wedge Matrix handlers above, minus the swing
+  // dimension — a "combo" here is just a club) =====
+  function toggleGappingClub(key) {
+    setGappingSelectedClubs((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
+  }
+
+  async function addGappingCustomClub(label) {
+    const trimmed = label.trim();
+    if (!trimmed) return;
+    const club = { key: `custom-${uid()}`, label: trimmed.toUpperCase() };
+    const newCustomClubs = [...gappingCustomClubs, club];
+    setGappingCustomClubs(newCustomClubs);
+    setGappingSelectedClubs((prev) => [...prev, club.key]);
+    try {
+      await window.storage.set("gapping:customClubs", JSON.stringify(newCustomClubs), false);
+    } catch (e) {
+      // non-fatal — custom club still works for this session, just won't persist
+    }
+  }
+
+  async function removeGappingCustomClub(key) {
+    const newCustomClubs = gappingCustomClubs.filter((c) => c.key !== key);
+    setGappingCustomClubs(newCustomClubs);
+    setGappingSelectedClubs((prev) => prev.filter((k) => k !== key));
+    try {
+      await window.storage.set("gapping:customClubs", JSON.stringify(newCustomClubs), false);
+    } catch (e) {
+      // non-fatal
+    }
+  }
+
+  async function persistActiveGappingChart(state) {
+    setGappingActiveChart(state);
+    try {
+      await window.storage.set("gapping:active", JSON.stringify(state), false);
+    } catch (e) {
+      // non-fatal — progress just won't resume if the tab closes before the next save
+    }
+  }
+
+  async function clearActiveGappingChartStorage() {
+    setGappingActiveChart(null);
+    try {
+      await window.storage.delete("gapping:active", false);
+    } catch (e) {
+      // nothing to clear
+    }
+  }
+
+  function startGappingChart() {
+    const sequence = buildGappingSequence(gappingSelectedClubs, gappingCustomClubs);
+    if (sequence.length === 0) return;
+    setGappingSequence(sequence);
+    setGappingClubIndex(0);
+    setGappingCurrentShots([]);
+    setGappingDistanceInput("");
+    setGappingClubComplete(false);
+    setGappingResults({});
+    setScreen("gappingPractice");
+    persistActiveGappingChart({
+      selectedClubs: gappingSelectedClubs,
+      customClubs: gappingCustomClubs,
+      shotsPerClub: gappingShotsPerClub,
+      sequence,
+      clubIndex: 0,
+      currentShots: [],
+      results: {},
+    });
+  }
+
+  function resumeGappingChart() {
+    if (!gappingActiveChart) return;
+    setGappingSelectedClubs(gappingActiveChart.selectedClubs);
+    setGappingShotsPerClub(gappingActiveChart.shotsPerClub);
+    setGappingSequence(gappingActiveChart.sequence);
+    setGappingClubIndex(gappingActiveChart.clubIndex);
+    setGappingCurrentShots(gappingActiveChart.currentShots);
+    setGappingResults(gappingActiveChart.results);
+    setGappingDistanceInput("");
+    setGappingClubComplete(false);
+    setScreen("gappingPractice");
+  }
+
+  async function discardActiveGappingChart() {
+    await clearActiveGappingChartStorage();
+    setGappingClubIndex(0);
+    setGappingCurrentShots([]);
+    setGappingResults({});
+    setGappingSequence([]);
+  }
+
+  function submitGappingShot() {
+    const val = unitToYds(parseFloat(gappingDistanceInput), units);
+    if (isNaN(val) || val < 0) return;
+    const newShots = [...gappingCurrentShots, val];
+    setGappingCurrentShots(newShots);
+    setGappingDistanceInput("");
+    if (gappingInputRef.current) gappingInputRef.current.focus();
+
+    if (newShots.length >= gappingShotsPerClub) {
+      const club = gappingSequence[gappingClubIndex];
+      const trimmed = trimWedgeOutliersAndAverage(newShots);
+      const newResults = { ...gappingResults, [club.clubKey]: trimmed };
+      setGappingResults(newResults);
+      setGappingClubComplete(true);
+      persistActiveGappingChart({
+        selectedClubs: gappingSelectedClubs,
+        customClubs: gappingCustomClubs,
+        shotsPerClub: gappingShotsPerClub,
+        sequence: gappingSequence,
+        clubIndex: gappingClubIndex,
+        currentShots: newShots,
+        results: newResults,
+      });
+    } else {
+      persistActiveGappingChart({
+        selectedClubs: gappingSelectedClubs,
+        customClubs: gappingCustomClubs,
+        shotsPerClub: gappingShotsPerClub,
+        sequence: gappingSequence,
+        clubIndex: gappingClubIndex,
+        currentShots: newShots,
+        results: gappingResults,
+      });
+    }
+  }
+
+  function toggleGappingShotIncluded(clubKey, shotIndex) {
+    const result = gappingResults[clubKey];
+    if (!result) return;
+    const targetShot = result.shots[shotIndex];
+    const includedCount = result.shots.filter((s) => s.included).length;
+    if (targetShot.included && includedCount <= 1) return;
+    const newShots = result.shots.map((s, i) => (i === shotIndex ? { ...s, included: !s.included } : s));
+    const newAverage = avg(newShots.filter((s) => s.included).map((s) => s.value));
+    const newResults = { ...gappingResults, [clubKey]: { shots: newShots, average: newAverage } };
+    setGappingResults(newResults);
+    persistActiveGappingChart({
+      selectedClubs: gappingSelectedClubs,
+      customClubs: gappingCustomClubs,
+      shotsPerClub: gappingShotsPerClub,
+      sequence: gappingSequence,
+      clubIndex: gappingClubIndex,
+      currentShots: gappingCurrentShots,
+      results: newResults,
+    });
+  }
+
+  // Same "hit more shots" mechanism as addAnotherWedgeShot() — restores the raw values already
+  // hit for the just-finished club and drops back into shot-entry mode, so the very next shot
+  // re-triggers the finalize branch in submitGappingShot() and re-trims over the bigger sample.
+  function addAnotherGappingShot() {
+    const club = gappingSequence[gappingClubIndex];
+    const result = gappingResults[club.clubKey];
+    if (!result) return;
+    const existingValues = result.shots.map((s) => s.value);
+    setGappingCurrentShots(existingValues);
+    setGappingClubComplete(false);
+    setGappingDistanceInput("");
+    persistActiveGappingChart({
+      selectedClubs: gappingSelectedClubs,
+      customClubs: gappingCustomClubs,
+      shotsPerClub: gappingShotsPerClub,
+      sequence: gappingSequence,
+      clubIndex: gappingClubIndex,
+      currentShots: existingValues,
+      results: gappingResults,
+    });
+  }
+
+  async function nextGappingClub() {
+    if (gappingClubIndex + 1 >= gappingSequence.length) {
+      const completed = {
+        id: uid(),
+        date: new Date().toISOString(),
+        selectedClubs: gappingSelectedClubs,
+        customClubs: gappingCustomClubs,
+        shotsPerClub: gappingShotsPerClub,
+        sequence: gappingSequence,
+        results: gappingResults,
+      };
+      const newHistory = [completed, ...gappingHistory];
+      setGappingHistory(newHistory);
+      setGappingViewingChart(completed);
+      try {
+        await window.storage.set("gapping:completed", JSON.stringify(newHistory), false);
+      } catch (e) {
+        // non-fatal — the chart is still shown from local state
+      }
+      await clearActiveGappingChartStorage();
+      setScreen("gappingResult");
+    } else {
+      const nextIndex = gappingClubIndex + 1;
+      setGappingClubIndex(nextIndex);
+      setGappingCurrentShots([]);
+      setGappingClubComplete(false);
+      setGappingDistanceInput("");
+      persistActiveGappingChart({
+        selectedClubs: gappingSelectedClubs,
+        customClubs: gappingCustomClubs,
+        shotsPerClub: gappingShotsPerClub,
+        sequence: gappingSequence,
+        clubIndex: nextIndex,
+        currentShots: [],
+        results: gappingResults,
+      });
+    }
+  }
+
+  function exitGappingEarly() {
+    setScreen("gappingSetup");
+  }
+
+  function viewGappingChartFromHistory(chart) {
+    setGappingViewingChart(chart);
+    setScreen("gappingResult");
+  }
+
+  async function updateGappingHistoryShot(chartId, clubKey, shotIndex, updateFn) {
+    let blocked = false;
+    let updatedChartForViewing = null;
+    const newHistory = gappingHistory.map((m) => {
+      if (m.id !== chartId) return m;
+      const result = m.results[clubKey];
+      if (!result) return m;
+      const targetShot = result.shots[shotIndex];
+      const updated = updateFn(targetShot, result.shots);
+      if (updated === null) {
+        blocked = true;
+        return m;
+      }
+      const newShots = result.shots.map((s, i) => (i === shotIndex ? updated : s));
+      const newAverage = avg(newShots.filter((s) => s.included).map((s) => s.value));
+      const newChart = { ...m, results: { ...m.results, [clubKey]: { shots: newShots, average: newAverage } } };
+      updatedChartForViewing = newChart;
+      return newChart;
+    });
+    if (blocked) return;
+    setGappingHistory(newHistory);
+    if (gappingViewingChart && gappingViewingChart.id === chartId && updatedChartForViewing) {
+      setGappingViewingChart(updatedChartForViewing);
+    }
+    try {
+      await window.storage.set("gapping:completed", JSON.stringify(newHistory), false);
+    } catch (e) {
+      // non-fatal
+    }
+  }
+
+  function toggleGappingHistoryShotIncluded(chartId, clubKey, shotIndex) {
+    updateGappingHistoryShot(chartId, clubKey, shotIndex, (shot, allShots) => {
+      const includedCount = allShots.filter((s) => s.included).length;
+      if (shot.included && includedCount <= 1) return null;
+      return { ...shot, included: !shot.included };
+    });
+  }
+
+  function editGappingHistoryShotValue(chartId, clubKey, shotIndex, newValue) {
+    updateGappingHistoryShot(chartId, clubKey, shotIndex, (shot) => ({ ...shot, value: newValue }));
+  }
+
+  async function deleteGappingChartFromHistory(id) {
+    const newHistory = gappingHistory.filter((m) => m.id !== id);
+    setGappingHistory(newHistory);
+    try {
+      await window.storage.set("gapping:completed", JSON.stringify(newHistory), false);
+    } catch (e) {
+      // non-fatal
+    }
+  }
+
+  function startNewGappingChart() {
+    setScreen("gappingSetup");
   }
 
   // Adds 10 sample sessions to every section in one go, rather than loading each area separately.
@@ -2635,6 +3701,8 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
 
         {screen === "rangeChoose" && <RangeChooseScreen onNavigate={(s) => setScreen(s)} />}
 
+        {screen === "yardagesChoose" && <YardagesChooseScreen onNavigate={(s) => setScreen(s)} />}
+
         {screen === "setup" && settingsLoaded && rangeTrackingMode === null && (
           <RangeOnboardingScreen onAnswer={updateRangeTrackingMode} />
         )}
@@ -2705,15 +3773,19 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
             rangeHistory={history}
             rangeLoaded={loaded}
             onDeleteRangeSession={deleteRangeSession}
+            onEditRangeSessionShot={editRangeSessionShot}
             puttingHistory={puttHistory}
             puttingLoaded={puttLoaded}
             onDeletePuttingSession={deletePuttingSession}
+            onEditPuttingSessionShot={editPuttingSessionPutt}
             shortGameHistory={shortHistory}
             shortGameLoaded={shortLoaded}
             onDeleteShortGameSession={deleteShortGameSession}
+            onEditShortGameSessionShot={editShortGameSessionShot}
             teeHistory={teeHistory}
             teeLoaded={teeLoaded}
             onDeleteTeeSession={deleteTeeSession}
+            onEditTeeSessionShot={editTeeSessionShot}
             onBack={goHome}
             profileName={profileName}
             profileHandicap={profileHandicap}
@@ -2794,6 +3866,10 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
             onSubmit={submitTeeShot}
             onExit={resetTeeToSetup}
             units={units}
+            editingShotIndex={teeEditingShotIndex}
+            onStartEditShot={setTeeEditingShotIndex}
+            onSaveEditShot={saveTeeShotEdit}
+            onCancelEditShot={() => setTeeEditingShotIndex(null)}
           />
         )}
 
@@ -2804,6 +3880,111 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
             onNewSession={resetTeeToSetup}
             storageError={teeStorageError}
             units={units}
+          />
+        )}
+
+        {screen === "wedgeMatrixSetup" && (
+          <WedgeMatrixSetupScreen
+            selectedClubs={wedgeSelectedClubs}
+            onToggleClub={toggleWedgeClub}
+            selectedSwings={wedgeSelectedSwings}
+            onToggleSwing={toggleWedgeSwing}
+            shotsPerCombo={wedgeShotsPerCombo}
+            setShotsPerCombo={setWedgeShotsPerCombo}
+            onStart={startWedgeMatrix}
+            activeMatrix={wedgeActiveMatrix}
+            onResume={resumeWedgeMatrix}
+            onDiscard={discardActiveWedgeMatrix}
+            history={wedgeMatrixHistory}
+            loaded={wedgeLoaded}
+            onViewMatrix={viewWedgeMatrixFromHistory}
+            onDeleteMatrix={deleteWedgeMatrixFromHistory}
+            units={units}
+          />
+        )}
+
+        {screen === "wedgeMatrixPractice" && wedgeSequence.length > 0 && (
+          <WedgeMatrixPracticeScreen
+            sequence={wedgeSequence}
+            comboIndex={wedgeComboIndex}
+            currentShots={wedgeCurrentShots}
+            shotsPerCombo={wedgeShotsPerCombo}
+            distanceInput={wedgeDistanceInput}
+            setDistanceInput={setWedgeDistanceInput}
+            onSubmitShot={submitWedgeShot}
+            comboComplete={wedgeComboComplete}
+            results={wedgeResults}
+            onNextCombo={nextWedgeCombo}
+            onToggleShot={toggleWedgeShotIncluded}
+            onAddShot={addAnotherWedgeShot}
+            onExitEarly={exitWedgeMatrixEarly}
+            units={units}
+            inputRef={wedgeInputRef}
+          />
+        )}
+
+        {screen === "wedgeMatrixResult" && wedgeViewingMatrix && (
+          <WedgeMatrixResultScreen
+            matrix={wedgeViewingMatrix}
+            units={units}
+            onNewMatrix={startNewWedgeMatrix}
+            onToggleShot={(comboKey, shotIndex) => toggleWedgeHistoryShotIncluded(wedgeViewingMatrix.id, comboKey, shotIndex)}
+            onEditShotValue={(comboKey, shotIndex, newValue) =>
+              editWedgeHistoryShotValue(wedgeViewingMatrix.id, comboKey, shotIndex, newValue)
+            }
+          />
+        )}
+
+        {screen === "gappingSetup" && (
+          <GappingSetupScreen
+            selectedClubs={gappingSelectedClubs}
+            onToggleClub={toggleGappingClub}
+            customClubs={gappingCustomClubs}
+            onAddCustomClub={addGappingCustomClub}
+            onRemoveCustomClub={removeGappingCustomClub}
+            shotsPerClub={gappingShotsPerClub}
+            setShotsPerClub={setGappingShotsPerClub}
+            onStart={startGappingChart}
+            activeChart={gappingActiveChart}
+            onResume={resumeGappingChart}
+            onDiscard={discardActiveGappingChart}
+            history={gappingHistory}
+            loaded={gappingLoaded}
+            onViewChart={viewGappingChartFromHistory}
+            onDeleteChart={deleteGappingChartFromHistory}
+            units={units}
+          />
+        )}
+
+        {screen === "gappingPractice" && gappingSequence.length > 0 && (
+          <GappingPracticeScreen
+            sequence={gappingSequence}
+            clubIndex={gappingClubIndex}
+            currentShots={gappingCurrentShots}
+            shotsPerClub={gappingShotsPerClub}
+            distanceInput={gappingDistanceInput}
+            setDistanceInput={setGappingDistanceInput}
+            onSubmitShot={submitGappingShot}
+            clubComplete={gappingClubComplete}
+            results={gappingResults}
+            onNextClub={nextGappingClub}
+            onToggleShot={toggleGappingShotIncluded}
+            onAddShot={addAnotherGappingShot}
+            onExitEarly={exitGappingEarly}
+            units={units}
+            inputRef={gappingInputRef}
+          />
+        )}
+
+        {screen === "gappingResult" && gappingViewingChart && (
+          <GappingResultScreen
+            chart={gappingViewingChart}
+            units={units}
+            onNewChart={startNewGappingChart}
+            onToggleShot={(clubKey, shotIndex) => toggleGappingHistoryShotIncluded(gappingViewingChart.id, clubKey, shotIndex)}
+            onEditShotValue={(clubKey, shotIndex, newValue) =>
+              editGappingHistoryShotValue(gappingViewingChart.id, clubKey, shotIndex, newValue)
+            }
           />
         )}
 
@@ -2864,6 +4045,10 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
             maxDist={competeMaxDist}
             units={units}
             onNewCompetition={resetCompeteToSetup}
+            editingIndex={competeSummaryEditingIndex}
+            onStartEdit={setCompeteSummaryEditingIndex}
+            onSaveEdit={saveCompeteRoundEditFromSummary}
+            onCancelEdit={() => setCompeteSummaryEditingIndex(null)}
           />
         )}
 
@@ -2922,6 +4107,10 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
             roundResults={sgCompeteRoundResults}
             units={units}
             onNewCompetition={resetSgCompeteToSetup}
+            editingIndex={sgCompeteSummaryEditingIndex}
+            onStartEdit={setSgCompeteSummaryEditingIndex}
+            onSaveEdit={saveSgCompeteRoundEditFromSummary}
+            onCancelEdit={() => setSgCompeteSummaryEditingIndex(null)}
           />
         )}
 
@@ -2970,6 +4159,10 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
             holeResults={puttCompeteHoleResults}
             units={units}
             onNewCompetition={resetPuttCompeteToSetup}
+            editingIndex={puttCompeteSummaryEditingIndex}
+            onStartEdit={setPuttCompeteSummaryEditingIndex}
+            onSaveEdit={savePuttCompeteHoleEditFromSummary}
+            onCancelEdit={() => setPuttCompeteSummaryEditingIndex(null)}
           />
         )}
 
@@ -3007,6 +4200,10 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
             onReroll={rerollShortGameShot}
             onExit={exitShortGameToMenu}
             units={units}
+            editingShotIndex={shortEditingShotIndex}
+            onStartEditShot={setShortEditingShotIndex}
+            onSaveEditShot={saveShortGameShotEdit}
+            onCancelEditShot={() => setShortEditingShotIndex(null)}
           />
         )}
 
@@ -3057,6 +4254,10 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
             runningAvg={puttRunningAvg}
             onExit={exitPuttingToMenu}
             units={units}
+            editingShotIndex={puttEditingShotIndex}
+            onStartEditShot={setPuttEditingShotIndex}
+            onSaveEditShot={savePuttShotEdit}
+            onCancelEditShot={() => setPuttEditingShotIndex(null)}
           />
         )}
 
@@ -4710,15 +5911,19 @@ function AnalysisScreen({
   rangeHistory,
   rangeLoaded,
   onDeleteRangeSession,
+  onEditRangeSessionShot,
   puttingHistory,
   puttingLoaded,
   onDeletePuttingSession,
+  onEditPuttingSessionShot,
   shortGameHistory,
   shortGameLoaded,
   onDeleteShortGameSession,
+  onEditShortGameSessionShot,
   teeHistory,
   teeLoaded,
   onDeleteTeeSession,
+  onEditTeeSessionShot,
   onBack,
   profileName,
   profileHandicap,
@@ -4791,19 +5996,43 @@ function AnalysisScreen({
       )}
 
       {section === "range" && (
-        <RangeAnalysisHub history={rangeHistory} loaded={rangeLoaded} onDeleteSession={onDeleteRangeSession} units={units} />
+        <RangeAnalysisHub
+          history={rangeHistory}
+          loaded={rangeLoaded}
+          onDeleteSession={onDeleteRangeSession}
+          onEditSessionShot={onEditRangeSessionShot}
+          units={units}
+        />
       )}
 
       {section === "putting" && (
-        <PuttingAnalysisHub history={puttingHistory} loaded={puttingLoaded} onDeleteSession={onDeletePuttingSession} units={units} />
+        <PuttingAnalysisHub
+          history={puttingHistory}
+          loaded={puttingLoaded}
+          onDeleteSession={onDeletePuttingSession}
+          onEditSessionShot={onEditPuttingSessionShot}
+          units={units}
+        />
       )}
 
       {section === "shortgame" && (
-        <ShortGameAnalysisBody history={shortGameHistory} loaded={shortGameLoaded} onDeleteSession={onDeleteShortGameSession} />
+        <ShortGameAnalysisBody
+          history={shortGameHistory}
+          loaded={shortGameLoaded}
+          onDeleteSession={onDeleteShortGameSession}
+          onEditSessionShot={onEditShortGameSessionShot}
+          units={units}
+        />
       )}
 
       {section === "teeaccuracy" && (
-        <TeeAccuracyAnalysisBody history={teeHistory} loaded={teeLoaded} onDeleteSession={onDeleteTeeSession} />
+        <TeeAccuracyAnalysisBody
+          history={teeHistory}
+          loaded={teeLoaded}
+          onDeleteSession={onDeleteTeeSession}
+          onEditSessionShot={onEditTeeSessionShot}
+          units={units}
+        />
       )}
 
       <button
@@ -5017,10 +6246,12 @@ function teeAccuracySessionTrendData(sessions) {
     }));
 }
 
-function TeeAccuracyAnalysisBody({ history, loaded, onDeleteSession }) {
+function TeeAccuracyAnalysisBody({ history, loaded, onDeleteSession, onEditSessionShot, units }) {
   const [tab, setTab] = useState("insights"); // insights | graphs
   const [printMode, triggerPrint] = usePrintMode();
   const [timescale, setTimescale] = useState("all");
+  const [viewingSessionId, setViewingSessionId] = useState(null);
+  const viewingSession = viewingSessionId ? history.find((s) => s.id === viewingSessionId) : null;
 
   if (!loaded) {
     return <div style={{ color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace" }}>Loading sessions…</div>;
@@ -5140,7 +6371,7 @@ function TeeAccuracyAnalysisBody({ history, loaded, onDeleteSession }) {
           <CollapsibleSection title="All sessions" count={filtered.length}>
             {filtered.map((s) => (
               <SwipeToDelete key={s.id} onDelete={() => onDeleteSession(s.id)}>
-                <Card style={{ marginBottom: 12 }}>
+                <Card style={{ marginBottom: 12, cursor: "pointer" }} onClick={() => setViewingSessionId(s.id)}>
                   <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, paddingRight: 20 }}>
                     {new Date(s.date).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
                     {"  ·  "}
@@ -5154,6 +6385,15 @@ function TeeAccuracyAnalysisBody({ history, loaded, onDeleteSession }) {
               </SwipeToDelete>
             ))}
           </CollapsibleSection>
+
+          {viewingSession && (
+            <TeeSessionDetailModal
+              session={viewingSession}
+              units={units}
+              onEditShot={(shotIndex, updatedShot) => onEditSessionShot(viewingSession.id, shotIndex, updatedShot)}
+              onClose={() => setViewingSessionId(null)}
+            />
+          )}
         </>
       )}
 
@@ -5237,10 +6477,12 @@ function TeeAccuracyAnalysisBody({ history, loaded, onDeleteSession }) {
   );
 }
 
-function ShortGameAnalysisBody({ history, loaded, onDeleteSession }) {
+function ShortGameAnalysisBody({ history, loaded, onDeleteSession, onEditSessionShot, units }) {
   const [tab, setTab] = useState("insights"); // insights | graphs
   const [printMode, triggerPrint] = usePrintMode();
   const [timescale, setTimescale] = useState("all");
+  const [viewingSessionId, setViewingSessionId] = useState(null);
+  const viewingSession = viewingSessionId ? history.find((s) => s.id === viewingSessionId) : null;
 
   if (!loaded) {
     return <div style={{ color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace" }}>Loading sessions…</div>;
@@ -5395,7 +6637,7 @@ function ShortGameAnalysisBody({ history, loaded, onDeleteSession }) {
               const sessionAvgSG = avg(s.shots.map((sh) => sgForShortGameShot(sh.lie, sh.target, sh.resultFt)));
               return (
                 <SwipeToDelete key={s.id} onDelete={() => onDeleteSession(s.id)}>
-                  <Card style={{ marginBottom: 12 }}>
+                  <Card style={{ marginBottom: 12, cursor: "pointer" }} onClick={() => setViewingSessionId(s.id)}>
                     <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, paddingRight: 20 }}>
                       {new Date(s.date).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
                       {"  ·  "}
@@ -5410,6 +6652,15 @@ function ShortGameAnalysisBody({ history, loaded, onDeleteSession }) {
               );
             })}
           </CollapsibleSection>
+
+          {viewingSession && (
+            <ShortGameSessionDetailModal
+              session={viewingSession}
+              units={units}
+              onEditShot={(shotIndex, updatedShot) => onEditSessionShot(viewingSession.id, shotIndex, updatedShot)}
+              onClose={() => setViewingSessionId(null)}
+            />
+          )}
         </>
       )}
 
@@ -5491,7 +6742,7 @@ function ShortGameAnalysisBody({ history, loaded, onDeleteSession }) {
   );
 }
 
-function RangeAnalysisHub({ history, loaded, onDeleteSession, units }) {
+function RangeAnalysisHub({ history, loaded, onDeleteSession, onEditSessionShot, units }) {
   const [subTab, setSubTab] = useState("distance"); // distance | rating
 
   const distanceHistory = history.filter((s) => s.mode !== "rating");
@@ -5536,15 +6787,33 @@ function RangeAnalysisHub({ history, loaded, onDeleteSession, units }) {
         </button>
       </div>
 
-      {subTab === "distance" && <RangeAnalysisBody history={distanceHistory} loaded={loaded} onDeleteSession={onDeleteSession} units={units} />}
-      {subTab === "rating" && <RangeRatingAnalysisBody history={ratingHistory} loaded={loaded} onDeleteSession={onDeleteSession} />}
+      {subTab === "distance" && (
+        <RangeAnalysisBody
+          history={distanceHistory}
+          loaded={loaded}
+          onDeleteSession={onDeleteSession}
+          onEditSessionShot={onEditSessionShot}
+          units={units}
+        />
+      )}
+      {subTab === "rating" && (
+        <RangeRatingAnalysisBody
+          history={ratingHistory}
+          loaded={loaded}
+          onDeleteSession={onDeleteSession}
+          onEditSessionShot={onEditSessionShot}
+          units={units}
+        />
+      )}
     </div>
   );
 }
 
-function RangeRatingAnalysisBody({ history, loaded, onDeleteSession }) {
+function RangeRatingAnalysisBody({ history, loaded, onDeleteSession, onEditSessionShot, units }) {
   const [timescale, setTimescale] = useState("all");
   const [printMode, triggerPrint] = usePrintMode();
+  const [viewingSessionId, setViewingSessionId] = useState(null);
+  const viewingSession = viewingSessionId ? history.find((s) => s.id === viewingSessionId) : null;
 
   if (!loaded) {
     return <div style={{ color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace" }}>Loading sessions…</div>;
@@ -5669,7 +6938,7 @@ function RangeRatingAnalysisBody({ history, loaded, onDeleteSession }) {
               const sessionAvgRating = avg(s.shots.map((sh) => sh.rating));
               return (
                 <SwipeToDelete key={s.id} onDelete={() => onDeleteSession(s.id)}>
-                  <Card style={{ marginBottom: 12 }}>
+                  <Card style={{ marginBottom: 12, cursor: "pointer" }} onClick={() => setViewingSessionId(s.id)}>
                     <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, paddingRight: 20 }}>
                       {new Date(s.date).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
                       {"  ·  "}
@@ -5688,6 +6957,15 @@ function RangeRatingAnalysisBody({ history, loaded, onDeleteSession }) {
             })}
           </CollapsibleSection>
 
+          {viewingSession && (
+            <RangeSessionDetailModal
+              session={viewingSession}
+              units={units}
+              onEditShot={(shotIndex, updatedShot) => onEditSessionShot(viewingSession.id, shotIndex, updatedShot)}
+              onClose={() => setViewingSessionId(null)}
+            />
+          )}
+
           <SendReportButton onClick={triggerPrint} />
         </>
       )}
@@ -5695,13 +6973,15 @@ function RangeRatingAnalysisBody({ history, loaded, onDeleteSession }) {
   );
 }
 
-function RangeAnalysisBody({ history, loaded, onDeleteSession, units }) {
+function RangeAnalysisBody({ history, loaded, onDeleteSession, onEditSessionShot, units }) {
   const [tab, setTab] = useState("insights"); // insights | graphs
   const [printMode, triggerPrint] = usePrintMode();
   const [timescale, setTimescale] = useState("all");
   const [minYds, setMinYds] = useState(0);
   const [maxYds, setMaxYds] = useState(300);
   const [activePreset, setActivePreset] = useState("All");
+  const [viewingSessionId, setViewingSessionId] = useState(null);
+  const viewingSession = viewingSessionId ? history.find((s) => s.id === viewingSessionId) : null;
 
   if (!loaded) {
     return <div style={{ color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace" }}>Loading sessions…</div>;
@@ -5852,7 +7132,7 @@ function RangeAnalysisBody({ history, loaded, onDeleteSession, units }) {
                 const sessionAvgSG = avg(s.shots.map((sh) => sgForApproachShot(sh.target, sh.actual)));
                 return (
                   <SwipeToDelete key={s.id} onDelete={() => onDeleteSession(s.id)}>
-                    <Card style={{ marginBottom: 12 }}>
+                    <Card style={{ marginBottom: 12, cursor: "pointer" }} onClick={() => setViewingSessionId(s.id)}>
                       <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, paddingRight: 20 }}>
                         {new Date(s.date).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
                         {"  ·  "}
@@ -5869,6 +7149,15 @@ function RangeAnalysisBody({ history, loaded, onDeleteSession, units }) {
             )}
           </CollapsibleSection>
         </>
+      )}
+
+      {viewingSession && (
+        <RangeSessionDetailModal
+          session={viewingSession}
+          units={units}
+          onEditShot={(shotIndex, updatedShot) => onEditSessionShot(viewingSession.id, shotIndex, updatedShot)}
+          onClose={() => setViewingSessionId(null)}
+        />
       )}
 
       {analysis && (tab === "graphs" || printMode) && (
@@ -5986,9 +7275,10 @@ function RangeAnalysisBody({ history, loaded, onDeleteSession, units }) {
   );
 }
 
-function Card({ children, style }) {
+function Card({ children, style, onClick }) {
   return (
     <div
+      onClick={onClick}
       style={{
         background: `${COLORS.turf}cc`,
         border: `1px solid ${COLORS.creamDim}22`,
@@ -6122,19 +7412,33 @@ function CompeteIllustration() {
   return (
     <svg viewBox="0 0 400 240" preserveAspectRatio="xMidYMid slice" style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}>
       <defs>
+        {/* Same green gradient as WedgeMatrixIllustration/GappingIllustration, so every home
+            tile reads as one consistent green family rather than Compete standing out as the
+            one warm/brown tile. */}
         <linearGradient id="compBg" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor="#4C3A1D" />
+          <stop offset="0%" stopColor="#2F6B4F" />
           <stop offset="100%" stopColor="#14291F" />
         </linearGradient>
       </defs>
       <rect width="400" height="240" fill="url(#compBg)" />
-      <circle cx="150" cy="120" r="34" fill="none" stroke="#F1EAD6" strokeOpacity="0.7" strokeWidth="3" />
-      <circle cx="150" cy="120" r="10" fill="#C1440E" />
-      <circle cx="250" cy="90" r="26" fill="none" stroke="#F1EAD6" strokeOpacity="0.45" strokeWidth="3" />
-      <circle cx="250" cy="90" r="7" fill="#E4DBC2" />
-      <circle cx="290" cy="160" r="20" fill="none" stroke="#F1EAD6" strokeOpacity="0.3" strokeWidth="3" />
-      <circle cx="290" cy="160" r="6" fill="#E4DBC2" />
-      <path d="M60,205 L340,205" stroke="#F1EAD6" strokeOpacity="0.15" strokeWidth="2" strokeDasharray="4 6" />
+
+      {/* 3-tier podium, 2nd/1st/3rd left to right */}
+      <rect x="85" y="152" width="90" height="68" fill="#E4DBC2" opacity="0.22" />
+      <rect x="180" y="108" width="90" height="112" fill="#E4DBC2" opacity="0.32" />
+      <rect x="275" y="172" width="90" height="48" fill="#E4DBC2" opacity="0.18" />
+      <text x="130" y="196" textAnchor="middle" fontFamily="'Bebas Neue', sans-serif" fontSize="34" fill="#F1EAD6" opacity="0.55">2</text>
+      <text x="225" y="174" textAnchor="middle" fontFamily="'Bebas Neue', sans-serif" fontSize="42" fill="#F1EAD6" opacity="0.7">1</text>
+      <text x="320" y="206" textAnchor="middle" fontFamily="'Bebas Neue', sans-serif" fontSize="28" fill="#F1EAD6" opacity="0.5">3</text>
+
+      {/* trophy, standing on the 1st place block */}
+      <g transform="translate(225 34)">
+        <circle cx="0" cy="-8" r="5" fill="#C1440E" />
+        <path d="M-20,0 L20,0 L15,32 Q0,44 -15,32 Z" fill="#C9A66B" />
+        <path d="M-20,4 C-36,4 -36,28 -18,28" fill="none" stroke="#C9A66B" strokeWidth="4" strokeLinecap="round" />
+        <path d="M20,4 C36,4 36,28 18,28" fill="none" stroke="#C9A66B" strokeWidth="4" strokeLinecap="round" />
+        <rect x="-5" y="44" width="10" height="14" fill="#C9A66B" />
+        <rect x="-22" y="58" width="44" height="8" rx="2" fill="#C9A66B" />
+      </g>
     </svg>
   );
 }
@@ -6160,6 +7464,104 @@ function TeeAccuracyIllustration() {
   );
 }
 
+function WedgeMatrixIllustration() {
+  return (
+    <svg viewBox="0 0 400 240" preserveAspectRatio="xMidYMid slice" style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}>
+      <defs>
+        <linearGradient id="wedgeBg" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#2F6B4F" />
+          <stop offset="100%" stopColor="#14291F" />
+        </linearGradient>
+      </defs>
+      <rect width="400" height="240" fill="url(#wedgeBg)" />
+      {[0, 1, 2, 3].map((row) =>
+        [0, 1, 2].map((col) => (
+          <rect
+            key={`${row}-${col}`}
+            x={90 + col * 80}
+            y={40 + row * 45}
+            width={70}
+            height={35}
+            fill="none"
+            stroke="#F1EAD6"
+            strokeOpacity={0.25}
+            strokeWidth={1.5}
+          />
+        ))
+      )}
+      <rect x={170} y={130} width={70} height={35} fill="#C1440E" opacity="0.85" />
+      <rect x={90} y={85} width={70} height={35} fill="#4C8A68" opacity="0.55" />
+      <rect x={250} y={175} width={70} height={35} fill="#4C8A68" opacity="0.4" />
+    </svg>
+  );
+}
+
+function YardagesIllustration() {
+  return (
+    <svg viewBox="0 0 400 240" preserveAspectRatio="xMidYMid slice" style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}>
+      <defs>
+        <linearGradient id="yardagesBg" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#2F6B4F" />
+          <stop offset="100%" stopColor="#14291F" />
+        </linearGradient>
+      </defs>
+      <rect width="400" height="240" fill="url(#yardagesBg)" />
+      {/* notepad, tilted like something jotted down on the course */}
+      <g transform="rotate(-6 200 125)">
+        <rect x="128" y="38" width="150" height="182" rx="6" fill="#F1EAD6" />
+        <rect x="128" y="38" width="150" height="182" rx="6" fill="none" stroke="#14291F" strokeOpacity="0.15" strokeWidth="2" />
+        {[0, 1, 2, 3, 4, 5].map((i) => (
+          <circle key={i} cx={146 + i * 24} cy="38" r="5" fill="none" stroke="#C9A66B" strokeWidth="3" />
+        ))}
+        {[68, 88, 108, 128, 148, 168, 188].map((y) => (
+          <line key={y} x1="143" y1={y} x2="263" y2={y} stroke="#14291F" strokeOpacity="0.12" strokeWidth="1.5" />
+        ))}
+        <text x="148" y="86" fontFamily="Georgia, serif" fontSize="15" fill="#1D3A2B" fontWeight="700">142</text>
+        <text x="148" y="126" fontFamily="Georgia, serif" fontSize="15" fill="#1D3A2B" fontWeight="700">165</text>
+        <text x="148" y="166" fontFamily="Georgia, serif" fontSize="15" fill="#1D3A2B" fontWeight="700">180</text>
+        <line x1="228" y1="188" x2="228" y2="152" stroke="#C1440E" strokeWidth="2" />
+        <polygon points="228,152 249,158 228,164" fill="#C1440E" />
+      </g>
+      {/* pencil resting across the page */}
+      <g transform="rotate(38 300 70)">
+        <rect x="283" y="38" width="10" height="92" rx="2" fill="#C9A66B" />
+        <rect x="283" y="38" width="10" height="13" fill="#E4DBC2" />
+        <polygon points="283,130 293,130 288,146" fill="#4C3A1D" />
+      </g>
+    </svg>
+  );
+}
+
+function GappingIllustration() {
+  const yards = [95, 110, 130, 150, 165, 175];
+  return (
+    <svg viewBox="0 0 400 240" preserveAspectRatio="xMidYMid slice" style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}>
+      <defs>
+        {/* Same green gradient as WedgeMatrixIllustration's wedgeBg — Gapping and Wedge Matrix
+            are the two Yardages options, so they deliberately share a background color. */}
+        <linearGradient id="gappingBg" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#2F6B4F" />
+          <stop offset="100%" stopColor="#14291F" />
+        </linearGradient>
+      </defs>
+      <rect width="400" height="240" fill="url(#gappingBg)" />
+      {yards.map((y, i) => {
+        const barWidth = 20 + (y / 175) * 200;
+        const rowY = 30 + i * 30;
+        return (
+          <g key={i}>
+            <rect x="30" y={rowY} width={barWidth} height="16" rx="3" fill="#F1EAD6" opacity={0.2 + i * 0.12} />
+            <text x={44 + barWidth} y={rowY + 13} fontFamily="'JetBrains Mono', monospace" fontSize="11" fill="#F1EAD6" opacity="0.8">
+              {y}
+            </text>
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+// Order here is the home page's section order: Range, Yardages, Short Game, Putting, Compete, Analysis.
 const TILE_META = [
   {
     key: "range",
@@ -6170,6 +7572,14 @@ const TILE_META = [
     Illustration: RangeIllustration,
   },
   {
+    key: "yardages",
+    label: "YARDAGES",
+    subtitle: "Gapping & Wedge Matrix",
+    screen: "yardagesChoose",
+    available: true,
+    Illustration: YardagesIllustration,
+  },
+  {
     key: "shortgame",
     label: "SHORT GAME",
     subtitle: "Chipping & pitching",
@@ -6178,23 +7588,27 @@ const TILE_META = [
     Illustration: ShortGameIllustration,
   },
   { key: "putting", label: "PUTTING", subtitle: "Practice & On-Course", screen: "putting", available: true, Illustration: PuttingIllustration },
+  {
+    key: "compete",
+    label: "COMPETE",
+    subtitle: "Head-to-head — Range, Putting, Short Game",
+    screen: "competeChoose",
+    available: true,
+    Illustration: CompeteIllustration,
+  },
   { key: "analysis", label: "ANALYSIS", subtitle: "Track your progress", screen: "analysis", available: true, Illustration: AnalysisIllustration },
 ];
-
-const COMPETE_TILE = {
-  key: "compete",
-  label: "COMPETE",
-  subtitle: "Head-to-head — Range, Putting, Short Game",
-  screen: "competeChoose",
-  available: true,
-  Illustration: CompeteIllustration,
-};
 
 const HOME_INFO = {
   range: {
     title: "THE RANGE",
     short: "Distance Control or Tee Accuracy — full swing practice with Strokes Gained.",
     body: "Two ways to work on your full swing: Distance Control gives you a random target yardage and tracks how close you land to it, feeding real Strokes Gained analysis. Tee Accuracy tests whether you find the fairway off the tee, by club, against a fairway width you set.",
+  },
+  yardages: {
+    title: "YARDAGES",
+    short: "Gapping and Wedge Matrix — know exactly how far each club goes.",
+    body: "Everything about how far your clubs actually go lives here. Gapping builds a full-swing yardage chart from Driver down to 9 Iron (plus any custom clubs you add) — wedges are covered separately in Wedge Matrix, which also breaks each wedge down by swing length.",
   },
   shortgame: {
     title: "SHORT GAME",
@@ -6603,12 +8017,18 @@ function PuttingCompeteHoleEditModal({ hole, players, units, onSave, onCancel })
 
 // Full detail view for a single on-course round, opened by tapping it in "All rounds" — same
 // stat layout as the post-round Summary screen, plus the full hole-by-hole log.
-function RoundSummaryModal({ session, units, onClose }) {
+function RoundSummaryModal({ session, units, onEditShot, onClose }) {
+  const [editingShotIndex, setEditingShotIndex] = useState(null);
   const stats = courseRoundStats(session);
   const onePutts = session.putts.filter((p) => p.strokes <= 1).length;
   const onePuttPct = (onePutts / session.putts.length) * 100;
   const threePutts = session.putts.filter((p) => p.strokes >= 3).length;
   const avgStrokes = avg(session.putts.map((p) => p.strokes));
+
+  function handleSave(updatedHole) {
+    onEditShot(editingShotIndex, updatedHole);
+    setEditingShotIndex(null);
+  }
 
   return (
     <div
@@ -6667,9 +8087,9 @@ function RoundSummaryModal({ session, units, onClose }) {
         )}
 
         <div style={{ marginTop: 16 }}>
-          <SectionLabel>Hole by hole</SectionLabel>
+          <SectionLabel>Hole by hole — tap a hole to amend</SectionLabel>
           <div style={{ marginTop: 6 }}>
-            <PuttLog putts={session.putts} units={units} />
+            <PuttLog putts={session.putts} units={units} onEditShot={setEditingShotIndex} />
           </div>
         </div>
 
@@ -6691,6 +8111,17 @@ function RoundSummaryModal({ session, units, onClose }) {
           CLOSE
         </button>
       </div>
+
+      {editingShotIndex !== null && (
+        <div onClick={(e) => e.stopPropagation()}>
+          <PuttShotEditModal
+            shot={session.putts[editingShotIndex]}
+            units={units}
+            onSave={handleSave}
+            onCancel={() => setEditingShotIndex(null)}
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -6829,6 +8260,113 @@ function ShotEditModal({ shot, mode, units, onSave, onCancel }) {
   );
 }
 
+// Historical-session detail + edit view for The Range (both distance and rating modes). Reuses
+// ShotLog/RatingLog for display and the same ShotEditModal used for live-session editing, so a
+// wrong shot from a *finished* session can be amended the same way as one still in progress.
+function RangeSessionDetailModal({ session, units, onEditShot, onClose }) {
+  const [editingShotIndex, setEditingShotIndex] = useState(null);
+  const isRating = session.mode === "rating";
+  const sessionAvg = isRating
+    ? avg(session.shots.map((s) => s.rating))
+    : avg(session.shots.map((s) => sgForApproachShot(s.target, s.actual)));
+
+  function handleSave(updatedShot) {
+    onEditShot(editingShotIndex, updatedShot);
+    setEditingShotIndex(null);
+  }
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(10,22,15,0.75)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 24,
+        zIndex: 50,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: COLORS.turf,
+          border: `1px solid ${COLORS.creamDim}33`,
+          borderRadius: 14,
+          padding: 20,
+          maxWidth: 380,
+          width: "100%",
+          maxHeight: "85vh",
+          overflowY: "auto",
+        }}
+      >
+        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 20, letterSpacing: 1, color: COLORS.cream }}>
+          SESSION DETAIL
+        </div>
+        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 4 }}>
+          {new Date(session.date).toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" })}
+          {"  ·  "}
+          {session.shotCount} shots · {session.minDist}-{session.maxDist}y
+        </div>
+
+        <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
+          {isRating ? (
+            <StatBox label="AVG RATING" value={`${sessionAvg.toFixed(1)}/5`} valueColor={ratingRagColor(sessionAvg)} />
+          ) : (
+            <>
+              <StatBox label="AVG SG / SHOT" value={formatSG(sessionAvg)} valueColor={sgRagColor(sessionAvg)} />
+              <StatBox label="AVG MISS" value={`${session.avgDiff.toFixed(1)}y`} />
+            </>
+          )}
+        </div>
+
+        <div style={{ marginTop: 16 }}>
+          <SectionLabel>Shot by shot — tap a shot to amend</SectionLabel>
+          <div style={{ marginTop: 6 }}>
+            {isRating ? (
+              <RatingLog shots={session.shots} units={units} onEditShot={setEditingShotIndex} />
+            ) : (
+              <ShotLog shots={session.shots} units={units} onEditShot={setEditingShotIndex} />
+            )}
+          </div>
+        </div>
+
+        <button
+          onClick={onClose}
+          style={{
+            width: "100%",
+            marginTop: 16,
+            padding: "11px 0",
+            borderRadius: 10,
+            border: `1px solid ${COLORS.creamDim}33`,
+            background: "transparent",
+            color: COLORS.creamDim,
+            fontFamily: "'Bebas Neue', sans-serif",
+            fontSize: 15,
+            cursor: "pointer",
+          }}
+        >
+          CLOSE
+        </button>
+      </div>
+
+      {editingShotIndex !== null && (
+        <div onClick={(e) => e.stopPropagation()}>
+          <ShotEditModal
+            shot={session.shots[editingShotIndex]}
+            mode={session.mode}
+            units={units}
+            onSave={handleSave}
+            onCancel={() => setEditingShotIndex(null)}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
 function HomeScreen({ onNavigate }) {
   const [infoKey, setInfoKey] = useState(null);
 
@@ -6918,50 +8456,6 @@ function HomeScreen({ onNavigate }) {
             </div>
           </div>
         ))}
-      </div>
-
-      <div
-        onClick={() => onNavigate(COMPETE_TILE.screen)}
-        style={{
-          position: "relative",
-          height: 100,
-          marginTop: 12,
-          borderRadius: 14,
-          overflow: "hidden",
-          cursor: "pointer",
-          border: `1px solid ${COLORS.creamDim}22`,
-        }}
-      >
-        <CompeteIllustration />
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            background: `linear-gradient(180deg, transparent 15%, ${COLORS.turfDark}dd 100%)`,
-          }}
-        />
-        <HomeInfoButton
-          onClick={() => setInfoKey("compete")}
-          style={{ top: 8, right: 8 }}
-          tooltipText={HOME_INFO.compete.short}
-        />
-        <div style={{ position: "absolute", left: 12, bottom: 8, right: 12 }}>
-          <div
-            style={{
-              fontFamily: "'Bebas Neue', sans-serif",
-              fontSize: 20,
-              letterSpacing: 0.5,
-              lineHeight: 1.05,
-              color: COLORS.cream,
-              textShadow: "0 2px 6px rgba(0,0,0,0.5)",
-            }}
-          >
-            {COMPETE_TILE.label}
-          </div>
-          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: COLORS.creamDim, marginTop: 2 }}>
-            {COMPETE_TILE.subtitle}
-          </div>
-        </div>
       </div>
 
       <HomeInfoModal infoKey={infoKey} onClose={() => setInfoKey(null)} />
@@ -7131,7 +8625,19 @@ function TeeAccuracySetupScreen({
   );
 }
 
-function TeeAccuracyPracticeScreen({ shots, shotCount, currentClub, fairwayWidth, onSubmit, onExit, units }) {
+function TeeAccuracyPracticeScreen({
+  shots,
+  shotCount,
+  currentClub,
+  fairwayWidth,
+  onSubmit,
+  onExit,
+  units,
+  editingShotIndex,
+  onStartEditShot,
+  onSaveEditShot,
+  onCancelEditShot,
+}) {
   const shotNum = shots.length + 1;
   const unitLabel = longUnitLabel(units);
   const hitSoFar = shots.filter((s) => s.hit).length;
@@ -7226,42 +8732,291 @@ function TeeAccuracyPracticeScreen({ shots, shotCount, currentClub, fairwayWidth
 
       {shots.length > 0 && (
         <div style={{ marginTop: 10 }}>
-          <SectionLabel>This session</SectionLabel>
+          <SectionLabel>This session — tap a shot to amend</SectionLabel>
+          <div style={{ marginTop: 4 }}>
+            <TeeShotLog shots={shots} units={units} onEditShot={onStartEditShot} />
+          </div>
+        </div>
+      )}
+
+      {editingShotIndex !== null && (
+        <TeeShotEditModal shot={shots[editingShotIndex]} onSave={onSaveEditShot} onCancel={onCancelEditShot} />
+      )}
+    </div>
+  );
+}
+
+function TeeShotLog({ shots, units, onEditShot }) {
+  return (
+    <div
+      style={{
+        border: `1px solid ${COLORS.creamDim}22`,
+        borderRadius: 10,
+        overflow: "hidden",
+        fontFamily: "'JetBrains Mono', monospace",
+        fontSize: 12,
+      }}
+    >
+      <div style={{ display: "flex", padding: "8px 12px", background: `${COLORS.turf}aa`, color: COLORS.creamDim }}>
+        <div style={{ width: 24 }}>#</div>
+        <div style={{ flex: 1 }}>CLUB</div>
+        <div style={{ width: 60, textAlign: "right" }}>RESULT</div>
+      </div>
+      <div style={{ maxHeight: 320, overflowY: "auto" }}>
+        {shots.map((s, i) => (
           <div
+            key={i}
+            onClick={() => onEditShot && onEditShot(i)}
             style={{
-              marginTop: 4,
-              border: `1px solid ${COLORS.creamDim}22`,
-              borderRadius: 10,
-              overflow: "hidden",
-              fontFamily: "'JetBrains Mono', monospace",
-              fontSize: 12,
+              display: "flex",
+              padding: "7px 12px",
+              borderTop: `1px solid ${COLORS.creamDim}11`,
+              color: COLORS.cream,
+              cursor: onEditShot ? "pointer" : "default",
             }}
           >
-            <div style={{ display: "flex", padding: "8px 12px", background: `${COLORS.turf}aa`, color: COLORS.creamDim }}>
-              <div style={{ width: 24 }}>#</div>
-              <div style={{ flex: 1 }}>CLUB</div>
-              <div style={{ width: 60, textAlign: "right" }}>RESULT</div>
-            </div>
-            <div style={{ maxHeight: 150, overflowY: "auto" }}>
-              {shots.map((s, i) => (
-                <div
-                  key={i}
-                  style={{
-                    display: "flex",
-                    padding: "7px 12px",
-                    borderTop: `1px solid ${COLORS.creamDim}11`,
-                    color: COLORS.cream,
-                  }}
-                >
-                  <div style={{ width: 24, color: COLORS.creamDim }}>{i + 1}</div>
-                  <div style={{ flex: 1 }}>{CLUB_LABELS[s.club]}</div>
-                  <div style={{ width: 60, textAlign: "right", color: s.hit ? COLORS.fairwayLight : COLORS.flag }}>
-                    {s.hit ? "HIT" : "MISS"}
-                  </div>
-                </div>
-              ))}
+            <div style={{ width: 24, color: COLORS.creamDim }}>{i + 1}</div>
+            <div style={{ flex: 1 }}>{CLUB_LABELS[s.club]}</div>
+            <div style={{ width: 60, textAlign: "right", color: s.hit ? COLORS.fairwayLight : COLORS.flag }}>
+              {s.hit ? "HIT" : "MISS"}
             </div>
           </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Lets someone correct a previous Tee Accuracy shot — both which club it was, and whether it
+// actually found the fairway.
+function TeeShotEditModal({ shot, onSave, onCancel }) {
+  const [club, setClub] = useState(shot.club);
+  const [hit, setHit] = useState(shot.hit);
+
+  function handleSave() {
+    onSave({ club, hit });
+  }
+
+  return (
+    <div
+      onClick={onCancel}
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(10,22,15,0.75)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 24,
+        zIndex: 50,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: COLORS.turf,
+          border: `1px solid ${COLORS.creamDim}33`,
+          borderRadius: 14,
+          padding: 20,
+          maxWidth: 360,
+          width: "100%",
+        }}
+      >
+        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 20, letterSpacing: 1, color: COLORS.cream }}>
+          EDIT SHOT
+        </div>
+
+        <div style={{ marginTop: 14 }}>
+          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginBottom: 6 }}>
+            CLUB
+          </div>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            {Object.keys(CLUB_LABELS).map((c) => (
+              <button
+                key={c}
+                onClick={() => setClub(c)}
+                style={{
+                  padding: "8px 10px",
+                  borderRadius: 8,
+                  border: club === c ? `2px solid ${COLORS.fairwayLight}` : `1px solid ${COLORS.creamDim}33`,
+                  background: club === c ? COLORS.fairway : "transparent",
+                  color: COLORS.cream,
+                  fontFamily: "'Bebas Neue', sans-serif",
+                  fontSize: 12,
+                  cursor: "pointer",
+                }}
+              >
+                {CLUB_LABELS[c]}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ marginTop: 14 }}>
+          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginBottom: 6 }}>
+            RESULT
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button
+              onClick={() => setHit(true)}
+              style={{
+                flex: 1,
+                padding: "12px 0",
+                borderRadius: 10,
+                border: hit ? "none" : `1px solid ${COLORS.creamDim}33`,
+                background: hit ? COLORS.fairway : "transparent",
+                color: COLORS.cream,
+                fontFamily: "'Bebas Neue', sans-serif",
+                fontSize: 16,
+                letterSpacing: 1,
+                cursor: "pointer",
+              }}
+            >
+              HIT
+            </button>
+            <button
+              onClick={() => setHit(false)}
+              style={{
+                flex: 1,
+                padding: "12px 0",
+                borderRadius: 10,
+                border: !hit ? `2px solid ${COLORS.flag}` : `1px solid ${COLORS.creamDim}33`,
+                background: "transparent",
+                color: COLORS.cream,
+                fontFamily: "'Bebas Neue', sans-serif",
+                fontSize: 16,
+                letterSpacing: 1,
+                cursor: "pointer",
+              }}
+            >
+              MISS
+            </button>
+          </div>
+        </div>
+
+        <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
+          <button
+            onClick={onCancel}
+            style={{
+              flex: 1,
+              padding: "11px 0",
+              borderRadius: 10,
+              border: `1px solid ${COLORS.creamDim}33`,
+              background: "transparent",
+              color: COLORS.creamDim,
+              fontFamily: "'Bebas Neue', sans-serif",
+              fontSize: 15,
+              cursor: "pointer",
+            }}
+          >
+            CANCEL
+          </button>
+          <button
+            onClick={handleSave}
+            style={{
+              flex: 1,
+              padding: "11px 0",
+              borderRadius: 10,
+              border: "none",
+              background: COLORS.fairway,
+              color: COLORS.cream,
+              fontFamily: "'Bebas Neue', sans-serif",
+              fontSize: 15,
+              cursor: "pointer",
+            }}
+          >
+            SAVE
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Historical-session detail + edit view for Tee Accuracy. Reuses TeeShotLog for display and the
+// same TeeShotEditModal used for live-session editing.
+function TeeSessionDetailModal({ session, units, onEditShot, onClose }) {
+  const [editingShotIndex, setEditingShotIndex] = useState(null);
+
+  function handleSave(updatedShot) {
+    onEditShot(editingShotIndex, updatedShot);
+    setEditingShotIndex(null);
+  }
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(10,22,15,0.75)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 24,
+        zIndex: 50,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: COLORS.turf,
+          border: `1px solid ${COLORS.creamDim}33`,
+          borderRadius: 14,
+          padding: 20,
+          maxWidth: 380,
+          width: "100%",
+          maxHeight: "85vh",
+          overflowY: "auto",
+        }}
+      >
+        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 20, letterSpacing: 1, color: COLORS.cream }}>
+          SESSION DETAIL
+        </div>
+        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 4 }}>
+          {new Date(session.date).toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" })}
+          {"  ·  "}
+          {session.shotCount} shots · {session.clubs.map((c) => CLUB_LABELS[c]).join(", ")}
+        </div>
+
+        <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
+          <StatBox label="FAIRWAYS HIT" value={`${session.hitPct.toFixed(0)}%`} valueColor={ratingRagColor(session.hitPct / 20)} />
+          <StatBox label="HIT / TOTAL" value={`${session.hitCount}/${session.shotCount}`} />
+        </div>
+
+        <div style={{ marginTop: 16 }}>
+          <SectionLabel>Shot by shot — tap a shot to amend</SectionLabel>
+          <div style={{ marginTop: 6 }}>
+            <TeeShotLog shots={session.shots} units={units} onEditShot={setEditingShotIndex} />
+          </div>
+        </div>
+
+        <button
+          onClick={onClose}
+          style={{
+            width: "100%",
+            marginTop: 16,
+            padding: "11px 0",
+            borderRadius: 10,
+            border: `1px solid ${COLORS.creamDim}33`,
+            background: "transparent",
+            color: COLORS.creamDim,
+            fontFamily: "'Bebas Neue', sans-serif",
+            fontSize: 15,
+            cursor: "pointer",
+          }}
+        >
+          CLOSE
+        </button>
+      </div>
+
+      {editingShotIndex !== null && (
+        <div onClick={(e) => e.stopPropagation()}>
+          <TeeShotEditModal
+            shot={session.shots[editingShotIndex]}
+            onSave={handleSave}
+            onCancel={() => setEditingShotIndex(null)}
+          />
         </div>
       )}
     </div>
@@ -7341,6 +9096,1524 @@ function TeeAccuracySummaryScreen({ shots, fairwayWidth, onNewSession, storageEr
         }}
       >
         NEW SESSION
+      </button>
+    </div>
+  );
+}
+
+// ===== Wedge Matrix screens =====
+
+function WedgeMatrixSetupScreen({
+  selectedClubs,
+  onToggleClub,
+  selectedSwings,
+  onToggleSwing,
+  shotsPerCombo,
+  setShotsPerCombo,
+  onStart,
+  activeMatrix,
+  onResume,
+  onDiscard,
+  history,
+  loaded,
+  onViewMatrix,
+  onDeleteMatrix,
+  units,
+}) {
+  const canStart = selectedClubs.length > 0 && selectedSwings.length > 0 && shotsPerCombo >= 1;
+  const totalCombos = selectedClubs.length * selectedSwings.length;
+  const totalShots = totalCombos * shotsPerCombo;
+  const [manualShotEntry, setManualShotEntry] = useState(![5, 10].includes(shotsPerCombo));
+
+  if (activeMatrix) {
+    const doneCount = Object.keys(activeMatrix.results || {}).length;
+    return (
+      <div>
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 24, letterSpacing: 1, lineHeight: 1 }}>WEDGE MATRIX</div>
+          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
+            You have a matrix in progress
+          </div>
+        </div>
+        <Card>
+          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: COLORS.cream }}>
+            {doneCount} of {activeMatrix.sequence.length} club/swing combos completed
+          </div>
+          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 4 }}>
+            {activeMatrix.selectedClubs.length} clubs × {activeMatrix.selectedSwings.length} swings ·{" "}
+            {activeMatrix.shotsPerCombo} shots each
+          </div>
+          <button
+            onClick={onResume}
+            style={{
+              width: "100%",
+              marginTop: 14,
+              padding: "13px 0",
+              borderRadius: 12,
+              border: "none",
+              background: COLORS.flag,
+              color: COLORS.cream,
+              fontFamily: "'Bebas Neue', sans-serif",
+              fontSize: 20,
+              letterSpacing: 1,
+              cursor: "pointer",
+            }}
+          >
+            RESUME
+          </button>
+          <div
+            onClick={onDiscard}
+            style={{
+              textAlign: "center",
+              marginTop: 10,
+              fontFamily: "'JetBrains Mono', monospace",
+              fontSize: 10,
+              color: COLORS.creamDim,
+              cursor: "pointer",
+              textDecoration: "underline",
+              textUnderlineOffset: 3,
+            }}
+          >
+            Discard and start over
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div style={{ marginBottom: 12 }}>
+        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 24, letterSpacing: 1, lineHeight: 1 }}>WEDGE MATRIX</div>
+        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
+          Build a personal yardage chart for every club and swing length
+        </div>
+      </div>
+
+      {loaded && history.length > 0 && (
+        <CollapsibleSection title="Past matrices" count={history.length}>
+          {history.map((m) => {
+            const comboCount = Object.keys(m.results || {}).length;
+            return (
+              <SwipeToDelete key={m.id} onDelete={() => onDeleteMatrix(m.id)}>
+                <div
+                  onClick={() => onViewMatrix(m)}
+                  style={{
+                    padding: "12px 14px",
+                    borderRadius: 10,
+                    border: `1px solid ${COLORS.creamDim}22`,
+                    background: COLORS.turf,
+                    marginBottom: 10,
+                    cursor: "pointer",
+                  }}
+                >
+                  <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 16, color: COLORS.sand }}>
+                    {new Date(m.date).toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" })}
+                  </div>
+                  <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginTop: 2 }}>
+                    {m.selectedClubs.length} clubs × {m.selectedSwings.length} swings · {comboCount} combos · {m.shotsPerCombo} shots each
+                  </div>
+                </div>
+              </SwipeToDelete>
+            );
+          })}
+        </CollapsibleSection>
+      )}
+
+      <Card>
+        <SectionLabel>Clubs to test</SectionLabel>
+        <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 8 }}>
+          {WEDGE_CLUBS.map((c) => (
+            <div
+              key={c.key}
+              onClick={() => onToggleClub(c.key)}
+              style={{
+                padding: "10px 14px",
+                borderRadius: 8,
+                border: selectedClubs.includes(c.key) ? `2px solid ${COLORS.fairwayLight}` : `1px solid ${COLORS.creamDim}33`,
+                background: selectedClubs.includes(c.key) ? COLORS.fairway : "transparent",
+                color: COLORS.cream,
+                fontFamily: "'Bebas Neue', sans-serif",
+                fontSize: 15,
+                letterSpacing: 0.5,
+                cursor: "pointer",
+              }}
+            >
+              {c.label}
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      <Card style={{ marginTop: 10 }}>
+        <SectionLabel>Swing lengths to test</SectionLabel>
+        <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
+          {WEDGE_SWINGS.map((s) => (
+            <div
+              key={s.key}
+              onClick={() => onToggleSwing(s.key)}
+              style={{
+                flex: 1,
+                textAlign: "center",
+                padding: "10px 6px",
+                borderRadius: 8,
+                border: selectedSwings.includes(s.key) ? `2px solid ${COLORS.fairwayLight}` : `1px solid ${COLORS.creamDim}33`,
+                background: selectedSwings.includes(s.key) ? COLORS.fairway : "transparent",
+                color: COLORS.cream,
+                fontFamily: "'Bebas Neue', sans-serif",
+                fontSize: 14,
+                cursor: "pointer",
+              }}
+            >
+              {s.label}
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      <Card style={{ marginTop: 10 }}>
+        <SectionLabel>Shots per combo</SectionLabel>
+        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginTop: 4 }}>
+          The middle 60% of shots count toward the average — the rest are dropped evenly from the
+          shortest and longest ends. You can also manually include/exclude individual shots
+          afterward.
+        </div>
+        <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+          <PillOption
+            label={5}
+            active={!manualShotEntry && shotsPerCombo === 5}
+            onClick={() => {
+              setShotsPerCombo(5);
+              setManualShotEntry(false);
+            }}
+          />
+          <PillOption
+            label={10}
+            active={!manualShotEntry && shotsPerCombo === 10}
+            onClick={() => {
+              setShotsPerCombo(10);
+              setManualShotEntry(false);
+            }}
+          />
+          <PillOption label="MANUAL" active={manualShotEntry} onClick={() => setManualShotEntry(true)} />
+        </div>
+        {manualShotEntry && (
+          <div style={{ marginTop: 8 }}>
+            {/* Deliberately doesn't clamp to a minimum on every keystroke (same class of bug as the
+                old Putting min-field) — clamping inline meant clearing the field to type e.g. "7"
+                snapped straight back to "1" before the "7" could be entered, so the field was stuck
+                unable to reach any single digit other than 1. Validation happens once, at START. */}
+            <NumberField label="SHOTS" value={shotsPerCombo} onChange={setShotsPerCombo} />
+            {shotsPerCombo < 1 && (
+              <div style={{ color: COLORS.flag, fontSize: 11, marginTop: 6, fontFamily: "'JetBrains Mono', monospace" }}>
+                Enter at least 1 shot per combo.
+              </div>
+            )}
+          </div>
+        )}
+        {shotsPerCombo >= 1 && (() => {
+          const { keepCount, dropLow, dropHigh } = wedgeTrimPreview(shotsPerCombo);
+          return (
+            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.sand, marginTop: 8 }}>
+              {shotsPerCombo} shots → keeps the middle {keepCount}
+              {dropLow + dropHigh > 0 ? `, drops ${dropLow} shortest + ${dropHigh} longest` : " (too few to drop any)"}
+            </div>
+          );
+        })()}
+      </Card>
+
+      {canStart && (
+        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 10, textAlign: "center" }}>
+          {totalCombos} combo{totalCombos === 1 ? "" : "s"} · {totalShots} shots total
+        </div>
+      )}
+
+      <button
+        onClick={onStart}
+        disabled={!canStart}
+        style={{
+          width: "100%",
+          marginTop: 10,
+          padding: "13px 0",
+          borderRadius: 12,
+          border: "none",
+          background: !canStart ? `${COLORS.fairway}66` : COLORS.flag,
+          color: COLORS.cream,
+          fontFamily: "'Bebas Neue', sans-serif",
+          fontSize: 22,
+          letterSpacing: 2,
+          cursor: !canStart ? "not-allowed" : "pointer",
+        }}
+      >
+        START MATRIX
+      </button>
+      {!canStart && (
+        <div style={{ color: COLORS.creamDim, fontSize: 11, marginTop: 8, fontFamily: "'JetBrains Mono', monospace", textAlign: "center" }}>
+          Select at least one club and one swing length.
+        </div>
+      )}
+    </div>
+  );
+}
+
+function WedgeMatrixPracticeScreen({
+  sequence,
+  comboIndex,
+  currentShots,
+  shotsPerCombo,
+  distanceInput,
+  setDistanceInput,
+  onSubmitShot,
+  comboComplete,
+  results,
+  onNextCombo,
+  onToggleShot,
+  onAddShot,
+  onExitEarly,
+  units,
+  inputRef,
+}) {
+  const combo = sequence[comboIndex];
+  const comboKey = `${combo.clubKey}-${combo.swingKey}`;
+  const result = results[comboKey];
+  const isLastCombo = comboIndex + 1 >= sequence.length;
+  const unitLabel = longUnitLabel(units);
+  const overallShotNumber = sequence.slice(0, comboIndex).length * shotsPerCombo + currentShots.length;
+  const totalShots = sequence.length * shotsPerCombo;
+
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim }}>
+          COMBO {comboIndex + 1} OF {sequence.length}
+        </div>
+        <div
+          onClick={onExitEarly}
+          style={{
+            fontFamily: "'JetBrains Mono', monospace",
+            fontSize: 10,
+            color: COLORS.creamDim,
+            cursor: "pointer",
+            textDecoration: "underline",
+            textUnderlineOffset: 3,
+          }}
+        >
+          SAVE &amp; EXIT
+        </div>
+      </div>
+
+      {!comboComplete ? (
+        <Card>
+          <div style={{ textAlign: "center" }}>
+            <div style={{ fontSize: 12, color: COLORS.sand, fontFamily: "'JetBrains Mono', monospace", letterSpacing: 2 }}>
+              {combo.clubLabel}
+            </div>
+            <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 32, lineHeight: 1.1, color: COLORS.flag, marginTop: 2 }}>
+              {combo.swingLabel}
+            </div>
+            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 8 }}>
+              {currentShots.length >= shotsPerCombo
+                ? `EXTRA SHOT ${currentShots.length - shotsPerCombo + 1}`
+                : `SHOT ${currentShots.length + 1} OF ${shotsPerCombo}`}
+            </div>
+          </div>
+
+          <div style={{ marginTop: 14 }}>
+            <div style={{ fontSize: 10, color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", marginBottom: 6 }}>
+              CARRY DISTANCE ({unitLabel.toUpperCase()})
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <input
+                ref={inputRef}
+                autoFocus
+                type="number"
+                inputMode="decimal"
+                value={distanceInput}
+                onChange={(e) => setDistanceInput(e.target.value)}
+                placeholder="0"
+                style={{
+                  flex: 1,
+                  background: COLORS.turfDark,
+                  border: `1px solid ${COLORS.creamDim}33`,
+                  borderRadius: 8,
+                  color: COLORS.cream,
+                  fontFamily: "'Bebas Neue', sans-serif",
+                  fontSize: 24,
+                  padding: "7px 12px",
+                  boxSizing: "border-box",
+                }}
+              />
+              <button
+                onClick={onSubmitShot}
+                disabled={distanceInput === ""}
+                style={{
+                  padding: "0 18px",
+                  borderRadius: 8,
+                  border: "none",
+                  background: distanceInput === "" ? `${COLORS.fairway}66` : COLORS.fairway,
+                  color: COLORS.cream,
+                  fontFamily: "'Bebas Neue', sans-serif",
+                  fontSize: 16,
+                  letterSpacing: 1,
+                  cursor: distanceInput === "" ? "not-allowed" : "pointer",
+                }}
+              >
+                LOG
+              </button>
+            </div>
+          </div>
+
+          {currentShots.length > 0 && (
+            <div style={{ marginTop: 10, fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim }}>
+              Logged so far: {currentShots.map((s) => `${ydsToUnitRound(s, units)}${unitLabel}`).join(", ")}
+            </div>
+          )}
+        </Card>
+      ) : (
+        <Card>
+          <div style={{ textAlign: "center" }}>
+            <div style={{ fontSize: 11, color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", letterSpacing: 2 }}>
+              {combo.clubLabel} · {combo.swingLabel} COMPLETE
+            </div>
+            <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 48, lineHeight: 1, color: COLORS.flag, marginTop: 4 }}>
+              {ydsToUnitRound(result.average, units)}
+              <span style={{ fontSize: 18, marginLeft: 6, color: COLORS.creamDim }}>{unitLabel}</span>
+            </div>
+            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginTop: 4 }}>
+              average of {result.shots.filter((s) => s.included).length} of {result.shots.length} shots
+            </div>
+          </div>
+
+          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginTop: 14, marginBottom: 6, textAlign: "center" }}>
+            TAP A SHOT TO INCLUDE/EXCLUDE IT — GREEN COUNTS TOWARD THE AVERAGE
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, justifyContent: "center" }}>
+            {result.shots.map((s, i) => (
+              <button
+                key={i}
+                onClick={() => onToggleShot(comboKey, i)}
+                style={{
+                  padding: "8px 12px",
+                  borderRadius: 8,
+                  border: s.included ? `2px solid ${COLORS.fairwayLight}` : `1px solid ${COLORS.flag}`,
+                  background: s.included ? COLORS.fairway : "transparent",
+                  color: s.included ? COLORS.cream : COLORS.creamDim,
+                  fontFamily: "'JetBrains Mono', monospace",
+                  fontSize: 12,
+                  cursor: "pointer",
+                  textDecoration: s.included ? "none" : "line-through",
+                }}
+              >
+                {ydsToUnitRound(s.value, units)}
+                {unitLabel}
+              </button>
+            ))}
+          </div>
+
+          <button
+            onClick={onAddShot}
+            style={{
+              width: "100%",
+              marginTop: 14,
+              padding: "11px 0",
+              borderRadius: 10,
+              border: `1px solid ${COLORS.creamDim}33`,
+              background: "transparent",
+              color: COLORS.cream,
+              fontFamily: "'Bebas Neue', sans-serif",
+              fontSize: 14,
+              letterSpacing: 0.5,
+              cursor: "pointer",
+            }}
+          >
+            + HIT ANOTHER SHOT
+          </button>
+          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: COLORS.creamDim, marginTop: 6, textAlign: "center" }}>
+            Not sure about these yardages? Hit a few more — the average re-trims automatically over
+            the bigger sample.
+          </div>
+
+          <button
+            onClick={onNextCombo}
+            style={{
+              width: "100%",
+              marginTop: 10,
+              padding: "13px 0",
+              borderRadius: 12,
+              border: "none",
+              background: COLORS.flag,
+              color: COLORS.cream,
+              fontFamily: "'Bebas Neue', sans-serif",
+              fontSize: 18,
+              letterSpacing: 1,
+              cursor: "pointer",
+            }}
+          >
+            {isLastCombo ? "FINISH MATRIX" : "NEXT COMBO"}
+          </button>
+        </Card>
+      )}
+
+      <div style={{ marginTop: 10, fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, textAlign: "center" }}>
+        {Math.min(overallShotNumber, totalShots)} of {totalShots} shots overall
+      </div>
+    </div>
+  );
+}
+
+function WedgeMatrixResultScreen({ matrix, units, onNewMatrix, onToggleShot, onEditShotValue }) {
+  const clubs = WEDGE_CLUBS.filter((c) => matrix.selectedClubs.includes(c.key));
+  const swings = WEDGE_SWINGS.filter((s) => matrix.selectedSwings.includes(s.key));
+  const unitLabel = longUnitLabel(units);
+  const [editingShot, setEditingShot] = useState(null); // { comboKey, shotIndex, shot }
+
+  return (
+    <div>
+      <PrintHeader title="Wedge Matrix" timescale="all" />
+      <div className="no-print" style={{ marginBottom: 12 }}>
+        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 24, letterSpacing: 1, lineHeight: 1 }}>YOUR WEDGE MATRIX</div>
+        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
+          {new Date(matrix.date).toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" })} ·{" "}
+          {matrix.shotsPerCombo} shots per combo, outliers removed
+        </div>
+      </div>
+
+      <Card style={{ padding: 0, overflow: "hidden" }}>
+        <div style={{ display: "flex" }}>
+          <div style={{ width: 90, flexShrink: 0, padding: "10px 8px", background: `${COLORS.turf}aa` }} />
+          {swings.map((s) => (
+            <div
+              key={s.key}
+              style={{
+                flex: 1,
+                padding: "10px 4px",
+                background: `${COLORS.turf}aa`,
+                textAlign: "center",
+                fontFamily: "'JetBrains Mono', monospace",
+                fontSize: 10,
+                color: COLORS.creamDim,
+                borderLeft: `1px solid ${COLORS.creamDim}15`,
+              }}
+            >
+              {s.label}
+            </div>
+          ))}
+        </div>
+        {clubs.map((c, i) => (
+          <div key={c.key} style={{ display: "flex", borderTop: `1px solid ${COLORS.creamDim}15` }}>
+            <div
+              style={{
+                width: 90,
+                flexShrink: 0,
+                padding: "10px 8px",
+                fontFamily: "'Bebas Neue', sans-serif",
+                fontSize: 14,
+                color: COLORS.cream,
+                display: "flex",
+                alignItems: "center",
+              }}
+            >
+              {c.key}
+            </div>
+            {swings.map((s) => {
+              const key = `${c.key}-${s.key}`;
+              const result = matrix.results[key];
+              return (
+                <div
+                  key={s.key}
+                  style={{
+                    flex: 1,
+                    padding: "10px 4px",
+                    textAlign: "center",
+                    borderLeft: `1px solid ${COLORS.creamDim}15`,
+                    fontFamily: "'Bebas Neue', sans-serif",
+                    fontSize: 18,
+                    color: result ? COLORS.flag : COLORS.creamDim,
+                  }}
+                >
+                  {result ? `${ydsToUnitRound(result.average, units)}${unitLabel}` : "—"}
+                </div>
+              );
+            })}
+          </div>
+        ))}
+      </Card>
+
+      <CollapsibleSection title="Shot detail" count={matrix.sequence.length}>
+        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginBottom: 10 }}>
+          Tap a shot to include/exclude it from the average · tap ✎ to correct a wrong value
+        </div>
+        {matrix.sequence.map((combo) => {
+          const comboKey = `${combo.clubKey}-${combo.swingKey}`;
+          const result = matrix.results[comboKey];
+          if (!result) return null;
+          return (
+            <div key={comboKey} style={{ marginBottom: 14 }}>
+              <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim }}>
+                <span style={{ color: COLORS.cream, fontFamily: "'Bebas Neue', sans-serif", fontSize: 15, letterSpacing: 0.5 }}>
+                  {combo.clubKey}
+                </span>{" "}
+                · {combo.swingLabel} · avg {ydsToUnitRound(result.average, units)}
+                {unitLabel} · {result.shots.filter((s) => s.included).length} of {result.shots.length} shots
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 6 }}>
+                {result.shots.map((s, i) => (
+                  <div key={i} style={{ display: "flex" }}>
+                    <button
+                      onClick={() => onToggleShot(comboKey, i)}
+                      style={{
+                        padding: "8px 10px",
+                        borderRadius: "8px 0 0 8px",
+                        border: s.included ? `2px solid ${COLORS.fairwayLight}` : `1px solid ${COLORS.flag}`,
+                        borderRight: "none",
+                        background: s.included ? COLORS.fairway : "transparent",
+                        color: s.included ? COLORS.cream : COLORS.creamDim,
+                        fontFamily: "'JetBrains Mono', monospace",
+                        fontSize: 12,
+                        cursor: "pointer",
+                        textDecoration: s.included ? "none" : "line-through",
+                      }}
+                    >
+                      {ydsToUnitRound(s.value, units)}
+                      {unitLabel}
+                    </button>
+                    <button
+                      onClick={() => setEditingShot({ comboKey, shotIndex: i, shot: s })}
+                      title="Correct this shot's value"
+                      style={{
+                        padding: "0 8px",
+                        borderRadius: "0 8px 8px 0",
+                        border: s.included ? `2px solid ${COLORS.fairwayLight}` : `1px solid ${COLORS.flag}`,
+                        borderLeft: `1px solid ${COLORS.creamDim}33`,
+                        background: "transparent",
+                        color: COLORS.creamDim,
+                        fontFamily: "'JetBrains Mono', monospace",
+                        fontSize: 12,
+                        cursor: "pointer",
+                      }}
+                    >
+                      ✎
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </CollapsibleSection>
+
+      {editingShot && (
+        <WedgeShotValueEditModal
+          shot={editingShot.shot}
+          units={units}
+          onSave={(newValue) => {
+            onEditShotValue(editingShot.comboKey, editingShot.shotIndex, newValue);
+            setEditingShot(null);
+          }}
+          onCancel={() => setEditingShot(null)}
+        />
+      )}
+
+      <div className="no-print" style={{ display: "flex", gap: 8, marginTop: 14 }}>
+        <button
+          onClick={() => window.print()}
+          style={{
+            flex: 1,
+            padding: "12px 0",
+            borderRadius: 10,
+            border: `1px solid ${COLORS.creamDim}33`,
+            background: "transparent",
+            color: COLORS.cream,
+            fontFamily: "'Bebas Neue', sans-serif",
+            fontSize: 15,
+            letterSpacing: 0.5,
+            cursor: "pointer",
+          }}
+        >
+          SAVE AS PDF
+        </button>
+        <button
+          onClick={() => downloadWedgeMatrixPNG(matrix, units)}
+          style={{
+            flex: 1,
+            padding: "12px 0",
+            borderRadius: 10,
+            border: `1px solid ${COLORS.creamDim}33`,
+            background: "transparent",
+            color: COLORS.cream,
+            fontFamily: "'Bebas Neue', sans-serif",
+            fontSize: 15,
+            letterSpacing: 0.5,
+            cursor: "pointer",
+          }}
+        >
+          DOWNLOAD PNG
+        </button>
+      </div>
+
+      <button
+        onClick={onNewMatrix}
+        className="no-print"
+        style={{
+          width: "100%",
+          marginTop: 10,
+          padding: "13px 0",
+          borderRadius: 12,
+          border: "none",
+          background: COLORS.flag,
+          color: COLORS.cream,
+          fontFamily: "'Bebas Neue', sans-serif",
+          fontSize: 18,
+          letterSpacing: 1,
+          cursor: "pointer",
+        }}
+      >
+        BUILD A NEW MATRIX
+      </button>
+    </div>
+  );
+}
+
+// Lets someone correct a Wedge Matrix shot's actual carry distance after the matrix is finished —
+// the include/exclude chip alone can only hide a bad shot from the average, not fix a mis-typed
+// value. Deliberately minimal (distance only) to match the rest of the app's small edit-modal
+// pattern.
+function WedgeShotValueEditModal({ shot, units, onSave, onCancel }) {
+  const [valueInput, setValueInput] = useState(String(fmt1(ydsToUnit(shot.value, units))));
+  const unitLabel = longUnitLabel(units);
+
+  function handleSave() {
+    const value = unitToYds(parseFloat(valueInput) || 0, units);
+    onSave(value);
+  }
+
+  return (
+    <div
+      onClick={onCancel}
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(10,22,15,0.75)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 24,
+        zIndex: 50,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: COLORS.turf,
+          border: `1px solid ${COLORS.creamDim}33`,
+          borderRadius: 14,
+          padding: 20,
+          maxWidth: 320,
+          width: "100%",
+        }}
+      >
+        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 20, letterSpacing: 1, color: COLORS.cream }}>
+          CORRECT SHOT
+        </div>
+        <div style={{ marginTop: 14 }}>
+          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginBottom: 6 }}>
+            CARRY DISTANCE ({unitLabel.toUpperCase()})
+          </div>
+          <input
+            type="number"
+            inputMode="decimal"
+            autoFocus
+            value={valueInput}
+            onChange={(e) => setValueInput(e.target.value)}
+            style={{
+              width: "100%",
+              background: COLORS.turfDark,
+              border: `1px solid ${COLORS.creamDim}33`,
+              borderRadius: 8,
+              color: COLORS.cream,
+              fontFamily: "'Bebas Neue', sans-serif",
+              fontSize: 22,
+              padding: "10px 12px",
+              boxSizing: "border-box",
+            }}
+          />
+        </div>
+        <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
+          <button
+            onClick={onCancel}
+            style={{
+              flex: 1,
+              padding: "11px 0",
+              borderRadius: 10,
+              border: `1px solid ${COLORS.creamDim}33`,
+              background: "transparent",
+              color: COLORS.creamDim,
+              fontFamily: "'Bebas Neue', sans-serif",
+              fontSize: 15,
+              cursor: "pointer",
+            }}
+          >
+            CANCEL
+          </button>
+          <button
+            onClick={handleSave}
+            style={{
+              flex: 1,
+              padding: "11px 0",
+              borderRadius: 10,
+              border: "none",
+              background: COLORS.fairway,
+              color: COLORS.cream,
+              fontFamily: "'Bebas Neue', sans-serif",
+              fontSize: 15,
+              cursor: "pointer",
+            }}
+          >
+            SAVE
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ===== Gapping screens (full-swing yardage chart — same process as Wedge Matrix, minus the
+// swing-length dimension) =====
+
+function GappingSetupScreen({
+  selectedClubs,
+  onToggleClub,
+  customClubs,
+  onAddCustomClub,
+  onRemoveCustomClub,
+  shotsPerClub,
+  setShotsPerClub,
+  onStart,
+  activeChart,
+  onResume,
+  onDiscard,
+  history,
+  loaded,
+  onViewChart,
+  onDeleteChart,
+  units,
+}) {
+  const canStart = selectedClubs.length > 0 && shotsPerClub >= 1;
+  const totalClubs = selectedClubs.length;
+  const totalShots = totalClubs * shotsPerClub;
+  const [manualShotEntry, setManualShotEntry] = useState(![5, 10].includes(shotsPerClub));
+  const [customClubInput, setCustomClubInput] = useState("");
+
+  if (activeChart) {
+    const doneCount = Object.keys(activeChart.results || {}).length;
+    return (
+      <div>
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 24, letterSpacing: 1, lineHeight: 1 }}>GAPPING</div>
+          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
+            You have a chart in progress
+          </div>
+        </div>
+        <Card>
+          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: COLORS.cream }}>
+            {doneCount} of {activeChart.sequence.length} clubs completed
+          </div>
+          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 4 }}>
+            {activeChart.selectedClubs.length} clubs · {activeChart.shotsPerClub} shots each
+          </div>
+          <button
+            onClick={onResume}
+            style={{
+              width: "100%",
+              marginTop: 14,
+              padding: "13px 0",
+              borderRadius: 12,
+              border: "none",
+              background: COLORS.flag,
+              color: COLORS.cream,
+              fontFamily: "'Bebas Neue', sans-serif",
+              fontSize: 20,
+              letterSpacing: 1,
+              cursor: "pointer",
+            }}
+          >
+            RESUME
+          </button>
+          <div
+            onClick={onDiscard}
+            style={{
+              textAlign: "center",
+              marginTop: 10,
+              fontFamily: "'JetBrains Mono', monospace",
+              fontSize: 10,
+              color: COLORS.creamDim,
+              cursor: "pointer",
+              textDecoration: "underline",
+              textUnderlineOffset: 3,
+            }}
+          >
+            Discard and start over
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div style={{ marginBottom: 12 }}>
+        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 24, letterSpacing: 1, lineHeight: 1 }}>GAPPING</div>
+        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
+          Build a full-swing yardage chart, club by club
+        </div>
+      </div>
+
+      {loaded && history.length > 0 && (
+        <CollapsibleSection title="Past charts" count={history.length}>
+          {history.map((m) => {
+            const clubCount = Object.keys(m.results || {}).length;
+            return (
+              <SwipeToDelete key={m.id} onDelete={() => onDeleteChart(m.id)}>
+                <div
+                  onClick={() => onViewChart(m)}
+                  style={{
+                    padding: "12px 14px",
+                    borderRadius: 10,
+                    border: `1px solid ${COLORS.creamDim}22`,
+                    background: COLORS.turf,
+                    marginBottom: 10,
+                    cursor: "pointer",
+                  }}
+                >
+                  <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 16, color: COLORS.sand }}>
+                    {new Date(m.date).toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" })}
+                  </div>
+                  <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginTop: 2 }}>
+                    {clubCount} clubs · {m.shotsPerClub} shots each
+                  </div>
+                </div>
+              </SwipeToDelete>
+            );
+          })}
+        </CollapsibleSection>
+      )}
+
+      <Card>
+        <SectionLabel>Clubs to test</SectionLabel>
+        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginTop: 4, marginBottom: 8 }}>
+          Full swings only, 9 Iron up through Driver (plus 2/3/4 Hybrid). For wedges — and
+          half/three-quarter swings — use the Wedge Matrix instead.
+        </div>
+        {/* Column contents come from GAPPING_GRID_COLUMNS — a hand-picked layout, not derived from
+            GAPPING_CLUBS' practice-order array (that order is unrelated to how this grid reads;
+            e.g. Driver sits at the top of column 1 despite practicing last). Built as three
+            separate flex columns inside an outer grid rather than relying on CSS
+            grid-auto-flow: column, so each column's contents are explicit and don't depend on the
+            total item count being evenly divisible. */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6 }}>
+          {(() => {
+            const columns = GAPPING_GRID_COLUMNS.map((keys) =>
+              keys.map((key) => GAPPING_CLUBS.find((c) => c.key === key)).filter(Boolean)
+            );
+            return columns.map((col, colIndex) => (
+              <div key={colIndex} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {col.map((c) => (
+                  <div
+                    key={c.key}
+                    onClick={() => onToggleClub(c.key)}
+                    style={{
+                      padding: "9px 4px",
+                      borderRadius: 8,
+                      border: selectedClubs.includes(c.key) ? `2px solid ${COLORS.fairwayLight}` : `1px solid ${COLORS.creamDim}33`,
+                      background: selectedClubs.includes(c.key) ? COLORS.fairway : "transparent",
+                      color: COLORS.cream,
+                      fontFamily: "'Bebas Neue', sans-serif",
+                      fontSize: 14,
+                      letterSpacing: 0.5,
+                      textAlign: "center",
+                      cursor: "pointer",
+                    }}
+                  >
+                    {c.label}
+                  </div>
+                ))}
+              </div>
+            ));
+          })()}
+        </div>
+
+        {customClubs.length > 0 && (
+          <div style={{ marginTop: 14 }}>
+            <SectionLabel>Custom clubs</SectionLabel>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, marginTop: 8 }}>
+              {customClubs.map((c) => (
+                <div key={c.key} style={{ position: "relative" }}>
+                  <div
+                    onClick={() => onToggleClub(c.key)}
+                    style={{
+                      padding: "9px 12px 9px 4px",
+                      borderRadius: 8,
+                      border: selectedClubs.includes(c.key) ? `2px solid ${COLORS.fairwayLight}` : `1px solid ${COLORS.creamDim}33`,
+                      background: selectedClubs.includes(c.key) ? COLORS.fairway : "transparent",
+                      color: COLORS.cream,
+                      fontFamily: "'Bebas Neue', sans-serif",
+                      fontSize: 12,
+                      letterSpacing: 0.3,
+                      textAlign: "center",
+                      cursor: "pointer",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {c.label}
+                  </div>
+                  <button
+                    onClick={() => onRemoveCustomClub(c.key)}
+                    title="Remove this custom club"
+                    style={{
+                      position: "absolute",
+                      top: -6,
+                      right: -6,
+                      width: 18,
+                      height: 18,
+                      borderRadius: "50%",
+                      border: `1px solid ${COLORS.creamDim}44`,
+                      background: COLORS.turfDark,
+                      color: COLORS.creamDim,
+                      fontFamily: "'JetBrains Mono', monospace",
+                      fontSize: 11,
+                      lineHeight: 1,
+                      padding: 0,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      cursor: "pointer",
+                    }}
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
+          <input
+            type="text"
+            value={customClubInput}
+            onChange={(e) => setCustomClubInput(e.target.value)}
+            placeholder="e.g. 2 HYBRID"
+            style={{
+              flex: 1,
+              background: COLORS.turfDark,
+              border: `1px solid ${COLORS.creamDim}33`,
+              borderRadius: 8,
+              color: COLORS.cream,
+              fontFamily: "'JetBrains Mono', monospace",
+              fontSize: 13,
+              padding: "10px 12px",
+              boxSizing: "border-box",
+            }}
+          />
+          <button
+            onClick={() => {
+              if (customClubInput.trim()) {
+                onAddCustomClub(customClubInput);
+                setCustomClubInput("");
+              }
+            }}
+            disabled={!customClubInput.trim()}
+            style={{
+              padding: "0 16px",
+              borderRadius: 8,
+              border: "none",
+              background: !customClubInput.trim() ? `${COLORS.fairway}66` : COLORS.fairway,
+              color: COLORS.cream,
+              fontFamily: "'Bebas Neue', sans-serif",
+              fontSize: 14,
+              letterSpacing: 0.5,
+              cursor: !customClubInput.trim() ? "not-allowed" : "pointer",
+            }}
+          >
+            + ADD CLUB
+          </button>
+        </div>
+        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: COLORS.creamDim, marginTop: 6 }}>
+          A custom club is added wherever it lands in the list above — position doesn't matter, only
+          the yardage does.
+        </div>
+      </Card>
+
+      <Card style={{ marginTop: 10 }}>
+        <SectionLabel>Shots per club</SectionLabel>
+        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginTop: 4 }}>
+          The middle 60% of shots count toward the average — the rest are dropped evenly from the
+          shortest and longest ends. You can also manually include/exclude individual shots
+          afterward.
+        </div>
+        <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+          <PillOption
+            label={5}
+            active={!manualShotEntry && shotsPerClub === 5}
+            onClick={() => {
+              setShotsPerClub(5);
+              setManualShotEntry(false);
+            }}
+          />
+          <PillOption
+            label={10}
+            active={!manualShotEntry && shotsPerClub === 10}
+            onClick={() => {
+              setShotsPerClub(10);
+              setManualShotEntry(false);
+            }}
+          />
+          <PillOption label="MANUAL" active={manualShotEntry} onClick={() => setManualShotEntry(true)} />
+        </div>
+        {manualShotEntry && (
+          <div style={{ marginTop: 8 }}>
+            {/* Same deliberate no-clamp-on-keystroke fix as the Wedge Matrix manual field. */}
+            <NumberField label="SHOTS" value={shotsPerClub} onChange={setShotsPerClub} />
+            {shotsPerClub < 1 && (
+              <div style={{ color: COLORS.flag, fontSize: 11, marginTop: 6, fontFamily: "'JetBrains Mono', monospace" }}>
+                Enter at least 1 shot per club.
+              </div>
+            )}
+          </div>
+        )}
+        {shotsPerClub >= 1 && (() => {
+          const { keepCount, dropLow, dropHigh } = wedgeTrimPreview(shotsPerClub);
+          return (
+            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.sand, marginTop: 8 }}>
+              {shotsPerClub} shots → keeps the middle {keepCount}
+              {dropLow + dropHigh > 0 ? `, drops ${dropLow} shortest + ${dropHigh} longest` : " (too few to drop any)"}
+            </div>
+          );
+        })()}
+      </Card>
+
+      {canStart && (
+        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 10, textAlign: "center" }}>
+          {totalClubs} club{totalClubs === 1 ? "" : "s"} · {totalShots} shots total
+        </div>
+      )}
+
+      <button
+        onClick={onStart}
+        disabled={!canStart}
+        style={{
+          width: "100%",
+          marginTop: 10,
+          padding: "13px 0",
+          borderRadius: 12,
+          border: "none",
+          background: !canStart ? `${COLORS.fairway}66` : COLORS.flag,
+          color: COLORS.cream,
+          fontFamily: "'Bebas Neue', sans-serif",
+          fontSize: 22,
+          letterSpacing: 2,
+          cursor: !canStart ? "not-allowed" : "pointer",
+        }}
+      >
+        START CHART
+      </button>
+      {!canStart && (
+        <div style={{ color: COLORS.creamDim, fontSize: 11, marginTop: 8, fontFamily: "'JetBrains Mono', monospace", textAlign: "center" }}>
+          Select at least one club.
+        </div>
+      )}
+    </div>
+  );
+}
+
+function GappingPracticeScreen({
+  sequence,
+  clubIndex,
+  currentShots,
+  shotsPerClub,
+  distanceInput,
+  setDistanceInput,
+  onSubmitShot,
+  clubComplete,
+  results,
+  onNextClub,
+  onToggleShot,
+  onAddShot,
+  onExitEarly,
+  units,
+  inputRef,
+}) {
+  const club = sequence[clubIndex];
+  const result = results[club.clubKey];
+  const isLastClub = clubIndex + 1 >= sequence.length;
+  const unitLabel = longUnitLabel(units);
+  const overallShotNumber = sequence.slice(0, clubIndex).length * shotsPerClub + currentShots.length;
+  const totalShots = sequence.length * shotsPerClub;
+
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim }}>
+          CLUB {clubIndex + 1} OF {sequence.length}
+        </div>
+        <div
+          onClick={onExitEarly}
+          style={{
+            fontFamily: "'JetBrains Mono', monospace",
+            fontSize: 10,
+            color: COLORS.creamDim,
+            cursor: "pointer",
+            textDecoration: "underline",
+            textUnderlineOffset: 3,
+          }}
+        >
+          SAVE &amp; EXIT
+        </div>
+      </div>
+
+      {!clubComplete ? (
+        <Card>
+          <div style={{ textAlign: "center" }}>
+            <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 32, lineHeight: 1.1, color: COLORS.flag, marginTop: 2 }}>
+              {club.clubLabel}
+            </div>
+            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 8 }}>
+              {currentShots.length >= shotsPerClub
+                ? `EXTRA SHOT ${currentShots.length - shotsPerClub + 1}`
+                : `SHOT ${currentShots.length + 1} OF ${shotsPerClub}`}
+            </div>
+          </div>
+
+          <div style={{ marginTop: 14 }}>
+            <div style={{ fontSize: 10, color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", marginBottom: 6 }}>
+              CARRY DISTANCE ({unitLabel.toUpperCase()})
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <input
+                ref={inputRef}
+                autoFocus
+                type="number"
+                inputMode="decimal"
+                value={distanceInput}
+                onChange={(e) => setDistanceInput(e.target.value)}
+                placeholder="0"
+                style={{
+                  flex: 1,
+                  background: COLORS.turfDark,
+                  border: `1px solid ${COLORS.creamDim}33`,
+                  borderRadius: 8,
+                  color: COLORS.cream,
+                  fontFamily: "'Bebas Neue', sans-serif",
+                  fontSize: 24,
+                  padding: "7px 12px",
+                  boxSizing: "border-box",
+                }}
+              />
+              <button
+                onClick={onSubmitShot}
+                disabled={distanceInput === ""}
+                style={{
+                  padding: "0 18px",
+                  borderRadius: 8,
+                  border: "none",
+                  background: distanceInput === "" ? `${COLORS.fairway}66` : COLORS.fairway,
+                  color: COLORS.cream,
+                  fontFamily: "'Bebas Neue', sans-serif",
+                  fontSize: 16,
+                  letterSpacing: 1,
+                  cursor: distanceInput === "" ? "not-allowed" : "pointer",
+                }}
+              >
+                LOG
+              </button>
+            </div>
+          </div>
+
+          {currentShots.length > 0 && (
+            <div style={{ marginTop: 10, fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim }}>
+              Logged so far: {currentShots.map((s) => `${ydsToUnitRound(s, units)}${unitLabel}`).join(", ")}
+            </div>
+          )}
+        </Card>
+      ) : (
+        <Card>
+          <div style={{ textAlign: "center" }}>
+            <div style={{ fontSize: 11, color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", letterSpacing: 2 }}>
+              {club.clubLabel} COMPLETE
+            </div>
+            <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 48, lineHeight: 1, color: COLORS.flag, marginTop: 4 }}>
+              {ydsToUnitRound(result.average, units)}
+              <span style={{ fontSize: 18, marginLeft: 6, color: COLORS.creamDim }}>{unitLabel}</span>
+            </div>
+            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginTop: 4 }}>
+              average of {result.shots.filter((s) => s.included).length} of {result.shots.length} shots
+            </div>
+          </div>
+
+          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginTop: 14, marginBottom: 6, textAlign: "center" }}>
+            TAP A SHOT TO INCLUDE/EXCLUDE IT — GREEN COUNTS TOWARD THE AVERAGE
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, justifyContent: "center" }}>
+            {result.shots.map((s, i) => (
+              <button
+                key={i}
+                onClick={() => onToggleShot(club.clubKey, i)}
+                style={{
+                  padding: "8px 12px",
+                  borderRadius: 8,
+                  border: s.included ? `2px solid ${COLORS.fairwayLight}` : `1px solid ${COLORS.flag}`,
+                  background: s.included ? COLORS.fairway : "transparent",
+                  color: s.included ? COLORS.cream : COLORS.creamDim,
+                  fontFamily: "'JetBrains Mono', monospace",
+                  fontSize: 12,
+                  cursor: "pointer",
+                  textDecoration: s.included ? "none" : "line-through",
+                }}
+              >
+                {ydsToUnitRound(s.value, units)}
+                {unitLabel}
+              </button>
+            ))}
+          </div>
+
+          <button
+            onClick={onAddShot}
+            style={{
+              width: "100%",
+              marginTop: 14,
+              padding: "11px 0",
+              borderRadius: 10,
+              border: `1px solid ${COLORS.creamDim}33`,
+              background: "transparent",
+              color: COLORS.cream,
+              fontFamily: "'Bebas Neue', sans-serif",
+              fontSize: 14,
+              letterSpacing: 0.5,
+              cursor: "pointer",
+            }}
+          >
+            + HIT ANOTHER SHOT
+          </button>
+          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: COLORS.creamDim, marginTop: 6, textAlign: "center" }}>
+            Not sure about this yardage? Hit a few more — the average re-trims automatically over
+            the bigger sample.
+          </div>
+
+          <button
+            onClick={onNextClub}
+            style={{
+              width: "100%",
+              marginTop: 10,
+              padding: "13px 0",
+              borderRadius: 12,
+              border: "none",
+              background: COLORS.flag,
+              color: COLORS.cream,
+              fontFamily: "'Bebas Neue', sans-serif",
+              fontSize: 18,
+              letterSpacing: 1,
+              cursor: "pointer",
+            }}
+          >
+            {isLastClub ? "FINISH CHART" : "NEXT CLUB"}
+          </button>
+        </Card>
+      )}
+
+      <div style={{ marginTop: 10, fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, textAlign: "center" }}>
+        {Math.min(overallShotNumber, totalShots)} of {totalShots} shots overall
+      </div>
+    </div>
+  );
+}
+
+function GappingResultScreen({ chart, units, onNewChart, onToggleShot, onEditShotValue }) {
+  const clubs = chart.sequence; // [{clubKey, clubLabel}], already in the fixed display order
+  const unitLabel = longUnitLabel(units);
+  const [editingShot, setEditingShot] = useState(null); // { clubKey, shotIndex, shot }
+
+  return (
+    <div>
+      <PrintHeader title="Gapping Chart" timescale="all" />
+      <div className="no-print" style={{ marginBottom: 12 }}>
+        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 24, letterSpacing: 1, lineHeight: 1 }}>YOUR GAPPING CHART</div>
+        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
+          {new Date(chart.date).toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" })} ·{" "}
+          {chart.shotsPerClub} shots per club, outliers removed
+        </div>
+      </div>
+
+      <Card style={{ padding: 0, overflow: "hidden" }}>
+        {clubs.map((c) => {
+          const result = chart.results[c.clubKey];
+          return (
+            <div key={c.clubKey} style={{ display: "flex", borderTop: `1px solid ${COLORS.creamDim}15` }}>
+              <div
+                style={{
+                  flex: 1,
+                  padding: "12px 14px",
+                  fontFamily: "'Bebas Neue', sans-serif",
+                  fontSize: 16,
+                  color: COLORS.cream,
+                  display: "flex",
+                  alignItems: "center",
+                }}
+              >
+                {c.clubLabel}
+              </div>
+              <div
+                style={{
+                  width: 100,
+                  flexShrink: 0,
+                  padding: "12px 4px",
+                  textAlign: "center",
+                  borderLeft: `1px solid ${COLORS.creamDim}15`,
+                  fontFamily: "'Bebas Neue', sans-serif",
+                  fontSize: 18,
+                  color: result ? COLORS.flag : COLORS.creamDim,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                {result ? `${ydsToUnitRound(result.average, units)}${unitLabel}` : "—"}
+              </div>
+            </div>
+          );
+        })}
+      </Card>
+
+      <CollapsibleSection title="Shot detail" count={chart.sequence.length}>
+        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginBottom: 10 }}>
+          Tap a shot to include/exclude it from the average · tap ✎ to correct a wrong value
+        </div>
+        {clubs.map((c) => {
+          const result = chart.results[c.clubKey];
+          if (!result) return null;
+          return (
+            <div key={c.clubKey} style={{ marginBottom: 14 }}>
+              <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim }}>
+                <span style={{ color: COLORS.cream, fontFamily: "'Bebas Neue', sans-serif", fontSize: 15, letterSpacing: 0.5 }}>
+                  {c.clubLabel}
+                </span>{" "}
+                · avg {ydsToUnitRound(result.average, units)}
+                {unitLabel} · {result.shots.filter((s) => s.included).length} of {result.shots.length} shots
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 6 }}>
+                {result.shots.map((s, i) => (
+                  <div key={i} style={{ display: "flex" }}>
+                    <button
+                      onClick={() => onToggleShot(c.clubKey, i)}
+                      style={{
+                        padding: "8px 10px",
+                        borderRadius: "8px 0 0 8px",
+                        border: s.included ? `2px solid ${COLORS.fairwayLight}` : `1px solid ${COLORS.flag}`,
+                        borderRight: "none",
+                        background: s.included ? COLORS.fairway : "transparent",
+                        color: s.included ? COLORS.cream : COLORS.creamDim,
+                        fontFamily: "'JetBrains Mono', monospace",
+                        fontSize: 12,
+                        cursor: "pointer",
+                        textDecoration: s.included ? "none" : "line-through",
+                      }}
+                    >
+                      {ydsToUnitRound(s.value, units)}
+                      {unitLabel}
+                    </button>
+                    <button
+                      onClick={() => setEditingShot({ clubKey: c.clubKey, shotIndex: i, shot: s })}
+                      title="Correct this shot's value"
+                      style={{
+                        padding: "0 8px",
+                        borderRadius: "0 8px 8px 0",
+                        border: s.included ? `2px solid ${COLORS.fairwayLight}` : `1px solid ${COLORS.flag}`,
+                        borderLeft: `1px solid ${COLORS.creamDim}33`,
+                        background: "transparent",
+                        color: COLORS.creamDim,
+                        fontFamily: "'JetBrains Mono', monospace",
+                        fontSize: 12,
+                        cursor: "pointer",
+                      }}
+                    >
+                      ✎
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </CollapsibleSection>
+
+      {editingShot && (
+        <WedgeShotValueEditModal
+          shot={editingShot.shot}
+          units={units}
+          onSave={(newValue) => {
+            onEditShotValue(editingShot.clubKey, editingShot.shotIndex, newValue);
+            setEditingShot(null);
+          }}
+          onCancel={() => setEditingShot(null)}
+        />
+      )}
+
+      <div className="no-print" style={{ display: "flex", gap: 8, marginTop: 14 }}>
+        <button
+          onClick={() => window.print()}
+          style={{
+            flex: 1,
+            padding: "12px 0",
+            borderRadius: 10,
+            border: `1px solid ${COLORS.creamDim}33`,
+            background: "transparent",
+            color: COLORS.cream,
+            fontFamily: "'Bebas Neue', sans-serif",
+            fontSize: 15,
+            letterSpacing: 0.5,
+            cursor: "pointer",
+          }}
+        >
+          SAVE AS PDF
+        </button>
+        <button
+          onClick={() => downloadGappingPNG(chart, units)}
+          style={{
+            flex: 1,
+            padding: "12px 0",
+            borderRadius: 10,
+            border: `1px solid ${COLORS.creamDim}33`,
+            background: "transparent",
+            color: COLORS.cream,
+            fontFamily: "'Bebas Neue', sans-serif",
+            fontSize: 15,
+            letterSpacing: 0.5,
+            cursor: "pointer",
+          }}
+        >
+          DOWNLOAD PNG
+        </button>
+      </div>
+
+      <button
+        onClick={onNewChart}
+        className="no-print"
+        style={{
+          width: "100%",
+          marginTop: 10,
+          padding: "13px 0",
+          borderRadius: 12,
+          border: "none",
+          background: COLORS.flag,
+          color: COLORS.cream,
+          fontFamily: "'Bebas Neue', sans-serif",
+          fontSize: 18,
+          letterSpacing: 1,
+          cursor: "pointer",
+        }}
+      >
+        BUILD A NEW CHART
       </button>
     </div>
   );
@@ -7834,7 +11107,19 @@ function CompetePlayScreen({
   );
 }
 
-function CompeteSummaryScreen({ players, mode, roundResults, minDist, maxDist, units, onNewCompetition }) {
+function CompeteSummaryScreen({
+  players,
+  mode,
+  roundResults,
+  minDist,
+  maxDist,
+  units,
+  onNewCompetition,
+  editingIndex,
+  onStartEdit,
+  onSaveEdit,
+  onCancelEdit,
+}) {
   const totals = computeCompeteTotals(players, roundResults);
   const leaderboard = [...players].sort((a, b) => (totals[b] || 0) - (totals[a] || 0));
   const topScore = totals[leaderboard[0]] || 0;
@@ -7888,9 +11173,9 @@ function CompeteSummaryScreen({ players, mode, roundResults, minDist, maxDist, u
         ))}
       </Card>
 
-      <CollapsibleSection title="Round by round" count={roundResults.length}>
+      <CollapsibleSection title="Round by round — tap a round to amend" count={roundResults.length}>
         {roundResults.map((r, i) => (
-          <Card key={i} style={{ marginBottom: 10 }}>
+          <Card key={i} style={{ marginBottom: 10, cursor: "pointer" }} onClick={() => onStartEdit(i)}>
             <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim }}>
               ROUND {i + 1} · TARGET {ydsToUnitRound(r.target, units)}
               {unitLabel}
@@ -7918,6 +11203,18 @@ function CompeteSummaryScreen({ players, mode, roundResults, minDist, maxDist, u
           </Card>
         ))}
       </CollapsibleSection>
+
+      {editingIndex !== null && (
+        <CompeteRoundEditModal
+          round={roundResults[editingIndex]}
+          players={players}
+          mode={mode}
+          units={units}
+          valueKind="yds"
+          onSave={onSaveEdit}
+          onCancel={onCancelEdit}
+        />
+      )}
 
       <button
         onClick={onNewCompetition}
@@ -7988,6 +11285,99 @@ function RangeChooseScreen({ onNavigate }) {
                 background: `linear-gradient(180deg, transparent 20%, ${COLORS.turfDark}dd 100%)`,
               }}
             />
+            <div style={{ position: "absolute", left: 12, bottom: 10, right: 12 }}>
+              <div
+                style={{
+                  fontFamily: "'Bebas Neue', sans-serif",
+                  fontSize: 22,
+                  letterSpacing: 0.5,
+                  lineHeight: 1.05,
+                  color: COLORS.cream,
+                  textShadow: "0 2px 6px rgba(0,0,0,0.5)",
+                }}
+              >
+                {o.label}
+              </div>
+              <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginTop: 2 }}>
+                {o.subtitle}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function YardagesChooseScreen({ onNavigate }) {
+  const options = [
+    {
+      key: "gapping",
+      label: "GAPPING",
+      subtitle: "Full-swing yardage chart, club by club",
+      screen: "gappingSetup",
+      available: true,
+      Illustration: GappingIllustration,
+    },
+    {
+      key: "wedgematrix",
+      label: "WEDGE MATRIX",
+      subtitle: "Build your own yardage chart, club by club",
+      screen: "wedgeMatrixSetup",
+      available: true,
+      Illustration: WedgeMatrixIllustration,
+    },
+  ];
+  return (
+    <div>
+      <div style={{ marginBottom: 14 }}>
+        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 24, letterSpacing: 1, lineHeight: 1 }}>YARDAGES</div>
+        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
+          Choose what you're working on
+        </div>
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        {options.map((o) => (
+          <div
+            key={o.key}
+            onClick={() => o.available && onNavigate(o.screen)}
+            style={{
+              position: "relative",
+              height: 120,
+              borderRadius: 14,
+              overflow: "hidden",
+              cursor: o.available ? "pointer" : "default",
+              border: `1px solid ${COLORS.creamDim}22`,
+              opacity: o.available ? 1 : 0.6,
+            }}
+          >
+            <o.Illustration />
+            <div
+              style={{
+                position: "absolute",
+                inset: 0,
+                background: `linear-gradient(180deg, transparent 20%, ${COLORS.turfDark}dd 100%)`,
+              }}
+            />
+            {!o.available && (
+              <div
+                style={{
+                  position: "absolute",
+                  top: 8,
+                  right: 8,
+                  background: `${COLORS.turfDark}cc`,
+                  border: `1px solid ${COLORS.creamDim}44`,
+                  borderRadius: 5,
+                  padding: "2px 6px",
+                  fontFamily: "'JetBrains Mono', monospace",
+                  fontSize: 8,
+                  color: COLORS.creamDim,
+                  letterSpacing: 0.5,
+                }}
+              >
+                SOON
+              </div>
+            )}
             <div style={{ position: "absolute", left: 12, bottom: 10, right: 12 }}>
               <div
                 style={{
@@ -8138,7 +11528,7 @@ function ShortGameCompeteSetupScreen({
       <Card style={{ marginTop: 10 }}>
         <SectionLabel>Rounds</SectionLabel>
         <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-          {[5, 10, 15].map((n) => (
+          {[9, 18, 27].map((n) => (
             <PillOption key={n} label={n} active={rounds === n} onClick={() => setRounds(n)} />
           ))}
         </div>
@@ -8513,7 +11903,17 @@ function ShortGameCompetePlayScreen({
   );
 }
 
-function ShortGameCompeteSummaryScreen({ players, mode, roundResults, units, onNewCompetition }) {
+function ShortGameCompeteSummaryScreen({
+  players,
+  mode,
+  roundResults,
+  units,
+  onNewCompetition,
+  editingIndex,
+  onStartEdit,
+  onSaveEdit,
+  onCancelEdit,
+}) {
   const totals = computeCompeteTotals(players, roundResults);
   const leaderboard = [...players].sort((a, b) => (totals[b] || 0) - (totals[a] || 0));
   const topScore = totals[leaderboard[0]] || 0;
@@ -8557,9 +11957,9 @@ function ShortGameCompeteSummaryScreen({ players, mode, roundResults, units, onN
         ))}
       </Card>
 
-      <CollapsibleSection title="Round by round" count={roundResults.length}>
+      <CollapsibleSection title="Round by round — tap a round to amend" count={roundResults.length}>
         {roundResults.map((r, i) => (
-          <Card key={i} style={{ marginBottom: 10 }}>
+          <Card key={i} style={{ marginBottom: 10, cursor: "pointer" }} onClick={() => onStartEdit(i)}>
             <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim }}>
               ROUND {i + 1} · {LIE_LABELS[r.lie]} · {ydsToUnitRound(r.target, units)}
               {longUnitLabel(units)}
@@ -8577,6 +11977,18 @@ function ShortGameCompeteSummaryScreen({ players, mode, roundResults, units, onN
           </Card>
         ))}
       </CollapsibleSection>
+
+      {editingIndex !== null && (
+        <CompeteRoundEditModal
+          round={roundResults[editingIndex]}
+          players={players}
+          mode={mode}
+          units={units}
+          valueKind="ft"
+          onSave={onSaveEdit}
+          onCancel={onCancelEdit}
+        />
+      )}
 
       <button
         onClick={onNewCompetition}
@@ -8678,7 +12090,7 @@ function PuttingCompeteSetupScreen({
       <Card style={{ marginTop: 10 }}>
         <SectionLabel>Holes</SectionLabel>
         <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-          {[5, 9, 18].map((n) => (
+          {[9, 18, 27].map((n) => (
             <PillOption key={n} label={n} active={holes === n} onClick={() => setHoles(n)} />
           ))}
         </div>
@@ -8690,7 +12102,7 @@ function PuttingCompeteSetupScreen({
           {unitLabel} min)
         </SectionLabel>
         <div style={{ display: "flex", gap: 10, marginTop: 8, alignItems: "center" }}>
-          <NumberField label="MIN" value={ftToUnitRound(minFt, units)} onChange={(v) => setMinFt(Math.max(3, unitToFtRound(v, units)))} />
+          <NumberField label="MIN" value={ftToUnitRound(minFt, units)} onChange={(v) => setMinFt(unitToFtRound(v, units))} />
           <div style={{ color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", paddingTop: 12 }}>—</div>
           <NumberField label="MAX" value={ftToUnitRound(maxFt, units)} onChange={(v) => setMaxFt(unitToFtRound(v, units))} />
         </div>
@@ -8953,7 +12365,16 @@ function PuttingCompetePlayScreen({
   );
 }
 
-function PuttingCompeteSummaryScreen({ players, holeResults, units, onNewCompetition }) {
+function PuttingCompeteSummaryScreen({
+  players,
+  holeResults,
+  units,
+  onNewCompetition,
+  editingIndex,
+  onStartEdit,
+  onSaveEdit,
+  onCancelEdit,
+}) {
   const tallies = computePuttCompeteTallies(players, holeResults);
   const leaderboard = [...players].sort((a, b) => (tallies[a] || 0) - (tallies[b] || 0));
   const bestTally = tallies[leaderboard[0]] || 0;
@@ -9004,9 +12425,9 @@ function PuttingCompeteSummaryScreen({ players, holeResults, units, onNewCompeti
         ))}
       </Card>
 
-      <CollapsibleSection title="Hole by hole" count={holeResults.length}>
+      <CollapsibleSection title="Hole by hole — tap a hole to amend" count={holeResults.length}>
         {holeResults.map((h, i) => (
-          <Card key={i} style={{ marginBottom: 10 }}>
+          <Card key={i} style={{ marginBottom: 10, cursor: "pointer" }} onClick={() => onStartEdit(i)}>
             <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim }}>
               HOLE {i + 1} · {ftToUnitRound(h.target, units)}
               {unitLabel}
@@ -9022,6 +12443,16 @@ function PuttingCompeteSummaryScreen({ players, holeResults, units, onNewCompeti
           </Card>
         ))}
       </CollapsibleSection>
+
+      {editingIndex !== null && (
+        <PuttingCompeteHoleEditModal
+          hole={holeResults[editingIndex]}
+          players={players}
+          units={units}
+          onSave={onSaveEdit}
+          onCancel={onCancelEdit}
+        />
+      )}
 
       <button
         onClick={onNewCompetition}
@@ -9047,7 +12478,7 @@ function PuttingCompeteSummaryScreen({ players, holeResults, units, onNewCompeti
 
 // ===== Putting section screens =====
 
-function ShortGameLog({ shots, units }) {
+function ShortGameLog({ shots, units, onEditShot }) {
   const yLabel = longUnitLabel(units);
   const shortLabel = shortUnitLabel(units);
   return (
@@ -9067,17 +12498,19 @@ function ShortGameLog({ shots, units }) {
         <div style={{ width: 55, textAlign: "right" }}>{shortLabel.toUpperCase()}</div>
         <div style={{ width: 50, textAlign: "right" }}>SG</div>
       </div>
-      <div style={{ maxHeight: 150, overflowY: "auto" }}>
+      <div style={{ maxHeight: 320, overflowY: "auto" }}>
         {shots.map((s, i) => {
           const sg = sgForShortGameShot(s.lie, s.target, s.resultFt);
           return (
             <div
               key={i}
+              onClick={() => onEditShot && onEditShot(i)}
               style={{
                 display: "flex",
                 padding: "7px 12px",
                 borderTop: `1px solid ${COLORS.creamDim}11`,
                 color: COLORS.cream,
+                cursor: onEditShot ? "pointer" : "default",
               }}
             >
               <div style={{ width: 22, color: COLORS.creamDim }}>{i + 1}</div>
@@ -9224,7 +12657,7 @@ function ShortGameSetupScreen({
       <Card>
         <SectionLabel>Shots this session</SectionLabel>
         <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-          {[10, 20, 30].map((n) => (
+          {[9, 18, 27].map((n) => (
             <PillOption key={n} label={n} active={shortShotCount === n} onClick={() => setShortShotCount(n)} />
           ))}
         </div>
@@ -9308,7 +12741,21 @@ function ShortGameSetupScreen({
   );
 }
 
-function ShortGamePracticeScreen({ shots, shotCount, currentShot, resultInput, setResultInput, onSubmit, onReroll, onExit, units }) {
+function ShortGamePracticeScreen({
+  shots,
+  shotCount,
+  currentShot,
+  resultInput,
+  setResultInput,
+  onSubmit,
+  onReroll,
+  onExit,
+  units,
+  editingShotIndex,
+  onStartEditShot,
+  onSaveEditShot,
+  onCancelEditShot,
+}) {
   const shotNum = shots.length + 1;
   const liveAvgSG = shots.length ? avg(shots.map((s) => sgForShortGameShot(s.lie, s.target, s.resultFt))) : null;
   const liveAvgFt = shots.length ? avg(shots.map((s) => s.resultFt)) : null;
@@ -9405,6 +12852,21 @@ function ShortGamePracticeScreen({ shots, shotCount, currentShot, resultInput, s
               LOG
             </button>
           </div>
+          <div
+            onClick={() => onSubmit(0)}
+            style={{
+              textAlign: "center",
+              marginTop: 10,
+              fontFamily: "'JetBrains Mono', monospace",
+              fontSize: 10,
+              color: COLORS.creamDim,
+              cursor: "pointer",
+              textDecoration: "underline",
+              textUnderlineOffset: 3,
+            }}
+          >
+            Holed it
+          </div>
         </div>
       </Card>
 
@@ -9422,10 +12884,263 @@ function ShortGamePracticeScreen({ shots, shotCount, currentShot, resultInput, s
 
       {shots.length > 0 && (
         <div style={{ marginTop: 10 }}>
-          <SectionLabel>This session</SectionLabel>
+          <SectionLabel>This session — tap a shot to amend</SectionLabel>
           <div style={{ marginTop: 4 }}>
-            <ShortGameLog shots={shots} units={units} />
+            <ShortGameLog shots={shots} units={units} onEditShot={onStartEditShot} />
           </div>
+        </div>
+      )}
+
+      {editingShotIndex !== null && (
+        <ShortGameShotEditModal shot={shots[editingShotIndex]} units={units} onSave={onSaveEditShot} onCancel={onCancelEditShot} />
+      )}
+    </div>
+  );
+}
+
+// Lets someone correct a previous Short Game shot — the lie, the target distance, and the
+// result distance from the hole are all editable, covering everything that could've been
+// mistyped or misremembered at the time.
+function ShortGameShotEditModal({ shot, units, onSave, onCancel }) {
+  const [lie, setLie] = useState(shot.lie);
+  const [targetInput, setTargetInput] = useState(String(fmt1(ydsToUnit(shot.target, units))));
+  const [resultInput, setResultInput] = useState(String(fmt1(ftToUnit(shot.resultFt, units))));
+  const yLabel = longUnitLabel(units);
+  const shortLabel = shortUnitLabel(units);
+
+  function handleSave() {
+    const target = unitToYds(parseFloat(targetInput) || 0, units);
+    const resultFt = unitToFt(parseFloat(resultInput) || 0, units);
+    onSave({ lie, target, resultFt });
+  }
+
+  return (
+    <div
+      onClick={onCancel}
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(10,22,15,0.75)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 24,
+        zIndex: 50,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: COLORS.turf,
+          border: `1px solid ${COLORS.creamDim}33`,
+          borderRadius: 14,
+          padding: 20,
+          maxWidth: 360,
+          width: "100%",
+        }}
+      >
+        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 20, letterSpacing: 1, color: COLORS.cream }}>
+          EDIT SHOT
+        </div>
+
+        <div style={{ marginTop: 14 }}>
+          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginBottom: 6 }}>
+            LIE
+          </div>
+          <div style={{ display: "flex", gap: 6 }}>
+            {Object.keys(LIE_LABELS).map((l) => (
+              <button
+                key={l}
+                onClick={() => setLie(l)}
+                style={{
+                  flex: 1,
+                  padding: "8px 0",
+                  borderRadius: 8,
+                  border: lie === l ? `2px solid ${COLORS.fairwayLight}` : `1px solid ${COLORS.creamDim}33`,
+                  background: lie === l ? COLORS.fairway : "transparent",
+                  color: COLORS.cream,
+                  fontFamily: "'Bebas Neue', sans-serif",
+                  fontSize: 12,
+                  cursor: "pointer",
+                }}
+              >
+                {LIE_LABELS[l]}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ marginTop: 14 }}>
+          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginBottom: 6 }}>
+            TARGET DISTANCE ({yLabel.toUpperCase()})
+          </div>
+          <input
+            type="number"
+            inputMode="decimal"
+            value={targetInput}
+            onChange={(e) => setTargetInput(e.target.value)}
+            style={{
+              width: "100%",
+              background: COLORS.turfDark,
+              border: `1px solid ${COLORS.creamDim}33`,
+              borderRadius: 8,
+              color: COLORS.cream,
+              fontFamily: "'Bebas Neue', sans-serif",
+              fontSize: 20,
+              padding: "8px 12px",
+              boxSizing: "border-box",
+            }}
+          />
+        </div>
+
+        <div style={{ marginTop: 14 }}>
+          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginBottom: 6 }}>
+            RESULT ({shortLabel.toUpperCase()} FROM HOLE)
+          </div>
+          <input
+            type="number"
+            inputMode="decimal"
+            value={resultInput}
+            onChange={(e) => setResultInput(e.target.value)}
+            style={{
+              width: "100%",
+              background: COLORS.turfDark,
+              border: `1px solid ${COLORS.creamDim}33`,
+              borderRadius: 8,
+              color: COLORS.cream,
+              fontFamily: "'Bebas Neue', sans-serif",
+              fontSize: 20,
+              padding: "8px 12px",
+              boxSizing: "border-box",
+            }}
+          />
+        </div>
+
+        <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
+          <button
+            onClick={onCancel}
+            style={{
+              flex: 1,
+              padding: "11px 0",
+              borderRadius: 10,
+              border: `1px solid ${COLORS.creamDim}33`,
+              background: "transparent",
+              color: COLORS.creamDim,
+              fontFamily: "'Bebas Neue', sans-serif",
+              fontSize: 15,
+              cursor: "pointer",
+            }}
+          >
+            CANCEL
+          </button>
+          <button
+            onClick={handleSave}
+            style={{
+              flex: 1,
+              padding: "11px 0",
+              borderRadius: 10,
+              border: "none",
+              background: COLORS.fairway,
+              color: COLORS.cream,
+              fontFamily: "'Bebas Neue', sans-serif",
+              fontSize: 15,
+              cursor: "pointer",
+            }}
+          >
+            SAVE
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Historical-session detail + edit view for Short Game. Reuses ShortGameLog for display and the
+// same ShortGameShotEditModal used for live-session editing.
+function ShortGameSessionDetailModal({ session, units, onEditShot, onClose }) {
+  const [editingShotIndex, setEditingShotIndex] = useState(null);
+  const sessionAvgSG = avg(session.shots.map((sh) => sgForShortGameShot(sh.lie, sh.target, sh.resultFt)));
+
+  function handleSave(updatedShot) {
+    onEditShot(editingShotIndex, updatedShot);
+    setEditingShotIndex(null);
+  }
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(10,22,15,0.75)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 24,
+        zIndex: 50,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: COLORS.turf,
+          border: `1px solid ${COLORS.creamDim}33`,
+          borderRadius: 14,
+          padding: 20,
+          maxWidth: 380,
+          width: "100%",
+          maxHeight: "85vh",
+          overflowY: "auto",
+        }}
+      >
+        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 20, letterSpacing: 1, color: COLORS.cream }}>
+          SESSION DETAIL
+        </div>
+        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 4 }}>
+          {new Date(session.date).toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" })}
+          {"  ·  "}
+          {session.shotCount} shots · {session.minYds}-{session.maxYds}y · {session.lies.map((l) => LIE_LABELS[l]).join("/")}
+        </div>
+
+        <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
+          <StatBox label="AVG SG / SHOT" value={formatSG(sessionAvgSG)} valueColor={sgRagColor(sessionAvgSG)} />
+          <StatBox label="AVG FT FROM HOLE" value={`${session.avgResultFt.toFixed(1)}ft`} />
+        </div>
+
+        <div style={{ marginTop: 16 }}>
+          <SectionLabel>Shot by shot — tap a shot to amend</SectionLabel>
+          <div style={{ marginTop: 6 }}>
+            <ShortGameLog shots={session.shots} units={units} onEditShot={setEditingShotIndex} />
+          </div>
+        </div>
+
+        <button
+          onClick={onClose}
+          style={{
+            width: "100%",
+            marginTop: 16,
+            padding: "11px 0",
+            borderRadius: 10,
+            border: `1px solid ${COLORS.creamDim}33`,
+            background: "transparent",
+            color: COLORS.creamDim,
+            fontFamily: "'Bebas Neue', sans-serif",
+            fontSize: 15,
+            cursor: "pointer",
+          }}
+        >
+          CLOSE
+        </button>
+      </div>
+
+      {editingShotIndex !== null && (
+        <div onClick={(e) => e.stopPropagation()}>
+          <ShortGameShotEditModal
+            shot={session.shots[editingShotIndex]}
+            units={units}
+            onSave={handleSave}
+            onCancel={() => setEditingShotIndex(null)}
+          />
         </div>
       )}
     </div>
@@ -9931,7 +13646,7 @@ function PuttingSetupScreen({
           <Card>
             <SectionLabel>Putts this session</SectionLabel>
             <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-              {[10, 20, 30].map((n) => (
+              {[9, 18, 27].map((n) => (
                 <PillOption key={n} label={n} active={puttCount === n} onClick={() => setPuttCount(n)} />
               ))}
             </div>
@@ -9943,7 +13658,7 @@ function PuttingSetupScreen({
               <NumberField
                 label="MIN"
                 value={ftToUnitRound(puttMinFt, units)}
-                onChange={(v) => setPuttMinFt(Math.max(3, unitToFtRound(v, units)))}
+                onChange={(v) => setPuttMinFt(unitToFtRound(v, units))}
               />
               <div style={{ color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", paddingTop: 12 }}>—</div>
               <NumberField
@@ -10000,7 +13715,7 @@ function PuttingSetupScreen({
   );
 }
 
-function PuttLog({ putts, units }) {
+function PuttLog({ putts, units, onEditShot }) {
   const unitLabel = shortUnitLabel(units);
   return (
     <div
@@ -10018,17 +13733,19 @@ function PuttLog({ putts, units }) {
         <div style={{ width: 55, textAlign: "right" }}>PUTTS</div>
         <div style={{ width: 55, textAlign: "right" }}>SG</div>
       </div>
-      <div style={{ maxHeight: 150, overflowY: "auto" }}>
+      <div style={{ maxHeight: 320, overflowY: "auto" }}>
         {putts.map((p, i) => {
           const sg = sgForPutt(p.targetFt, p.strokes);
           return (
             <div
               key={i}
+              onClick={() => onEditShot && onEditShot(i)}
               style={{
                 display: "flex",
                 padding: "7px 12px",
                 borderTop: `1px solid ${COLORS.creamDim}11`,
                 color: COLORS.cream,
+                cursor: onEditShot ? "pointer" : "default",
               }}
             >
               <div style={{ width: 32, color: COLORS.creamDim }}>{i + 1}</div>
@@ -10046,7 +13763,21 @@ function PuttLog({ putts, units }) {
   );
 }
 
-function PuttingPracticeScreen({ putts, puttCount, currentTarget, puttMinFt, puttMaxFt, onSubmit, runningAvg, onExit, units }) {
+function PuttingPracticeScreen({
+  putts,
+  puttCount,
+  currentTarget,
+  puttMinFt,
+  puttMaxFt,
+  onSubmit,
+  runningAvg,
+  onExit,
+  units,
+  editingShotIndex,
+  onStartEditShot,
+  onSaveEditShot,
+  onCancelEditShot,
+}) {
   const puttNum = putts.length + 1;
   const unitLabel = shortUnitLabel(units);
   return (
@@ -10128,10 +13859,235 @@ function PuttingPracticeScreen({ putts, puttCount, currentTarget, puttMinFt, put
 
       {putts.length > 0 && (
         <div style={{ marginTop: 10 }}>
-          <SectionLabel>This session</SectionLabel>
+          <SectionLabel>This session — tap a shot to amend</SectionLabel>
           <div style={{ marginTop: 4 }}>
-            <PuttLog putts={putts} units={units} />
+            <PuttLog putts={putts} units={units} onEditShot={onStartEditShot} />
           </div>
+        </div>
+      )}
+
+      {editingShotIndex !== null && (
+        <PuttShotEditModal shot={putts[editingShotIndex]} units={units} onSave={onSaveEditShot} onCancel={onCancelEditShot} />
+      )}
+    </div>
+  );
+}
+
+// Lets someone correct a previous practice putt — both the target distance and strokes taken.
+function PuttShotEditModal({ shot, units, onSave, onCancel }) {
+  const [targetInput, setTargetInput] = useState(String(fmt1(ftToUnit(shot.targetFt, units))));
+  const [strokes, setStrokes] = useState(shot.strokes);
+  const unitLabel = shortUnitLabel(units);
+
+  function handleSave() {
+    const targetFt = unitToFt(parseFloat(targetInput) || 0, units);
+    onSave({ targetFt, strokes });
+  }
+
+  return (
+    <div
+      onClick={onCancel}
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(10,22,15,0.75)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 24,
+        zIndex: 50,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: COLORS.turf,
+          border: `1px solid ${COLORS.creamDim}33`,
+          borderRadius: 14,
+          padding: 20,
+          maxWidth: 360,
+          width: "100%",
+        }}
+      >
+        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 20, letterSpacing: 1, color: COLORS.cream }}>
+          EDIT PUTT
+        </div>
+
+        <div style={{ marginTop: 14 }}>
+          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginBottom: 6 }}>
+            DISTANCE ({unitLabel.toUpperCase()})
+          </div>
+          <input
+            type="number"
+            inputMode="decimal"
+            value={targetInput}
+            onChange={(e) => setTargetInput(e.target.value)}
+            style={{
+              width: "100%",
+              background: COLORS.turfDark,
+              border: `1px solid ${COLORS.creamDim}33`,
+              borderRadius: 8,
+              color: COLORS.cream,
+              fontFamily: "'Bebas Neue', sans-serif",
+              fontSize: 20,
+              padding: "8px 12px",
+              boxSizing: "border-box",
+            }}
+          />
+        </div>
+
+        <div style={{ marginTop: 14 }}>
+          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginBottom: 6 }}>
+            PUTTS TAKEN
+          </div>
+          <div style={{ display: "flex", gap: 6 }}>
+            {[1, 2, 3, 4].map((n) => (
+              <button
+                key={n}
+                onClick={() => setStrokes(n)}
+                style={{
+                  flex: 1,
+                  padding: "10px 0",
+                  borderRadius: 8,
+                  border: strokes === n ? `2px solid ${COLORS.fairwayLight}` : `1px solid ${COLORS.creamDim}33`,
+                  background: strokes === n ? COLORS.fairway : "transparent",
+                  color: COLORS.cream,
+                  fontFamily: "'Bebas Neue', sans-serif",
+                  fontSize: 16,
+                  cursor: "pointer",
+                }}
+              >
+                {n === 4 ? "4+" : n}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
+          <button
+            onClick={onCancel}
+            style={{
+              flex: 1,
+              padding: "11px 0",
+              borderRadius: 10,
+              border: `1px solid ${COLORS.creamDim}33`,
+              background: "transparent",
+              color: COLORS.creamDim,
+              fontFamily: "'Bebas Neue', sans-serif",
+              fontSize: 15,
+              cursor: "pointer",
+            }}
+          >
+            CANCEL
+          </button>
+          <button
+            onClick={handleSave}
+            style={{
+              flex: 1,
+              padding: "11px 0",
+              borderRadius: 10,
+              border: "none",
+              background: COLORS.fairway,
+              color: COLORS.cream,
+              fontFamily: "'Bebas Neue', sans-serif",
+              fontSize: 15,
+              cursor: "pointer",
+            }}
+          >
+            SAVE
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Historical-session detail + edit view for Putting practice sessions. Reuses PuttLog for display
+// and the same PuttShotEditModal used for live-session editing.
+function PuttingSessionDetailModal({ session, units, onEditShot, onClose }) {
+  const [editingShotIndex, setEditingShotIndex] = useState(null);
+  const sessionAvgSG = avg(session.putts.map((p) => sgForPutt(p.targetFt, p.strokes)));
+
+  function handleSave(updatedShot) {
+    onEditShot(editingShotIndex, updatedShot);
+    setEditingShotIndex(null);
+  }
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(10,22,15,0.75)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 24,
+        zIndex: 50,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: COLORS.turf,
+          border: `1px solid ${COLORS.creamDim}33`,
+          borderRadius: 14,
+          padding: 20,
+          maxWidth: 380,
+          width: "100%",
+          maxHeight: "85vh",
+          overflowY: "auto",
+        }}
+      >
+        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 20, letterSpacing: 1, color: COLORS.cream }}>
+          SESSION DETAIL
+        </div>
+        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 4 }}>
+          {new Date(session.date).toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" })}
+          {"  ·  "}
+          {session.puttCount} putts · {session.puttMinFt}-{session.puttMaxFt}ft
+        </div>
+
+        <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
+          <StatBox label="AVG SG / PUTT" value={formatSG(sessionAvgSG)} valueColor={sgRagColor(sessionAvgSG)} />
+          <StatBox label="AVG PUTTS" value={session.avgStrokes.toFixed(2)} />
+        </div>
+
+        <div style={{ marginTop: 16 }}>
+          <SectionLabel>Putt by putt — tap a putt to amend</SectionLabel>
+          <div style={{ marginTop: 6 }}>
+            <PuttLog putts={session.putts} units={units} onEditShot={setEditingShotIndex} />
+          </div>
+        </div>
+
+        <button
+          onClick={onClose}
+          style={{
+            width: "100%",
+            marginTop: 16,
+            padding: "11px 0",
+            borderRadius: 10,
+            border: `1px solid ${COLORS.creamDim}33`,
+            background: "transparent",
+            color: COLORS.creamDim,
+            fontFamily: "'Bebas Neue', sans-serif",
+            fontSize: 15,
+            cursor: "pointer",
+          }}
+        >
+          CLOSE
+        </button>
+      </div>
+
+      {editingShotIndex !== null && (
+        <div onClick={(e) => e.stopPropagation()}>
+          <PuttShotEditModal
+            shot={session.putts[editingShotIndex]}
+            units={units}
+            onSave={handleSave}
+            onCancel={() => setEditingShotIndex(null)}
+          />
         </div>
       )}
     </div>
@@ -10599,7 +14555,7 @@ function FeetPicker({ min, max, onMin, onMax, onPreset, activePresetLabel }) {
   );
 }
 
-function PuttingAnalysisHub({ history, loaded, onDeleteSession, units }) {
+function PuttingAnalysisHub({ history, loaded, onDeleteSession, onEditSessionShot, units }) {
   const [subTab, setSubTab] = useState("practice"); // practice | course
 
   const practiceHistory = history.filter((s) => s.type !== "course");
@@ -10644,16 +14600,35 @@ function PuttingAnalysisHub({ history, loaded, onDeleteSession, units }) {
         </button>
       </div>
 
-      {subTab === "practice" && <PuttingAnalysisBody history={practiceHistory} loaded={loaded} onDeleteSession={onDeleteSession} units={units} />}
-      {subTab === "course" && <OnCourseAnalysisBody history={courseHistory} loaded={loaded} onDeleteSession={onDeleteSession} units={units} />}
+      {subTab === "practice" && (
+        <PuttingAnalysisBody
+          history={practiceHistory}
+          loaded={loaded}
+          onDeleteSession={onDeleteSession}
+          onEditSessionShot={onEditSessionShot}
+          units={units}
+        />
+      )}
+      {subTab === "course" && (
+        <OnCourseAnalysisBody
+          history={courseHistory}
+          loaded={loaded}
+          onDeleteSession={onDeleteSession}
+          onEditSessionShot={onEditSessionShot}
+          units={units}
+        />
+      )}
     </div>
   );
 }
 
-function OnCourseAnalysisBody({ history, loaded, onDeleteSession, units }) {
+function OnCourseAnalysisBody({ history, loaded, onDeleteSession, onEditSessionShot, units }) {
   const [timescale, setTimescale] = useState("all");
   const [printMode, triggerPrint] = usePrintMode();
-  const [selectedRound, setSelectedRound] = useState(null);
+  const [selectedRoundId, setSelectedRoundId] = useState(null);
+  // Looked up fresh from `history` (rather than keeping a snapshot) so the summary modal reflects
+  // an edit immediately without needing to be closed and reopened.
+  const selectedRound = selectedRoundId ? history.find((s) => s.id === selectedRoundId) : null;
 
   if (!loaded) {
     return <div style={{ color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace" }}>Loading rounds…</div>;
@@ -10835,7 +14810,7 @@ function OnCourseAnalysisBody({ history, loaded, onDeleteSession, units }) {
             {[...filtered]
               .sort((a, b) => new Date(b.date) - new Date(a.date))
               .map((s, i) => (
-                <CourseRoundRow key={s.id} session={s} isFirst={i === 0} onDelete={() => onDeleteSession(s.id)} onView={() => setSelectedRound(s)} />
+                <CourseRoundRow key={s.id} session={s} isFirst={i === 0} onDelete={() => onDeleteSession(s.id)} onView={() => setSelectedRoundId(s.id)} />
               ))}
           </div>
         </div>
@@ -10844,16 +14819,23 @@ function OnCourseAnalysisBody({ history, loaded, onDeleteSession, units }) {
       <SendReportButton onClick={triggerPrint} />
 
       {selectedRound && (
-        <RoundSummaryModal session={selectedRound} units={units} onClose={() => setSelectedRound(null)} />
+        <RoundSummaryModal
+          session={selectedRound}
+          units={units}
+          onEditShot={(holeIndex, updatedHole) => onEditSessionShot(selectedRound.id, holeIndex, updatedHole)}
+          onClose={() => setSelectedRoundId(null)}
+        />
       )}
     </div>
   );
 }
 
-function PuttingAnalysisBody({ history, loaded, onDeleteSession }) {
+function PuttingAnalysisBody({ history, loaded, onDeleteSession, onEditSessionShot, units }) {
   const [tab, setTab] = useState("insights");
   const [printMode, triggerPrint] = usePrintMode();
   const [timescale, setTimescale] = useState("all");
+  const [viewingSessionId, setViewingSessionId] = useState(null);
+  const viewingSession = viewingSessionId ? history.find((s) => s.id === viewingSessionId) : null;
   const [minFt, setMinFt] = useState(0);
   const [maxFt, setMaxFt] = useState(100);
   const [activePreset, setActivePreset] = useState("All");
@@ -11004,7 +14986,7 @@ function PuttingAnalysisBody({ history, loaded, onDeleteSession }) {
                 const sessionAvgSG = avg(s.putts.map((p) => sgForPutt(p.targetFt, p.strokes)));
                 return (
                   <SwipeToDelete key={s.id} onDelete={() => onDeleteSession(s.id)}>
-                    <Card style={{ marginBottom: 12 }}>
+                    <Card style={{ marginBottom: 12, cursor: "pointer" }} onClick={() => setViewingSessionId(s.id)}>
                       <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, paddingRight: 20 }}>
                         {new Date(s.date).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
                         {"  ·  "}
@@ -11020,6 +15002,15 @@ function PuttingAnalysisBody({ history, loaded, onDeleteSession }) {
               })
             )}
           </CollapsibleSection>
+
+          {viewingSession && (
+            <PuttingSessionDetailModal
+              session={viewingSession}
+              units={units}
+              onEditShot={(shotIndex, updatedShot) => onEditSessionShot(viewingSession.id, shotIndex, updatedShot)}
+              onClose={() => setViewingSessionId(null)}
+            />
+          )}
         </>
       )}
 
