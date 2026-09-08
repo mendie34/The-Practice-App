@@ -20,6 +20,9 @@ import {
   signInWithEmailAndPassword,
   signOut as firebaseSignOut,
   onAuthStateChanged,
+  setPersistence,
+  browserLocalPersistence,
+  browserSessionPersistence,
 } from "firebase/auth";
 import {
   initializeFirestore,
@@ -170,12 +173,21 @@ export async function importAppDataObject(uid, entries) {
 
 // ===== Auth =====
 
-export function signUp(email, password) {
-  return createUserWithEmailAndPassword(auth, email, password);
+// `remember` controls whether the session survives closing the browser/app:
+// true (default) -> browserLocalPersistence, stays signed in indefinitely, same as before this
+// was made configurable. false -> browserSessionPersistence, signed out once the tab/app closes.
+// Firebase persistence is a global auth setting, not per-call, so it must be set immediately
+// before the sign-up/sign-in call that follows it.
+export function signUp(email, password, remember = true) {
+  return setPersistence(auth, remember ? browserLocalPersistence : browserSessionPersistence).then(() =>
+    createUserWithEmailAndPassword(auth, email, password)
+  );
 }
 
-export function signIn(email, password) {
-  return signInWithEmailAndPassword(auth, email, password);
+export function signIn(email, password, remember = true) {
+  return setPersistence(auth, remember ? browserLocalPersistence : browserSessionPersistence).then(() =>
+    signInWithEmailAndPassword(auth, email, password)
+  );
 }
 
 export function signOutUser() {
