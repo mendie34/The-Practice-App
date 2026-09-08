@@ -192,10 +192,10 @@ function filterByTimescale(sessions, key) {
   return sessions.filter((s) => new Date(s.date) >= cutoff);
 }
 
-// Group distances into 25y bands, e.g. "75-100"
+// Group distances into 10y bands, e.g. "70-80"
 function bucketFor(target) {
-  const start = Math.floor(target / 25) * 25;
-  return `${start}-${start + 25}`;
+  const start = Math.floor(target / 10) * 10;
+  return `${start}-${start + 10}`;
 }
 
 function bucketSortKey(label) {
@@ -563,7 +563,7 @@ function sessionTrendData(sessions, filterMin, filterMax) {
     .filter(Boolean);
 }
 
-// Average miss % per 25y distance band, restricted to [filterMin, filterMax].
+// Average miss % per 10y distance band, restricted to [filterMin, filterMax].
 function bucketChartData(sessions, filterMin, filterMax) {
   const rows = flattenShots(sessions).filter((r) => r.target >= filterMin && r.target <= filterMax);
   const byBucket = {};
@@ -5952,7 +5952,7 @@ function SettingsScreen({
             cursor: "pointer",
           }}
         >
-          SWITCH PROFILE
+          SIGN OUT
         </button>
       </Card>
 
@@ -7558,7 +7558,7 @@ function RangeAnalysisBody({ history, loaded, onDeleteSession, onEditSessionShot
               <Card>
                 <SectionLabel>Strokes gained by distance band</SectionLabel>
                 <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
-                  25y bands within {minYds}-{maxYds}y, this timescale
+                  10y bands within {minYds}-{maxYds}y, this timescale
                 </div>
                 <div style={{ height: 220, marginTop: 12 }}>
                   <ResponsiveContainer width="100%" height="100%">
@@ -12113,9 +12113,27 @@ function YardagesChooseScreen({ onNavigate }) {
 
 function CompeteChooseScreen({ onNavigate }) {
   const options = [
-    { key: "range", label: "RANGE", subtitle: "Closest to target wins each round", screen: "competeSetup" },
-    { key: "putting", label: "PUTTING", subtitle: "Fewest putts across the round wins", screen: "competePuttingSetup" },
-    { key: "shortgame", label: "SHORT GAME", subtitle: "Closest to the hole wins each round", screen: "competeShortGameSetup" },
+    {
+      key: "range",
+      label: "RANGE",
+      subtitle: "Closest to target wins each round",
+      screen: "competeSetup",
+      Illustration: RangeIllustration,
+    },
+    {
+      key: "putting",
+      label: "PUTTING",
+      subtitle: "Fewest putts across the round wins",
+      screen: "competePuttingSetup",
+      Illustration: PuttingIllustration,
+    },
+    {
+      key: "shortgame",
+      label: "SHORT GAME",
+      subtitle: "Closest to the hole wins each round",
+      screen: "competeShortGameSetup",
+      Illustration: ShortGameIllustration,
+    },
   ];
   return (
     <div>
@@ -12129,24 +12147,44 @@ function CompeteChooseScreen({ onNavigate }) {
           gets closest — most points (or fewest putts in Putting) wins by the end.
         </div>
       </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         {options.map((o) => (
           <div
             key={o.key}
             onClick={() => onNavigate(o.screen)}
             style={{
-              padding: "16px",
-              borderRadius: 12,
-              border: `1px solid ${COLORS.creamDim}22`,
-              background: COLORS.turf,
+              position: "relative",
+              height: 120,
+              borderRadius: 14,
+              overflow: "hidden",
               cursor: "pointer",
+              border: `1px solid ${COLORS.creamDim}22`,
             }}
           >
-            <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 20, letterSpacing: 0.5, color: COLORS.cream }}>
-              {o.label}
-            </div>
-            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
-              {o.subtitle}
+            <o.Illustration />
+            <div
+              style={{
+                position: "absolute",
+                inset: 0,
+                background: `linear-gradient(180deg, transparent 20%, ${COLORS.turfDark}dd 100%)`,
+              }}
+            />
+            <div style={{ position: "absolute", left: 12, bottom: 10, right: 12 }}>
+              <div
+                style={{
+                  fontFamily: "'Bebas Neue', sans-serif",
+                  fontSize: 22,
+                  letterSpacing: 0.5,
+                  lineHeight: 1.05,
+                  color: COLORS.cream,
+                  textShadow: "0 2px 6px rgba(0,0,0,0.5)",
+                }}
+              >
+                {o.label}
+              </div>
+              <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginTop: 2 }}>
+                {o.subtitle}
+              </div>
             </div>
           </div>
         ))}

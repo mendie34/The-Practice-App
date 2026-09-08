@@ -104,13 +104,14 @@ function LoadingScreen() {
 function AuthScreen({ mode, setMode, onSubmit, submitting, error }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [remember, setRemember] = useState(true);
   const isSignUp = mode === "signup";
   const canSubmit = email.trim() !== "" && password.length >= 6 && !submitting;
 
   function handleSubmit(e) {
     e.preventDefault();
     if (!canSubmit) return;
-    onSubmit(email.trim(), password);
+    onSubmit(email.trim(), password, remember);
   }
 
   return (
@@ -142,6 +143,27 @@ function AuthScreen({ mode, setMode, onSubmit, submitting, error }) {
           placeholder={isSignUp ? "At least 6 characters" : "Your password"}
           style={inputStyle}
         />
+
+        <label
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            marginTop: 16,
+            fontFamily: "'JetBrains Mono', monospace",
+            fontSize: 12,
+            color: COLORS.creamDim,
+            cursor: "pointer",
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={remember}
+            onChange={(e) => setRemember(e.target.checked)}
+            style={{ width: 16, height: 16, accentColor: COLORS.fairway, cursor: "pointer" }}
+          />
+          Remember me
+        </label>
 
         {error && <div style={errorStyle}>{error}</div>}
 
@@ -257,7 +279,7 @@ export default function AuthGate() {
     return unsub;
   }, []);
 
-  async function handleAuthSubmit(email, password) {
+  async function handleAuthSubmit(email, password, remember) {
     setSubmitting(true);
     setAuthError(null);
     try {
@@ -265,10 +287,10 @@ export default function AuthGate() {
         // Scan THIS device for pre-login local data before creating the account, so we can offer
         // to migrate it right after — see legacyLocalData.js. Read-only, never touches the data.
         const localProfiles = await findLegacyLocalProfiles();
-        await signUp(email, password);
+        await signUp(email, password, remember);
         if (localProfiles.length) setMigrationCandidates(localProfiles);
       } else {
-        await signIn(email, password);
+        await signIn(email, password, remember);
       }
       // onAuthStateChanged (above) picks up from here and drives the rest of the flow.
     } catch (e) {
