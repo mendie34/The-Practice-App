@@ -1,16 +1,17 @@
 # The Practice App
 
 A golf practice tracker with real Strokes Gained analysis (Range, Short Game, Putting, Tee
-Accuracy) plus a local multiplayer Compete mode. Vite + React, no backend — everything is stored
-locally in the browser via IndexedDB.
+Accuracy) plus a local multiplayer Compete mode. Vite + React. Accounts and data are backed by
+Firebase (Firebase Auth for email/password login, Firestore for cloud-synced storage) — there is
+no other backend.
 
 ## Commands
 
 ```bash
 npm install
-npm run dev       # local dev server (http://localhost:5173)
-npm run build     # production build — must succeed before any deploy
-npm run preview   # serve the production build locally to sanity-check it
+npm run dev # local dev server (http://localhost:5173)
+npm run build # production build — must succeed before any deploy
+npm run preview # serve the production build locally to sanity-check it
 ```
 
 There is no test suite. The main correctness check before shipping any change is `npm run build`
@@ -20,51 +21,74 @@ that a simple syntax check would have missed.
 ## Architecture
 
 - **`src/App.jsx`** — the entire app. Deliberately a single large file rather than split into many
-  small ones, since it grew organically from a Claude-artifact prototype. Don't be alarmed by the
-  size (10,000+ lines) — it's mostly repeated screen/card patterns, not deep complexity.
-- **`src/storage.js`** — IndexedDB wrapper. Exposes a `window.storage.get/set/delete/list` API that
-  mirrors what Claude artifacts provide natively, so `App.jsx`'s calls don't need to know or care
-  whether they're running standalone or as a Claude preview. Also handles profile management
-  (list/create/delete/rename) and JSON export/import for backup.
-- **`src/ProfileGate.jsx`** — shown before the app. Lets someone pick or create a local profile
-  (name, handicap, launch-monitor question, SG baseline) via a wizard defined in `App.jsx` and
-  exported as `ProfileSetupWizard`. Installs `window.storage` scoped to whichever profile is
-  active before `App.jsx` ever renders.
-- **`src/main.jsx`** — just renders `<ProfileGate />`.
+small ones, since it grew organically from a Claude-artifact prototype. Don't be alarmed by the
+size (10,000+ lines) — it's mostly repeated screen/card patterns, not deep complexity. It only
+ever touches storage via `window.storage.{get,set,delete}` plus `loadAllAppData` /
+`exportProfileData` / `importProfileData` imported from `./storage.js` — it has no idea whether
+that's backed by IndexedDB or Firestore, which is what let the login/cloud-sync feature be added
+without changing this file at all.
+- **`src/storage.js`** — Firebase-backed storage + auth layer (Firestore for data, Firebase Auth
+for accounts). Exposes the same `window.storage.get/set/delete` shape, plus
+`loadAllAppData`/`exportProfileData`/`importProfileData`, that `App.jsx` already expects, so
+`App.jsx`'s calls don't need to know or care about the underlying backend. Data lives at
+`users/{uid}` (profile doc) and `users/{uid}/appData/{key}` (one doc per storage key). Also
+exports the auth functions (`signUp`, `signIn`, `signOutUser`, `watchAuthState`) and the
+per-user profile getter/setter (`getUserProfile`, `saveUserProfile`). Firestore's persistent
+local cache is enabled, so the app still works offline (queued writes sync once back online).
+- **`src/firebaseConfig.js`** — the Firebase project's web config (`the-practice-app-52ce6`). Not
+secret — safe to commit; real access control is Firestore Security Rules + Firebase Auth, not
+this file.
+- **`src/AuthGate.jsx`** — shown before the app. One account = one person (there's no more
+on-device multi-profile switcher). States: `loading → signedOut → needsProfile → ready`. Handles
+sign-up/sign-in (`AuthScreen`), then on a brand-new account offers to migrate any pre-login local
+data found on that device (`MigrationPrompt`, via `legacyLocalData.js`), then runs the existing
+`ProfileSetupWizard` (name/handicap) from `App.jsx`, then renders `GolfPracticeApp` itself.
+Installs `window.storage` scoped to the signed-in user's uid before `App.jsx` ever renders.
+- **`src/legacyLocalData.js`** — read-only scan of the OLD pre-login IndexedDB store
+(`practice-app-db` / store `kv`), used once at sign-up to offer copying a device's existing local
+data into the new cloud account. Never writes or deletes anything.
+- **`src/ProfileGate.jsx`** — superseded by `AuthGate.jsx` and no longer wired up (`main.jsx`
+renders `AuthGate`, not this). Left in the repo unused rather than deleted, in case any of its
+UI is worth referencing later.
+- **`src/main.jsx`** — renders `<AuthGate />`.
+- **`firestore.rules`** — not stored in this repo; published directly in the Firebase console.
+Enforces "you can only read/write your own `users/{uid}` doc and its `appData` subcollection."
+If you need to see or change them, they live in the Firebase console under Firestore Database →
+Rules for project `the-practice-app-52ce6`.
 - **`wrangler.jsonc`** — required for Cloudflare deployment. Without it, Cloudflare's newer
-  Workers-based deploy flow tries to auto-configure the project and fails on Vite version
-  detection. This file tells it "static assets only, skip auto-config" and includes a
-  `build.command` so `npm run build` actually runs before deploy (Cloudflare doesn't run it
-  automatically otherwise).
+Workers-based deploy flow tries to auto-configure the project and fails on Vite version
+detection. This file tells it "static assets only, skip auto-config" and includes a
+`build.command` so `npm run build` actually runs before deploy (Cloudflare doesn't run it
+automatically otherwise).
 - **`ios/`** — a Capacitor-wrapped native iOS project, generated by `npx cap add ios`. Uses
-  Swift Package Manager, not CocoaPods, so there's no `Podfile`/`pod install` step and the whole
-  folder is small enough to commit directly. Regenerate the web assets inside it with
-  `npm run ios:sync` any time `src/` changes — Capacitor doesn't watch for changes automatically.
+Swift Package Manager, not CocoaPods, so there's no `Podfile`/`pod install` step and the whole
+folder is small enough to commit directly. Regenerate the web assets inside it with
+`npm run ios:sync` any time `src/` changes — Capacitor doesn't watch for changes automatically.
 - **`codemagic.yaml`** — cloud CI/CD config so the iOS app can be built, signed, and shipped to
-  TestFlight without owning a Mac. Codemagic runs real Mac hardware and picks this file up
-  automatically on push to `main`.
+TestFlight without owning a Mac. Codemagic runs real Mac hardware and picks this file up
+automatically on push to `main`.
 
 ## Key conventions
 
 - **Units**: everything is calculated and stored internally in yards/feet, since that's what the
-  sourced Strokes Gained baseline tables use. Metric mode is a display-layer conversion only —
-  look for `ydsToUnit*` / `ftToUnit*` helpers at input and display boundaries.
+sourced Strokes Gained baseline tables use. Metric mode is a display-layer conversion only —
+look for `ydsToUnit*` / `ftToUnit*` helpers at input and display boundaries.
 - **Strokes Gained baseline**: defaults to PGA Tour, adjustable in Settings down to a 30 handicap.
-  Applied via a module-level `currentOffsets` variable set by `applyBaseline()` — every `sgFor*()`
-  function reads from it, so changing the setting updates every SG number app-wide without prop
-  drilling.
+Applied via a module-level `currentOffsets` variable set by `applyBaseline()` — every `sgFor*()`
+function reads from it, so changing the setting updates every SG number app-wide without prop
+drilling.
 - **Screen navigation**: a single `screen` state string drives which top-level component renders.
-  The header's Back button uses a static `BACK_MAP` lookup (screen → parent screen) rather than a
-  true navigation history stack. Any new screen needs an entry in `BACK_MAP`, or Back will
-  silently do nothing useful for it.
+The header's Back button uses a static `BACK_MAP` lookup (screen → parent screen) rather than a
+true navigation history stack. Any new screen needs an entry in `BACK_MAP`, or Back will
+silently do nothing useful for it.
 - **Print/report flow**: there's no backend to generate PDFs, so "Send Report" triggers the
-  browser's native print dialog. Charts use a `usePrintMode` hook that briefly renders both the
-  Insights and Graphs tab content together (not just whichever tab is active) and waits two
-  animation frames before printing — this matters because Recharts measures its own container
-  size, and a chart that's never been visible on screen renders blank.
+browser's native print dialog. Charts use a `usePrintMode` hook that briefly renders both the
+Insights and Graphs tab content together (not just whichever tab is active) and waits two
+animation frames before printing — this matters because Recharts measures its own container
+size, and a chart that's never been visible on screen renders blank.
 - **Fake/sample data**: each practice section has a `generateFake*Sessions(count)` generator, all
-  consolidated into one "Add 10 to every section" / "Clear all sections" pair of controls in
-  Settings, rather than per-section buttons.
+consolidated into one "Add 10 to every section" / "Clear all sections" pair of controls in
+Settings, rather than per-section buttons.
 
 ## Deploy
 
@@ -75,10 +99,17 @@ drag-and-drop file upload instead of copy-paste for that file specifically.
 ## Known gotchas
 
 - `App.jsx` occasionally gets developed against in a parallel "demo" build (a Claude-artifact
-  version with a different profile-storage shim, used for previewing changes before syncing them
-  here) — if something seems mysteriously behind, that's likely why. There is no automated sync;
-  changes have to be manually ported over.
-- `ProfileSetupWizard` is exported (not default) from `App.jsx` specifically so `ProfileGate.jsx`
-  can import and use it — don't remove that export.
+version with a different profile-storage shim, used for previewing changes before syncing them
+here) — if something seems mysteriously behind, that's likely why. There is no automated sync;
+changes have to be manually ported over. The demo build does not have login/cloud-sync — that
+was added only to this standalone app, deliberately without touching `App.jsx`, since the
+storage interface it relies on didn't need to change.
+- `ProfileSetupWizard` is exported (not default) from `App.jsx` specifically so `AuthGate.jsx`
+can import and use it — don't remove that export.
 - The PWA icons in `public/` are placeholders (simple generated flag-in-hole artwork) — replace
-  before treating this as a finished, shippable product.
+before treating this as a finished, shippable product.
+- Login/cloud-sync (Firebase Auth + Firestore) was added and verified against real production
+Firebase code, but never against Firebase's actual live servers — the sandbox that built it had
+no network access to `*.googleapis.com`. Verification used a hand-built SDK mock instead. The
+one thing that still needs a real-world check after any change here is an actual sign-up →
+wizard → sign-out → sign-in round trip against the live Cloudflare Pages deploy.
