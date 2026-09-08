@@ -4,6 +4,7 @@ import {
   Line,
   BarChart,
   Bar,
+  Cell,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -1309,6 +1310,72 @@ function computePuttingAnalysis(sessions) {
   };
 }
 
+// ===== Random Practice putting — break-of-putt breakdown =====
+// Optional, per-session: when a Random Practice session is logged with "include break?" turned on,
+// each putt is tagged with which way it broke (left-to-right / straight / right-to-left). Only
+// putts that actually carry a break tag are included here — older sessions, and sessions where the
+// feature was left off, simply have no break-tagged putts and this analysis returns null for them.
+const PUTT_BREAK_LABELS = { ltr: "Left to right", straight: "Straight", rtl: "Right to left" };
+const PUTT_BREAK_ORDER = { ltr: 0, straight: 1, rtl: 2 };
+// Button options for the live break-of-putt picker (PuttingPracticeScreen) — same three values as
+// PUTT_BREAK_LABELS above, just pre-shaped as an array for .map() with all-caps button copy.
+const PUTT_BREAK_OPTIONS = [
+  { key: "ltr", label: "LEFT TO RIGHT" },
+  { key: "straight", label: "STRAIGHT" },
+  { key: "rtl", label: "RIGHT TO LEFT" },
+];
+
+function flattenPuttsWithBreak(sessions) {
+  const rows = [];
+  [...sessions]
+    .sort((a, b) => new Date(a.date) - new Date(b.date))
+    .forEach((s) => {
+      s.putts.forEach((p) => {
+        if (p.break == null) return; // no break tag on this putt — skip
+        rows.push({
+          date: s.date,
+          targetFt: p.targetFt,
+          strokes: p.strokes,
+          sg: sgForPutt(p.targetFt, p.strokes),
+          breakDir: p.break,
+        });
+      });
+    });
+  return rows;
+}
+
+function computePuttingBreakAnalysis(sessions) {
+  const rows = flattenPuttsWithBreak(sessions);
+  if (rows.length === 0) return null;
+
+  const byBreak = {};
+  rows.forEach((r) => {
+    if (!byBreak[r.breakDir]) byBreak[r.breakDir] = [];
+    byBreak[r.breakDir].push(r);
+  });
+
+  const buckets = Object.entries(byBreak).map(([breakDir, breakRows]) => ({
+    label: PUTT_BREAK_LABELS[breakDir] || breakDir,
+    breakDir,
+    count: breakRows.length,
+    avgStrokes: avg(breakRows.map((r) => r.strokes)),
+    avgSG: avg(breakRows.map((r) => r.sg)),
+  }));
+
+  buckets.sort((a, b) => (PUTT_BREAK_ORDER[a.breakDir] ?? 99) - (PUTT_BREAK_ORDER[b.breakDir] ?? 99));
+
+  const withEnoughData = buckets.filter((b) => b.count >= 3);
+  const strengths = [...withEnoughData].sort((a, b) => b.avgSG - a.avgSG).slice(0, 2);
+  const weaknesses = [...withEnoughData].sort((a, b) => a.avgSG - b.avgSG).slice(0, 2);
+
+  return {
+    puttCount: rows.length,
+    buckets,
+    strengths,
+    weaknesses,
+  };
+}
+
 function computeAnalysis(sessions) {
   const rows = flattenShots(sessions);
   if (rows.length === 0) return null;
@@ -1732,7 +1799,9 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
   const [puttCount, setPuttCount] = useState(9);
   const [puttMinFt, setPuttMinFt] = useState(3);
   const [puttMaxFt, setPuttMaxFt] = useState(20);
-  const [putts, setPutts] = useState([]); // {targetFt, strokes}
+  const [puttIncludeBreak, setPuttIncludeBreak] = useState(false);
+  const [puttCurrentBreak, setPuttCurrentBreak] = useState(null); // "ltr" | "straight" | "rtl" | null
+  const [putts, setPutts] = useState([]); // {targetFt, strokes, break?}
   const [puttEditingShotIndex, setPuttEditingShotIndex] = useState(null);
   const [puttSessionFeedback, setPuttSessionFeedback] = useState(null);
   const [puttSummaryIsOnCourse, setPuttSummaryIsOnCourse] = useState(false);
@@ -2228,8 +2297,9 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
     const target = randomTarget(puttMinFt, puttMaxFt);
     setPutts([]);
     setPuttCurrentTarget(target);
+    setPuttCurrentBreak(null);
     setScreen("puttingPractice");
-    persistActivePutting({ puttCount, puttMinFt, puttMaxFt, putts: [], puttCurrentTarget: target });
+    persistActivePutting({ puttCount, puttMinFt, puttMaxFt, puttIncludeBreak, putts: [], puttCurrentTarget: target });
   }
 
   function resumePuttingSession() {
@@ -2237,8 +2307,10 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
     setPuttCount(puttActiveSaved.puttCount);
     setPuttMinFt(puttActiveSaved.puttMinFt);
     setPuttMaxFt(puttActiveSaved.puttMaxFt);
+    setPuttIncludeBreak(!!puttActiveSaved.puttIncludeBreak);
     setPutts(puttActiveSaved.putts);
     setPuttCurrentTarget(puttActiveSaved.puttCurrentTarget);
+    setPuttCurrentBreak(null);
     setScreen("puttingPractice");
   }
 
@@ -2247,7 +2319,7 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
   }
 
   function submitPutt(strokes) {
-    const newPutts = [...putts, { targetFt: puttCurrentTarget, strokes }];
+    const newPutts = [...putts, { targetFt: puttCurrentTarget, strokes, ...(puttIncludeBreak ? { break: puttCurrentBreak } : {}) }];
     setPutts(newPutts);
 
     if (newPutts.length >= puttCount) {
@@ -2255,7 +2327,8 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
     } else {
       const nextTarget = randomTarget(puttMinFt, puttMaxFt);
       setPuttCurrentTarget(nextTarget);
-      persistActivePutting({ puttCount, puttMinFt, puttMaxFt, putts: newPutts, puttCurrentTarget: nextTarget });
+      setPuttCurrentBreak(null);
+      persistActivePutting({ puttCount, puttMinFt, puttMaxFt, puttIncludeBreak, putts: newPutts, puttCurrentTarget: nextTarget });
     }
   }
 
@@ -2263,7 +2336,7 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
     const newPutts = putts.map((p, i) => (i === puttEditingShotIndex ? updatedShot : p));
     setPutts(newPutts);
     setPuttEditingShotIndex(null);
-    persistActivePutting({ puttCount, puttMinFt, puttMaxFt, putts: newPutts, puttCurrentTarget });
+    persistActivePutting({ puttCount, puttMinFt, puttMaxFt, puttIncludeBreak, putts: newPutts, puttCurrentTarget });
   }
 
   function exitPuttingToMenu() {
@@ -2278,6 +2351,7 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
       puttCount: finalPutts.length,
       puttMinFt,
       puttMaxFt,
+      includeBreak: puttIncludeBreak,
       putts: finalPutts,
       totalStrokes: finalPutts.reduce((a, p) => a + p.strokes, 0),
       avgStrokes: avg(finalPutts.map((p) => p.strokes)),
@@ -2305,6 +2379,7 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
   function resetToPuttingSetup() {
     setPutts([]);
     setPuttCurrentTarget(null);
+    setPuttCurrentBreak(null);
     setScreen(puttSummaryIsOnCourse ? "puttingCourseSetup" : "puttingRandomSetup");
   }
 
@@ -4515,6 +4590,8 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
             puttMaxFt={puttMaxFt}
             setPuttMinFt={setPuttMinFt}
             setPuttMaxFt={setPuttMaxFt}
+            puttIncludeBreak={puttIncludeBreak}
+            setPuttIncludeBreak={setPuttIncludeBreak}
             onStart={startPuttingSession}
             activeSaved={puttActiveSaved}
             onResume={resumePuttingSession}
@@ -4575,6 +4652,9 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
             currentTarget={puttCurrentTarget}
             puttMinFt={puttMinFt}
             puttMaxFt={puttMaxFt}
+            includeBreak={puttIncludeBreak}
+            currentBreak={puttCurrentBreak}
+            onSetCurrentBreak={setPuttCurrentBreak}
             onSubmit={submitPutt}
             runningAvg={puttRunningAvg}
             onExit={exitPuttingToMenu}
@@ -5890,8 +5970,9 @@ function SettingsScreen({
           {profileName}
         </div>
         <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 4, lineHeight: 1.5 }}>
-          Your data lives only on this device, under this profile. Export a backup before clearing
-          browser data or switching devices — there's no cloud copy.
+          Your data is synced to your account, not just this device — sign in with the same email
+          on another phone or browser and it'll all be there. Export a backup any time if you want
+          a local copy too.
         </div>
         <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
           <button
@@ -6802,7 +6883,7 @@ function TeeAccuracyAnalysisBody({ history, loaded, onDeleteSession, onEditSessi
                     <Tooltip content={<ChartTooltip suffix="%" />} />
                     <Bar dataKey="hitPct" radius={[4, 4, 0, 0]}>
                       {analysis.buckets.map((c, i) => (
-                        <Bar key={i} dataKey="hitPct" fill={ratingRagColor(c.hitPct / 20)} />
+                        <Cell key={i} fill={ratingRagColor(c.hitPct / 20)} />
                       ))}
                     </Bar>
                   </BarChart>
@@ -7067,7 +7148,7 @@ function ShortGameAnalysisBody({ history, loaded, onDeleteSession, onEditSession
                     <Tooltip content={<ChartTooltip suffix=" SG" />} />
                     <Bar dataKey="avgSG" radius={[4, 4, 0, 0]}>
                       {lieStats.map((l, i) => (
-                        <Bar key={i} dataKey="avgSG" fill={sgRagColor(l.avgSG)} />
+                        <Cell key={i} fill={sgRagColor(l.avgSG)} />
                       ))}
                     </Bar>
                   </BarChart>
@@ -7560,13 +7641,17 @@ function RangeAnalysisBody({ history, loaded, onDeleteSession, onEditSessionShot
                 <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
                   10y bands within {minYds}-{maxYds}y, this timescale
                 </div>
-                <div style={{ height: 220, marginTop: 12 }}>
+                <div style={{ height: 250, marginTop: 12 }}>
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={graphBuckets} margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
+                    <BarChart data={graphBuckets} margin={{ top: 8, right: 8, left: -20, bottom: 8 }}>
                       <CartesianGrid stroke={`${COLORS.creamDim}22`} vertical={false} />
                       <XAxis
                         dataKey="label"
-                        tick={{ fill: COLORS.creamDim, fontSize: 10, fontFamily: "JetBrains Mono, monospace" }}
+                        interval={0}
+                        angle={-45}
+                        textAnchor="end"
+                        height={54}
+                        tick={{ fill: COLORS.creamDim, fontSize: 9, fontFamily: "JetBrains Mono, monospace" }}
                         axisLine={{ stroke: `${COLORS.creamDim}33` }}
                         tickLine={false}
                       />
@@ -7579,7 +7664,7 @@ function RangeAnalysisBody({ history, loaded, onDeleteSession, onEditSessionShot
                       <Tooltip content={<ChartTooltip suffix=" SG" />} />
                       <Bar dataKey="avgSG" radius={[4, 4, 0, 0]}>
                         {graphBuckets.map((b, i) => (
-                          <Bar key={i} dataKey="avgSG" fill={sgRagColor(b.avgSG)} />
+                          <Cell key={i} fill={sgRagColor(b.avgSG)} />
                         ))}
                       </Bar>
                     </BarChart>
@@ -14059,6 +14144,8 @@ function PuttingRandomSetupScreen({
   puttMaxFt,
   setPuttMinFt,
   setPuttMaxFt,
+  puttIncludeBreak,
+  setPuttIncludeBreak,
   onStart,
   activeSaved,
   onResume,
@@ -14157,6 +14244,18 @@ function PuttingRandomSetupScreen({
             Min can't go below {ftToUnitRound(3, units)}{unitLabel}, and max must be greater than min.
           </div>
         )}
+      </Card>
+
+      <Card style={{ marginTop: 10 }}>
+        <SectionLabel>Include break?</SectionLabel>
+        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 4, lineHeight: 1.5 }}>
+          Log which way each putt breaks — left to right, straight, or right to left — so Analysis
+          can show which break direction you're strongest and weakest on.
+        </div>
+        <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+          <PillOption label="NO" active={!puttIncludeBreak} onClick={() => setPuttIncludeBreak(false)} />
+          <PillOption label="YES" active={puttIncludeBreak} onClick={() => setPuttIncludeBreak(true)} />
+        </div>
       </Card>
 
       <button
@@ -14889,6 +14988,11 @@ function PuttLog({ putts, units, onEditShot }) {
               <div style={{ flex: 1 }}>
                 {fmt1(ftToUnit(p.targetFt, units))}
                 {unitLabel}
+                {p.break != null && (
+                  <div style={{ fontSize: 10, color: COLORS.creamDim, marginTop: 2 }}>
+                    {PUTT_BREAK_LABELS[p.break] || p.break}
+                  </div>
+                )}
               </div>
               <div style={{ width: 55, textAlign: "right", color: ragColor(ragStatusForPutts(p.strokes)) }}>{p.strokes}</div>
               <div style={{ width: 55, textAlign: "right", color: sgRagColor(sg) }}>{formatSG(sg)}</div>
@@ -14906,6 +15010,9 @@ function PuttingPracticeScreen({
   currentTarget,
   puttMinFt,
   puttMaxFt,
+  includeBreak,
+  currentBreak,
+  onSetCurrentBreak,
   onSubmit,
   runningAvg,
   onExit,
@@ -14917,6 +15024,9 @@ function PuttingPracticeScreen({
 }) {
   const puttNum = putts.length + 1;
   const unitLabel = shortUnitLabel(units);
+  // When break-tracking is on, require a break to be picked before the putt can be logged — keeps
+  // every putt in a break-tracked session actually tagged, rather than silently skippable.
+  const canSubmitPutt = !includeBreak || currentBreak != null;
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 5 }}>
@@ -14957,6 +15067,36 @@ function PuttingPracticeScreen({
           unit={unitLabel}
         />
 
+        {includeBreak && (
+          <div style={{ marginTop: 14 }}>
+            <div style={{ fontSize: 10, color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", marginBottom: 6 }}>
+              BREAK
+            </div>
+            <div style={{ display: "flex", gap: 6 }}>
+              {PUTT_BREAK_OPTIONS.map((o) => (
+                <button
+                  key={o.key}
+                  onClick={() => onSetCurrentBreak(o.key)}
+                  style={{
+                    flex: 1,
+                    padding: "10px 2px",
+                    borderRadius: 10,
+                    border: currentBreak === o.key ? `2px solid ${COLORS.fairwayLight}` : `1px solid ${COLORS.creamDim}33`,
+                    background: currentBreak === o.key ? COLORS.fairway : "transparent",
+                    color: currentBreak === o.key ? COLORS.cream : COLORS.creamDim,
+                    fontFamily: "'Bebas Neue', sans-serif",
+                    fontSize: 12,
+                    letterSpacing: 0.3,
+                    cursor: "pointer",
+                  }}
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div style={{ marginTop: 14 }}>
           <div style={{ fontSize: 10, color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", marginBottom: 6 }}>
             PUTTS TAKEN
@@ -14965,23 +15105,30 @@ function PuttingPracticeScreen({
             {[1, 2, 3].map((n) => (
               <button
                 key={n}
-                onClick={() => onSubmit(n)}
+                onClick={() => canSubmitPutt && onSubmit(n)}
+                disabled={!canSubmitPutt}
                 style={{
                   flex: 1,
                   padding: "12px 0",
                   borderRadius: 10,
-                  border: `2px solid ${ragColor(ragStatusForPutts(n))}`,
+                  border: `2px solid ${canSubmitPutt ? ragColor(ragStatusForPutts(n)) : COLORS.creamDim + "33"}`,
                   background: "transparent",
-                  color: COLORS.cream,
+                  color: canSubmitPutt ? COLORS.cream : COLORS.creamDim,
                   fontFamily: "'Bebas Neue', sans-serif",
                   fontSize: 24,
-                  cursor: "pointer",
+                  cursor: canSubmitPutt ? "pointer" : "not-allowed",
+                  opacity: canSubmitPutt ? 1 : 0.6,
                 }}
               >
                 {n}
               </button>
             ))}
           </div>
+          {includeBreak && !canSubmitPutt && (
+            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginTop: 6 }}>
+              Pick a break direction above first.
+            </div>
+          )}
         </div>
       </Card>
 
@@ -15014,11 +15161,15 @@ function PuttingPracticeScreen({
 function PuttShotEditModal({ shot, units, onSave, onCancel }) {
   const [targetInput, setTargetInput] = useState(String(fmt1(ftToUnit(shot.targetFt, units))));
   const [strokes, setStrokes] = useState(shot.strokes);
+  // Only this putt's own session had break-tracking on if it carries a "break" field at all —
+  // older putts, and putts from sessions where the feature was off, simply have no such key.
+  const hasBreak = shot.break !== undefined;
+  const [breakVal, setBreakVal] = useState(shot.break ?? null);
   const unitLabel = shortUnitLabel(units);
 
   function handleSave() {
     const targetFt = unitToFt(parseFloat(targetInput) || 0, units);
-    onSave({ targetFt, strokes });
+    onSave({ targetFt, strokes, ...(hasBreak ? { break: breakVal } : {}) });
   }
 
   return (
@@ -15099,6 +15250,36 @@ function PuttShotEditModal({ shot, units, onSave, onCancel }) {
             ))}
           </div>
         </div>
+
+        {hasBreak && (
+          <div style={{ marginTop: 14 }}>
+            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginBottom: 6 }}>
+              BREAK
+            </div>
+            <div style={{ display: "flex", gap: 6 }}>
+              {PUTT_BREAK_OPTIONS.map((o) => (
+                <button
+                  key={o.key}
+                  onClick={() => setBreakVal(o.key)}
+                  style={{
+                    flex: 1,
+                    padding: "10px 2px",
+                    borderRadius: 8,
+                    border: breakVal === o.key ? `2px solid ${COLORS.fairwayLight}` : `1px solid ${COLORS.creamDim}33`,
+                    background: breakVal === o.key ? COLORS.fairway : "transparent",
+                    color: breakVal === o.key ? COLORS.cream : COLORS.creamDim,
+                    fontFamily: "'Bebas Neue', sans-serif",
+                    fontSize: 11,
+                    letterSpacing: 0.3,
+                    cursor: "pointer",
+                  }}
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
           <button
@@ -15660,6 +15841,53 @@ function PuttInsightCard({ title, subtitle, items, emptyText }) {
   );
 }
 
+// Same idea as PuttBucketRow/PuttInsightCard above but for break-of-putt buckets ("Left to right" /
+// "Straight" / "Right to left") instead of distance bands — kept separate because PuttBucketRow
+// hardcodes a "ft" suffix on its label that doesn't make sense for a break direction.
+function PuttBreakBucketRow({ bucket }) {
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0" }}>
+      <div>
+        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 20, color: COLORS.cream }}>{bucket.label}</div>
+        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim }}>
+          {bucket.count} putts · {bucket.avgStrokes.toFixed(2)} avg
+        </div>
+      </div>
+      <div style={{ textAlign: "right" }}>
+        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 22, color: sgRagColor(bucket.avgSG) }}>
+          {formatSG(bucket.avgSG)}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PuttBreakInsightCard({ title, subtitle, items, emptyText }) {
+  return (
+    <Card style={{ marginBottom: 14 }}>
+      <SectionLabel>{title}</SectionLabel>
+      {subtitle && (
+        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
+          {subtitle}
+        </div>
+      )}
+      <div style={{ marginTop: 8 }}>
+        {items.length === 0 ? (
+          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: COLORS.creamDim, padding: "6px 0" }}>
+            {emptyText}
+          </div>
+        ) : (
+          items.map((b, i) => (
+            <div key={b.breakDir} style={{ borderTop: i > 0 ? `1px solid ${COLORS.creamDim}15` : "none" }}>
+              <PuttBreakBucketRow bucket={b} />
+            </div>
+          ))
+        )}
+      </div>
+    </Card>
+  );
+}
+
 function FeetPicker({ min, max, onMin, onMax, onPreset, activePresetLabel }) {
   return (
     <div style={{ marginBottom: 16 }}>
@@ -15726,7 +15954,7 @@ function PuttingAnalysisHub({
             cursor: "pointer",
           }}
         >
-          PRACTICE
+          RANDOM
         </button>
         <button
           onClick={() => setSubTab("clock")}
@@ -16193,6 +16421,7 @@ function PuttingAnalysisBody({ history, loaded, onDeleteSession, onEditSessionSh
 
   const filtered = filterByTimescale(history, timescale);
   const analysis = computePuttingAnalysis(filtered);
+  const breakAnalysis = computePuttingBreakAnalysis(filtered);
   const trend = puttingSessionTrendData(filtered, minFt, maxFt);
   const graphBuckets = puttingBucketChartData(filtered, minFt, maxFt);
   const hasGraphData = trend.length > 0;
@@ -16212,7 +16441,7 @@ function PuttingAnalysisBody({ history, loaded, onDeleteSession, onEditSessionSh
 
   return (
     <div>
-      <PrintHeader title="Putting Analysis — Practice" timescale={timescale} />
+      <PrintHeader title="Putting Analysis — Random" timescale={timescale} />
       <div className="no-print" style={{ display: "flex", gap: 6, marginBottom: 14 }}>
         <button
           onClick={() => setTab("insights")}
@@ -16321,6 +16550,24 @@ function PuttingAnalysisBody({ history, loaded, onDeleteSession, onEditSessionSh
               items={analysis.regressing}
               emptyText=""
             />
+          )}
+
+          {breakAnalysis && (
+            <>
+              <PuttBreakInsightCard
+                title="Strengths by break"
+                subtitle="Which way the putt broke, where you gain the most strokes on the PGA Tour baseline"
+                items={breakAnalysis.strengths}
+                emptyText="Not enough putts logged with a break direction yet."
+              />
+
+              <PuttBreakInsightCard
+                title="Focus areas by break"
+                subtitle="Which way the putt broke, where you lose the most strokes to the PGA Tour baseline"
+                items={breakAnalysis.weaknesses}
+                emptyText="Not enough putts logged with a break direction yet."
+              />
+            </>
           )}
 
           <CollapsibleSection title="All sessions" count={filtered.length}>
@@ -16439,7 +16686,7 @@ function PuttingAnalysisBody({ history, loaded, onDeleteSession, onEditSessionSh
                       <Tooltip content={<ChartTooltip suffix=" SG" />} />
                       <Bar dataKey="avgSG" radius={[4, 4, 0, 0]}>
                         {graphBuckets.map((b, i) => (
-                          <Bar key={i} dataKey="avgSG" fill={sgRagColor(b.avgSG)} />
+                          <Cell key={i} fill={sgRagColor(b.avgSG)} />
                         ))}
                       </Bar>
                     </BarChart>
