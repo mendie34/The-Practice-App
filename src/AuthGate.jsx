@@ -93,12 +93,12 @@ const errorStyle = {
 function LoadingScreen() {
   return (
     <div style={{ ...shellStyle, display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <style>{FONT_IMPORT}</style>style>
-    <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: COLORS.creamDim }}>
-    Loading…
-    </div>div>
-    </div>div>
-    );
+      <style>{FONT_IMPORT}</style>
+      <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: COLORS.creamDim }}>
+        Loading…
+      </div>
+    </div>
+  );
 }
 
 function AuthScreen({ mode, setMode, onSubmit, submitting, error }) {
@@ -106,114 +106,114 @@ function AuthScreen({ mode, setMode, onSubmit, submitting, error }) {
   const [password, setPassword] = useState("");
   const isSignUp = mode === "signup";
   const canSubmit = email.trim() !== "" && password.length >= 6 && !submitting;
-  
+
   function handleSubmit(e) {
     e.preventDefault();
     if (!canSubmit) return;
     onSubmit(email.trim(), password);
   }
-  
+
   return (
     <div style={shellStyle}>
-    <style>{FONT_IMPORT}</style>style>
-    <div style={titleStyle}>THE PRACTICE APP</div>div>
-    <form style={cardStyle} onSubmit={handleSubmit}>
-    <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 20, letterSpacing: 0.5 }}>
-      {isSignUp ? "CREATE ACCOUNT" : "LOG IN"}
-    </div>div>
-    
-    <div style={labelStyle}>EMAIL</div>div>
-    <input
-      type="email"
-      autoComplete="email"
-      value={email}
-      onChange={(e) => setEmail(e.target.value)}
-      placeholder="you@example.com"
-      style={inputStyle}
-      autoFocus
-      />
-    
-    <div style={labelStyle}>PASSWORD</div>div>
-    <input
-      type="password"
-      autoComplete={isSignUp ? "new-password" : "current-password"}
-      value={password}
-      onChange={(e) => setPassword(e.target.value)}
-      placeholder={isSignUp ? "At least 6 characters" : "Your password"}
-      style={inputStyle}
-      />
-    
-      {error && <div style={errorStyle}>{error}</div>div>}
-    
-    <button type="submit" disabled={!canSubmit} style={primaryButtonStyle(!canSubmit)}>
-      {submitting ? "PLEASE WAIT…" : isSignUp ? "CREATE ACCOUNT" : "LOG IN"}
-    </button>button>
-    
-    <button
-      type="button"
-      onClick={() => setMode(isSignUp ? "signin" : "signup")}
-      style={linkButtonStyle}
-      >
-      {isSignUp ? "Already have an account? Log in" : "New here? Create an account"}
-    </button>button>
-    </form>form>
-    </div>div>
-    );
+      <style>{FONT_IMPORT}</style>
+      <div style={titleStyle}>THE PRACTICE APP</div>
+      <form style={cardStyle} onSubmit={handleSubmit}>
+        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 20, letterSpacing: 0.5 }}>
+          {isSignUp ? "CREATE ACCOUNT" : "LOG IN"}
+        </div>
+
+        <div style={labelStyle}>EMAIL</div>
+        <input
+          type="email"
+          autoComplete="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="you@example.com"
+          style={inputStyle}
+          autoFocus
+        />
+
+        <div style={labelStyle}>PASSWORD</div>
+        <input
+          type="password"
+          autoComplete={isSignUp ? "new-password" : "current-password"}
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          placeholder={isSignUp ? "At least 6 characters" : "Your password"}
+          style={inputStyle}
+        />
+
+        {error && <div style={errorStyle}>{error}</div>}
+
+        <button type="submit" disabled={!canSubmit} style={primaryButtonStyle(!canSubmit)}>
+          {submitting ? "PLEASE WAIT…" : isSignUp ? "CREATE ACCOUNT" : "LOG IN"}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setMode(isSignUp ? "signin" : "signup")}
+          style={linkButtonStyle}
+        >
+          {isSignUp ? "Already have an account? Log in" : "New here? Create an account"}
+        </button>
+      </form>
+    </div>
+  );
 }
 
 function MigrationPrompt({ candidates, onMigrate, onSkip, busy }) {
   const [selectedId, setSelectedId] = useState(candidates[0].profileId);
   return (
     <div style={shellStyle}>
-    <style>{FONT_IMPORT}</style>style>
-    <div style={cardStyle}>
-    <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 20, letterSpacing: 0.5 }}>
-    BRING YOUR DATA IN?
-    </div>div>
-    <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: COLORS.creamDim, marginTop: 8, lineHeight: 1.5 }}>
-    We found existing practice data saved on this device, from before you had an account.
-    Want to copy it into your new account?
-    </div>div>
-    
-      {candidates.length > 1 && (
-      <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 14 }}>
-      More than one local dataset was found — choose which one:
-      </div>div>
-    )}
-    
-    <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 8 }}>
-      {candidates.map((c) => (
-      <div
-        key={c.profileId}
-        onClick={() => setSelectedId(c.profileId)}
-        style={{
-          border: `1px solid ${selectedId === c.profileId ? COLORS.fairwayLight : COLORS.creamDim + "33"}`,
-          borderRadius: 10,
-          padding: "10px 12px",
-          cursor: "pointer",
-          background: selectedId === c.profileId ? `${COLORS.fairway}33` : "transparent",
-        }}
+      <style>{FONT_IMPORT}</style>
+      <div style={cardStyle}>
+        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 20, letterSpacing: 0.5 }}>
+          BRING YOUR DATA IN?
+        </div>
+        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: COLORS.creamDim, marginTop: 8, lineHeight: 1.5 }}>
+          We found existing practice data saved on this device, from before you had an account.
+          Want to copy it into your new account?
+        </div>
+
+        {candidates.length > 1 && (
+          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 14 }}>
+            More than one local dataset was found — choose which one:
+          </div>
+        )}
+
+        <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 8 }}>
+          {candidates.map((c) => (
+            <div
+              key={c.profileId}
+              onClick={() => setSelectedId(c.profileId)}
+              style={{
+                border: `1px solid ${selectedId === c.profileId ? COLORS.fairwayLight : COLORS.creamDim + "33"}`,
+                borderRadius: 10,
+                padding: "10px 12px",
+                cursor: "pointer",
+                background: selectedId === c.profileId ? `${COLORS.fairway}33` : "transparent",
+              }}
+            >
+              <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}>
+                {describeLegacyProfile(c)}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <button
+          onClick={() => onMigrate(candidates.find((c) => c.profileId === selectedId))}
+          disabled={busy}
+          style={primaryButtonStyle(busy)}
         >
-      <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}>
-        {describeLegacyProfile(c)}
-      </div>div>
-      </div>div>
-      ))}
-    </div>div>
-    
-    <button
-      onClick={() => onMigrate(candidates.find((c) => c.profileId === selectedId))}
-      disabled={busy}
-      style={primaryButtonStyle(busy)}
-      >
-      {busy ? "COPYING DATA…" : "BRING IT IN"}
-    </button>button>
-    <button type="button" onClick={onSkip} disabled={busy} style={linkButtonStyle}>
-    Skip — start fresh instead
-    </button>button>
-    </div>div>
-    </div>div>
-    );
+          {busy ? "COPYING DATA…" : "BRING IT IN"}
+        </button>
+        <button type="button" onClick={onSkip} disabled={busy} style={linkButtonStyle}>
+          Skip — start fresh instead
+        </button>
+      </div>
+    </div>
+  );
 }
 
 export default function AuthGate() {
@@ -229,7 +229,7 @@ export default function AuthGate() {
   // resolved (migrated or skipped).
   const [migrationCandidates, setMigrationCandidates] = useState(null);
   const [migrationBusy, setMigrationBusy] = useState(false);
-  
+
   useEffect(() => {
     const unsub = watchAuthState(async (fbUser) => {
       if (!fbUser) {
@@ -256,7 +256,7 @@ export default function AuthGate() {
     });
     return unsub;
   }, []);
-  
+
   async function handleAuthSubmit(email, password) {
     setSubmitting(true);
     setAuthError(null);
@@ -277,11 +277,11 @@ export default function AuthGate() {
       setSubmitting(false);
     }
   }
-  
+
   function handleSwitchProfile() {
     signOutUser();
   }
-  
+
   async function handleMigrate(candidate) {
     setMigrationBusy(true);
     try {
@@ -291,7 +291,7 @@ export default function AuthGate() {
       setMigrationCandidates(null);
     }
   }
-  
+
   async function handleWizardComplete(payload) {
     const uid = user.uid;
     const profileDoc = { name: payload.name, handicap: payload.handicap, createdAt: Date.now() };
@@ -304,21 +304,21 @@ export default function AuthGate() {
         rangeTrackingMode: payload.rangeTrackingMode || "distance",
       }),
       false
-      );
+    );
     setProfile(profileDoc);
     setAuthState("ready");
   }
-  
+
   if (authState === "loading") {
     return <LoadingScreen />;
   }
-  
+
   if (authState === "signedOut") {
     return (
       <AuthScreen mode={mode} setMode={setMode} onSubmit={handleAuthSubmit} submitting={submitting} error={authError} />
-      );
+    );
   }
-  
+
   if (authState === "needsProfile") {
     if (migrationCandidates && migrationCandidates.length) {
       return (
@@ -327,19 +327,18 @@ export default function AuthGate() {
           busy={migrationBusy}
           onMigrate={handleMigrate}
           onSkip={() => setMigrationCandidates(null)}
-          />
-        );
+        />
+      );
     }
     return <ProfileSetupWizard onComplete={handleWizardComplete} />;
   }
-  
+
   return (
     <GolfPracticeApp
       onSwitchProfile={handleSwitchProfile}
       profileName={profile ? profile.name : ""}
       profileId={user.uid}
       profileHandicap={profile ? profile.handicap : null}
-      />
-    );
+    />
+  );
 }
-</style>
