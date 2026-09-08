@@ -1,9 +1,9 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import ProfileGate from "./ProfileGate.jsx";
+import AuthGate from "./AuthGate.jsx";
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>
-    <ProfileGate />
+  <AuthGate />
   </StrictMode>
-);
+  );
