@@ -388,11 +388,7 @@ export default function AuthGate() {
     <>
       <div
         style={{
-          position: "fixed",
-          top: 0,
-          left: 0,
-          right: 0,
-          zIndex: 99999,
+          position: "relative",
           background: "#000000ee",
           color: "#7CFC7C",
           fontFamily: "monospace",
@@ -412,7 +408,7 @@ export default function AuthGate() {
         <br />
         sign out clicked: {debugInfo.signOutClicked || 0} times | result: {debugInfo.signOutResult || "—"}
       </div>
-      <div style={{ paddingTop: 54 }}>{content}</div>
+      {content}
     </>
   );
 }
