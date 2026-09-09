@@ -255,22 +255,9 @@ export default function AuthGate() {
   // resolved (migrated or skipped).
   const [migrationCandidates, setMigrationCandidates] = useState(null);
   const [migrationBusy, setMigrationBusy] = useState(false);
-  // TEMPORARY DEBUG — remove once the sign-out/session mystery is solved. Tracks exactly what
-  // onAuthStateChanged reports, so we can see it directly instead of guessing from outside.
-  const [debugInfo, setDebugInfo] = useState({ fired: false, callCount: 0 });
 
   useEffect(() => {
     const unsub = watchAuthState(async (fbUser) => {
-      setDebugInfo((d) => ({
-        fired: true,
-        callCount: d.callCount + 1,
-        firedAt: new Date().toLocaleTimeString(),
-        fbUserPresent: !!fbUser,
-        uid: fbUser ? fbUser.uid : null,
-        email: fbUser ? fbUser.email : null,
-        isAnonymous: fbUser ? fbUser.isAnonymous : null,
-        profileStep: "checking…",
-      }));
       if (!fbUser) {
         setUser(null);
         setProfile(null);
@@ -281,7 +268,6 @@ export default function AuthGate() {
       installWindowStorage(fbUser.uid);
       try {
         const existingProfile = await getUserProfile(fbUser.uid);
-        setDebugInfo((d) => ({ ...d, profileStep: existingProfile ? "found profile" : "no profile doc" }));
         if (existingProfile) {
           setProfile(existingProfile);
           setAuthState("ready");
@@ -289,7 +275,6 @@ export default function AuthGate() {
           setAuthState("needsProfile");
         }
       } catch (e) {
-        setDebugInfo((d) => ({ ...d, profileStep: "ERROR: " + (e && e.message) }));
         // Firestore unreachable (offline on first-ever login, before anything is cached) — fall
         // back to the setup wizard rather than getting stuck; saving will retry once online.
         setAuthState("needsProfile");
@@ -320,10 +305,7 @@ export default function AuthGate() {
   }
 
   function handleSwitchProfile() {
-    setDebugInfo((d) => ({ ...d, signOutClicked: (d.signOutClicked || 0) + 1, signOutResult: "calling…" }));
-    signOutUser()
-      .then(() => setDebugInfo((d) => ({ ...d, signOutResult: "resolved OK" })))
-      .catch((e) => setDebugInfo((d) => ({ ...d, signOutResult: "REJECTED: " + (e && e.message) })));
+    signOutUser();
   }
 
   async function handleMigrate(candidate) {
@@ -353,16 +335,19 @@ export default function AuthGate() {
     setAuthState("ready");
   }
 
-  let content;
   if (authState === "loading") {
-    content = <LoadingScreen />;
-  } else if (authState === "signedOut") {
-    content = (
+    return <LoadingScreen />;
+  }
+
+  if (authState === "signedOut") {
+    return (
       <AuthScreen mode={mode} setMode={setMode} onSubmit={handleAuthSubmit} submitting={submitting} error={authError} />
     );
-  } else if (authState === "needsProfile") {
+  }
+
+  if (authState === "needsProfile") {
     if (migrationCandidates && migrationCandidates.length) {
-      content = (
+      return (
         <MigrationPrompt
           candidates={migrationCandidates}
           busy={migrationBusy}
@@ -370,45 +355,16 @@ export default function AuthGate() {
           onSkip={() => setMigrationCandidates(null)}
         />
       );
-    } else {
-      content = <ProfileSetupWizard onComplete={handleWizardComplete} />;
     }
-  } else {
-    content = (
-      <GolfPracticeApp
-        onSwitchProfile={handleSwitchProfile}
-        profileName={profile ? profile.name : ""}
-        profileId={user.uid}
-        profileHandicap={profile ? profile.handicap : null}
-      />
-    );
+    return <ProfileSetupWizard onComplete={handleWizardComplete} />;
   }
 
   return (
-    <>
-      <div
-        style={{
-          position: "relative",
-          background: "#000000ee",
-          color: "#7CFC7C",
-          fontFamily: "monospace",
-          fontSize: 10,
-          padding: "6px 8px",
-          lineHeight: 1.5,
-          wordBreak: "break-all",
-        }}
-      >
-        DEBUG — authState: {authState} | onAuthStateChanged fired: {String(debugInfo.fired)} (x{debugInfo.callCount}
-        ) {debugInfo.firedAt ? `at ${debugInfo.firedAt}` : ""}
-        <br />
-        fbUser present: {String(debugInfo.fbUserPresent)} | uid: {debugInfo.uid || "—"} | email: {debugInfo.email || "—"} |
-        anonymous: {String(debugInfo.isAnonymous)}
-        <br />
-        profile step: {debugInfo.profileStep || "—"}
-        <br />
-        sign out clicked: {debugInfo.signOutClicked || 0} times | result: {debugInfo.signOutResult || "—"}
-      </div>
-      {content}
-    </>
+    <GolfPracticeApp
+      onSwitchProfile={handleSwitchProfile}
+      profileName={profile ? profile.name : ""}
+      profileId={user.uid}
+      profileHandicap={profile ? profile.handicap : null}
+    />
   );
 }
