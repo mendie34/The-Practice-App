@@ -40,6 +40,35 @@ export const COLORS = {
   sand: "#C9A66B",
 };
 
+// Real static asset (see public/logo.png) rather than an inline data URI — this is a normal
+// deployed web app with a public folder, unlike the Claude-artifact demo this was designed
+// alongside, which has to inline images as base64 since it has no separate asset pipeline.
+export const LOGO_SRC = "/logo.png";
+// Composite lockup: same icon, with PLAYER baked into the image itself (not a separate text
+// badge) so it reads as one mark. Used on the prominent auth screen; the compact in-app header
+// keeps the plain icon + a live PlayerBadge since baked-in text is illegible at 20px.
+export const LOGO_PLAYER_SRC = "/logo-player.png";
+
+export function PlayerBadge({ style }) {
+  return (
+    <div
+      style={{
+        display: "inline-block",
+        fontFamily: "'JetBrains Mono', monospace",
+        fontSize: 10,
+        letterSpacing: 1.5,
+        color: COLORS.turfDark,
+        background: COLORS.sand,
+        borderRadius: 5,
+        padding: "2px 7px",
+        ...style,
+      }}
+    >
+      PLAYER
+    </div>
+  );
+}
+
 function uid() {
   return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
 }
@@ -4691,15 +4720,27 @@ function Header({ screen, onSettings, onHome, onBack, backDestination }) {
       <div
         onClick={onHome}
         style={{
-          fontFamily: "'Bebas Neue', sans-serif",
-          fontSize: 19,
-          letterSpacing: 0.5,
-          lineHeight: 1,
+          display: "flex",
+          alignItems: "center",
+          gap: 7,
           cursor: "pointer",
-          color: COLORS.cream,
         }}
       >
-        THE PRACTICE APP
+        <img src={LOGO_SRC} alt="" style={{ width: 20, height: 20, flexShrink: 0 }} />
+        <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+          <div
+            style={{
+              fontFamily: "'Bebas Neue', sans-serif",
+              fontSize: 19,
+              letterSpacing: 0.5,
+              lineHeight: 1,
+              color: COLORS.cream,
+            }}
+          >
+            THE PRACTICE APP
+          </div>
+          <PlayerBadge />
+        </div>
       </div>
       <div style={{ display: "flex", gap: 5 }}>
         {screen !== "home" && backDestination !== "home" && (
