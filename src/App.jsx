@@ -13,6 +13,7 @@ import {
   ReferenceLine,
 } from "recharts";
 import {
+  auth,
   loadAllAppData,
   exportProfileData,
   importProfileData,
@@ -1898,7 +1899,7 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
   const [clockStorageError, setClockStorageError] = useState(false);
 
   // ===== Putting — "Start Line" gate drill state =====
-  // 10 putts through a 15in gate set 15in in front of the putter — a start-line/face-control
+  // 10 putts through a gate (width is the player's choice) set ~15in in front of the ball — a start-line/face-control
   // drill, not a distance drill, so there's nothing to randomize and nothing per-putt to record:
   // the player just plays all 10 for real, then enters the one number at the end. Own storage
   // key + own (very small) history list, same reasoning as Around the Clock above.
@@ -6726,7 +6727,7 @@ function AddCoachScreen({ profileId, profileName, myCoachLinks, onBack }) {
   async function handleApply(coach) {
     setApplyingCoachId(coach.id);
     try {
-      await applyToCoach(profileId, profileName || "Player", coach.email || "", coach.id, coach.name);
+      await applyToCoach(profileId, profileName || "Player", auth.currentUser?.email || "", coach.id, coach.name);
     } catch (e) {
       setError("Couldn't send that request — try again.");
     } finally {
@@ -15758,14 +15759,14 @@ function PuttingStartLineIntroScreen({ history, onStart }) {
           START LINE
         </div>
         <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
-          10 putts through a 15in gate
+          10 putts through a gate
         </div>
       </div>
 
       <Card>
         <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 13, color: COLORS.cream, lineHeight: 1.6 }}>
-          Set up a gate about 15 inches wide, 15 inches in front of your putter face — two tees or
-          alignment sticks work fine. Hit 10 putts, aiming to roll the ball through the gate
+          Set up a gate with 2 tees, the width of your choosing, roughly 15 inches from your ball.
+          Hit 10 putts, aiming to roll the ball through the gate
           without touching either side. Play all 10 for real, then come back and enter how many
           got through clean — no need to confirm make or miss one at a time.
         </div>
@@ -15828,7 +15829,7 @@ function PuttingStartLinePlayScreen({ madeInput, setMadeInput, onSubmit, onExit 
       <Card>
         <div style={{ textAlign: "center" }}>
           <div style={{ fontSize: 11, color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", letterSpacing: 1.5 }}>
-            GATE — 15IN WIDE, 15IN AHEAD
+            GATE — WIDTH YOUR CHOICE, ~15IN AHEAD
           </div>
           <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 13, color: COLORS.creamDim, marginTop: 8, lineHeight: 1.5 }}>
             Play all 10 putts through the gate, then enter how many got through cleanly.
@@ -17815,7 +17816,7 @@ function PuttingStartLineAnalysisBody({ history, loaded, onDeleteSession, onEdit
       <Card style={{ marginBottom: 14, marginTop: 12 }}>
         <SectionLabel>Overview</SectionLabel>
         <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginTop: 2 }}>
-          10 putts through a 15in gate
+          10 putts through a gate
         </div>
         <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
           <StatBox label="ROUNDS PLAYED" value={filtered.length} />
