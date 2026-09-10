@@ -201,6 +201,12 @@ const BACK_MAP = {
   puttingClockIntro: "puttingChoose",
   puttingClockPlay: "puttingClockIntro",
   puttingClockSummary: "puttingClockIntro",
+  puttingStartLineIntro: "puttingChoose",
+  puttingStartLinePlay: "puttingStartLineIntro",
+  puttingStartLineSummary: "puttingStartLineIntro",
+  puttingPaceSetup: "puttingChoose",
+  puttingPacePlay: "puttingPaceSetup",
+  puttingPaceSummary: "puttingPaceSetup",
   analysis: "home",
   settings: "home",
   addCoach: "settings",
@@ -650,6 +656,28 @@ function ragStatusForPutts(strokes) {
   if (strokes <= 1) return "green";
   if (strokes === 2) return "amber";
   return "red";
+}
+
+// ===== Putting — Pace Control drill constants =====
+// Fixed distance set the player selects from (order also drives display order everywhere).
+const PACE_DISTANCES_FT = [10, 20, 30, 40];
+// 0-3 point scale scored by proximity to the hole once the putt has finished rolling.
+const PACE_POINT_OPTIONS = [
+  { points: 0, label: "0 PTS", radiusLabel: "Outside 3ft" },
+  { points: 1, label: "1 PT", radiusLabel: "Within 3ft" },
+  { points: 2, label: "2 PTS", radiusLabel: "Within 2ft" },
+  { points: 3, label: "3 PTS", radiusLabel: "Within 1ft or holed" },
+];
+function paceRagColor(pct) {
+  if (pct >= 66) return COLORS.fairwayLight;
+  if (pct >= 40) return COLORS.sand;
+  return COLORS.flag;
+}
+function pacePointColor(points) {
+  if (points === 3) return COLORS.fairwayLight;
+  if (points === 2) return COLORS.sand;
+  if (points === 1) return `${COLORS.sand}99`;
+  return COLORS.flag;
 }
 
 // ===== PGA Tour putting baseline (strokes gained) =====
@@ -1869,6 +1897,29 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
   const [clockLoaded, setClockLoaded] = useState(false);
   const [clockStorageError, setClockStorageError] = useState(false);
 
+  // ===== Putting — "Start Line" gate drill state =====
+  // 10 putts through a 15in gate set 15in in front of the putter — a start-line/face-control
+  // drill, not a distance drill, so there's nothing to randomize and nothing per-putt to record:
+  // the player just plays all 10 for real, then enters the one number at the end. Own storage
+  // key + own (very small) history list, same reasoning as Around the Clock above.
+  const [startLineMadeInput, setStartLineMadeInput] = useState(""); // entry field, while on the play screen
+  const [startLineHistory, setStartLineHistory] = useState([]);
+  const [startLineLoaded, setStartLineLoaded] = useState(false);
+  const [startLineStorageError, setStartLineStorageError] = useState(false);
+
+  // ===== Putting — "Pace Control" state =====
+  // Player picks which of 10/20/30/40ft to include and 3 or 5 putts per distance; those putts are
+  // built into one shuffled queue at START, then scored putt-by-putt on a 0-3 point scale (radius
+  // to the hole) rather than made/missed. Own storage key + own history list, same pattern as
+  // Around the Clock / Start Line above.
+  const [paceSelectedDistances, setPaceSelectedDistances] = useState([]); // subset of PACE_DISTANCES_FT
+  const [pacePuttsPerDistance, setPacePuttsPerDistance] = useState(5); // 3 | 5
+  const [pacePutts, setPacePutts] = useState([]); // [{targetFt, points: null|0|1|2|3}], built + shuffled at start
+  const [paceCurrentIndex, setPaceCurrentIndex] = useState(0);
+  const [paceHistory, setPaceHistory] = useState([]);
+  const [paceLoaded, setPaceLoaded] = useState(false);
+  const [paceStorageError, setPaceStorageError] = useState(false);
+
   // ===== Short Game section state =====
   // ===== Tee Accuracy state =====
   const [teeShotCount, setTeeShotCount] = useState(10);
@@ -1997,6 +2048,21 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
         } catch (e) {}
       }
       setClockLoaded(true);
+
+      // Start Line and Pace Control are newer than the consolidated loadAllAppData() key list
+      // above, so they're fetched individually here rather than via `data` — same window.storage
+      // API, just not (yet) folded into that batch.
+      try {
+        const startLineRes = await window.storage.get("putting:startLineSessions", false);
+        if (startLineRes && startLineRes.value) setStartLineHistory(JSON.parse(startLineRes.value));
+      } catch (e) {}
+      setStartLineLoaded(true);
+
+      try {
+        const paceRes = await window.storage.get("putting:paceSessions", false);
+        if (paceRes && paceRes.value) setPaceHistory(JSON.parse(paceRes.value));
+      } catch (e) {}
+      setPaceLoaded(true);
 
       if (data["tee:sessions"]) {
         try {
@@ -2714,6 +2780,151 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
       await window.storage.set("putting:clockSessions", JSON.stringify([]), false);
     } catch (e) {
       setClockStorageError(true);
+    }
+  }
+
+  // ===== Putting — Start Line handlers =====
+  function startStartLineDrill() {
+    setStartLineMadeInput("");
+    setScreen("puttingStartLinePlay");
+  }
+
+  async function submitStartLineDrill() {
+    const parsed = parseInt(startLineMadeInput, 10);
+    const made = Math.max(0, Math.min(10, isNaN(parsed) ? 0 : parsed));
+    const session = { id: uid(), date: new Date().toISOString(), made, total: 10 };
+    const newHistory = [session, ...startLineHistory];
+    setStartLineHistory(newHistory);
+    setScreen("puttingStartLineSummary");
+    try {
+      await window.storage.set("putting:startLineSessions", JSON.stringify(newHistory), false);
+    } catch (e) {
+      setStartLineStorageError(true);
+    }
+  }
+
+  function exitStartLineDrill() {
+    setScreen("puttingStartLineIntro");
+  }
+
+  async function deleteStartLineSession(id) {
+    const newHistory = startLineHistory.filter((s) => s.id !== id);
+    setStartLineHistory(newHistory);
+    try {
+      await window.storage.set("putting:startLineSessions", JSON.stringify(newHistory), false);
+    } catch (e) {
+      setStartLineStorageError(true);
+    }
+  }
+
+  // Corrects a past round's made-count (e.g. the "wrong figure entered" complaint that started
+  // this whole edit-everywhere push) — clamped the same way the original submit is.
+  async function editStartLineSession(sessionId, newMade) {
+    const parsed = parseInt(newMade, 10);
+    const clamped = Math.max(0, Math.min(10, isNaN(parsed) ? 0 : parsed));
+    const newHistory = startLineHistory.map((s) => (s.id === sessionId ? { ...s, made: clamped } : s));
+    setStartLineHistory(newHistory);
+    try {
+      await window.storage.set("putting:startLineSessions", JSON.stringify(newHistory), false);
+    } catch (e) {
+      setStartLineStorageError(true);
+    }
+  }
+
+  async function clearAllStartLineSessions() {
+    setStartLineHistory([]);
+    try {
+      await window.storage.set("putting:startLineSessions", JSON.stringify([]), false);
+    } catch (e) {
+      setStartLineStorageError(true);
+    }
+  }
+
+  // ===== Putting — Pace Control handlers =====
+  function togglePaceDistance(ft) {
+    setPaceSelectedDistances((prev) => (prev.includes(ft) ? prev.filter((d) => d !== ft) : [...prev, ft]));
+  }
+
+  function startPaceDrill() {
+    const queue = [];
+    paceSelectedDistances.forEach((ft) => {
+      for (let i = 0; i < pacePuttsPerDistance; i++) queue.push({ targetFt: ft, points: null });
+    });
+    setPacePutts(shuffleArray(queue));
+    setPaceCurrentIndex(0);
+    setScreen("puttingPacePlay");
+  }
+
+  function recordPacePutt(points) {
+    const newPutts = pacePutts.map((p, i) => (i === paceCurrentIndex ? { ...p, points } : p));
+    setPacePutts(newPutts);
+    if (paceCurrentIndex + 1 >= newPutts.length) {
+      finishPaceDrill(newPutts);
+    } else {
+      setPaceCurrentIndex(paceCurrentIndex + 1);
+    }
+  }
+
+  async function finishPaceDrill(finalPutts) {
+    const totalPoints = finalPutts.reduce((a, p) => a + (p.points || 0), 0);
+    const session = {
+      id: uid(),
+      date: new Date().toISOString(),
+      distances: [...paceSelectedDistances].sort((a, b) => a - b),
+      puttsPerDistance: pacePuttsPerDistance,
+      putts: finalPutts,
+      totalPoints,
+      maxPoints: finalPutts.length * 3,
+    };
+    const newHistory = [session, ...paceHistory];
+    setPaceHistory(newHistory);
+    setScreen("puttingPaceSummary");
+    try {
+      await window.storage.set("putting:paceSessions", JSON.stringify(newHistory), false);
+    } catch (e) {
+      setPaceStorageError(true);
+    }
+  }
+
+  function exitPaceDrill() {
+    setScreen("puttingPaceSetup");
+  }
+
+  async function deletePaceSession(id) {
+    const newHistory = paceHistory.filter((s) => s.id !== id);
+    setPaceHistory(newHistory);
+    try {
+      await window.storage.set("putting:paceSessions", JSON.stringify(newHistory), false);
+    } catch (e) {
+      setPaceStorageError(true);
+    }
+  }
+
+  // Corrects one putt's points within an already-completed Pace Control round, recomputing the
+  // cached totalPoints the summary/analysis screens read — same "don't let edits go stale" rule
+  // as every other historical-edit handler in this file.
+  async function editPacePuttPoints(sessionId, puttIndex, newPoints) {
+    const clamped = Math.max(0, Math.min(3, newPoints));
+    const newHistory = paceHistory.map((s) => {
+      if (s.id !== sessionId) return s;
+      const newPutts = s.putts.map((p, i) => (i === puttIndex ? { ...p, points: clamped } : p));
+      const totalPoints = newPutts.reduce((a, p) => a + (p.points || 0), 0);
+      return { ...s, putts: newPutts, totalPoints };
+    });
+    setPaceHistory(newHistory);
+    try {
+      await window.storage.set("putting:paceSessions", JSON.stringify(newHistory), false);
+    } catch (e) {
+      setPaceStorageError(true);
+    }
+  }
+
+  async function clearAllPaceSessions() {
+    setPaceHistory([]);
+    try {
+      await window.storage.set("putting:paceSessions", JSON.stringify([]), false);
+    } catch (e) {
+      setPaceStorageError(true);
     }
   }
 
@@ -4163,6 +4374,14 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
             clockLoaded={clockLoaded}
             onDeleteClockSession={deleteClockSession}
             onEditClockSessionShot={editClockSessionPutt}
+            startLineHistory={startLineHistory}
+            startLineLoaded={startLineLoaded}
+            onDeleteStartLineSession={deleteStartLineSession}
+            onEditStartLineSession={editStartLineSession}
+            paceHistory={paceHistory}
+            paceLoaded={paceLoaded}
+            onDeletePaceSession={deletePaceSession}
+            onEditPacePutt={editPacePuttPoints}
             shortGameHistory={shortHistory}
             shortGameLoaded={shortLoaded}
             onDeleteShortGameSession={deleteShortGameSession}
@@ -4221,6 +4440,18 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
                 label: "Putting — Around the Clock",
                 count: clockHistory.length,
                 onClear: clearAllPuttingClockSessions,
+              },
+              {
+                key: "puttingstartline",
+                label: "Putting — Start Line",
+                count: startLineHistory.length,
+                onClear: clearAllStartLineSessions,
+              },
+              {
+                key: "puttingpace",
+                label: "Putting — Pace Control",
+                count: paceHistory.length,
+                onClear: clearAllPaceSessions,
               },
             ]}
             onLoadAllSampleData={loadSampleDataForAllSections}
@@ -4709,6 +4940,63 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
             onPlayAgain={startClockRound}
             onExit={() => setScreen("puttingChoose")}
             storageError={clockStorageError}
+            units={units}
+          />
+        )}
+
+        {screen === "puttingStartLineIntro" && (
+          <PuttingStartLineIntroScreen history={startLineHistory} onStart={startStartLineDrill} />
+        )}
+
+        {screen === "puttingStartLinePlay" && (
+          <PuttingStartLinePlayScreen
+            madeInput={startLineMadeInput}
+            setMadeInput={setStartLineMadeInput}
+            onSubmit={submitStartLineDrill}
+            onExit={exitStartLineDrill}
+          />
+        )}
+
+        {screen === "puttingStartLineSummary" && startLineHistory.length > 0 && (
+          <PuttingStartLineSummaryScreen
+            session={startLineHistory[0]}
+            onPlayAgain={startStartLineDrill}
+            onExit={() => setScreen("puttingChoose")}
+            storageError={startLineStorageError}
+          />
+        )}
+
+        {screen === "puttingPaceSetup" && (
+          <PuttingPaceSetupScreen
+            selectedDistances={paceSelectedDistances}
+            onToggleDistance={togglePaceDistance}
+            puttsPerDistance={pacePuttsPerDistance}
+            setPuttsPerDistance={setPacePuttsPerDistance}
+            onStart={startPaceDrill}
+            onViewAnalysis={() => {
+              setAnalysisSection("putting");
+              setScreen("analysis");
+            }}
+            units={units}
+          />
+        )}
+
+        {screen === "puttingPacePlay" && pacePutts.length > 0 && (
+          <PuttingPacePlayScreen
+            putts={pacePutts}
+            currentIndex={paceCurrentIndex}
+            onRecordPoints={recordPacePutt}
+            onExit={exitPaceDrill}
+            units={units}
+          />
+        )}
+
+        {screen === "puttingPaceSummary" && paceHistory.length > 0 && (
+          <PuttingPaceSummaryScreen
+            session={paceHistory[0]}
+            onPlayAgain={() => setScreen("puttingPaceSetup")}
+            onExit={() => setScreen("puttingChoose")}
+            storageError={paceStorageError}
             units={units}
           />
         )}
@@ -6769,6 +7057,14 @@ function AnalysisScreen({
   clockLoaded,
   onDeleteClockSession,
   onEditClockSessionShot,
+  startLineHistory,
+  startLineLoaded,
+  onDeleteStartLineSession,
+  onEditStartLineSession,
+  paceHistory,
+  paceLoaded,
+  onDeletePaceSession,
+  onEditPacePutt,
   shortGameHistory,
   shortGameLoaded,
   onDeleteShortGameSession,
@@ -6868,6 +7164,14 @@ function AnalysisScreen({
           clockLoaded={clockLoaded}
           onDeleteClockSession={onDeleteClockSession}
           onEditClockSessionShot={onEditClockSessionShot}
+          startLineHistory={startLineHistory}
+          startLineLoaded={startLineLoaded}
+          onDeleteStartLineSession={onDeleteStartLineSession}
+          onEditStartLineSession={onEditStartLineSession}
+          paceHistory={paceHistory}
+          paceLoaded={paceLoaded}
+          onDeletePaceSession={onDeletePaceSession}
+          onEditPacePutt={onEditPacePutt}
           units={units}
         />
       )}
@@ -8366,6 +8670,52 @@ function OnCourseIllustration() {
   );
 }
 
+// "Start Line" tile — a ball rolling dead straight through two gate posts toward the hole,
+// literally depicting the gate drill.
+function PuttingStartLineIllustration() {
+  return (
+    <svg viewBox="0 0 400 240" preserveAspectRatio="xMidYMid slice" style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}>
+      <defs>
+        <radialGradient id="puttStartLineBg" cx="50%" cy="35%" r="80%">
+          <stop offset="0%" stopColor="#4C8A68" />
+          <stop offset="100%" stopColor="#14291F" />
+        </radialGradient>
+      </defs>
+      <rect width="400" height="240" fill="url(#puttStartLineBg)" />
+      <line x1="70" y1="190" x2="330" y2="70" stroke="#F1EAD6" strokeOpacity="0.18" strokeWidth="2" strokeDasharray="3 6" />
+      {/* Gate posts, roughly 15% of the line's length apart to read as a narrow gate */}
+      <line x1="150" y1="152" x2="170" y2="135" stroke="#C1440E" strokeWidth="5" strokeLinecap="round" />
+      <line x1="178" y1="146" x2="198" y2="129" stroke="#C1440E" strokeWidth="5" strokeLinecap="round" />
+      <circle cx="300" cy="88" r="9" fill="#F1EAD6" />
+      <circle cx="90" cy="182" r="9" fill="#F1EAD6" opacity="0.85" />
+    </svg>
+  );
+}
+
+// "Pace Control" tile — concentric rings around the hole, echoing the 1/2/3ft proximity radii
+// the drill scores against.
+function PuttingPaceIllustration() {
+  return (
+    <svg viewBox="0 0 400 240" preserveAspectRatio="xMidYMid slice" style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}>
+      <defs>
+        <radialGradient id="puttPaceBg" cx="50%" cy="35%" r="80%">
+          <stop offset="0%" stopColor="#4C8A68" />
+          <stop offset="100%" stopColor="#14291F" />
+        </radialGradient>
+      </defs>
+      <rect width="400" height="240" fill="url(#puttPaceBg)" />
+      <circle cx="200" cy="130" r="92" fill="none" stroke="#F1EAD6" strokeOpacity="0.12" strokeWidth="2" />
+      <circle cx="200" cy="130" r="60" fill="none" stroke="#F1EAD6" strokeOpacity="0.18" strokeWidth="2" />
+      <circle cx="200" cy="130" r="30" fill="none" stroke="#F1EAD6" strokeOpacity="0.28" strokeWidth="2" />
+      <circle cx="200" cy="130" r="8" fill="#0A160F" stroke="#F1EAD6" strokeWidth="1.5" />
+      <text x="200" y="58" textAnchor="middle" fontFamily="'Bebas Neue', sans-serif" fontSize="16" fill="#F1EAD6" opacity="0.55">3</text>
+      <text x="200" y="88" textAnchor="middle" fontFamily="'Bebas Neue', sans-serif" fontSize="16" fill="#F1EAD6" opacity="0.6">2</text>
+      <text x="200" y="112" textAnchor="middle" fontFamily="'Bebas Neue', sans-serif" fontSize="16" fill="#F1EAD6" opacity="0.7">1</text>
+      <circle cx="130" cy="70" r="7" fill="#F1EAD6" opacity="0.85" />
+    </svg>
+  );
+}
+
 function AnalysisIllustration() {
   const points = [
     [30, 190],
@@ -8617,7 +8967,7 @@ const TILE_META = [
     available: true,
     Illustration: ShortGameIllustration,
   },
-  { key: "putting", label: "PUTTING", subtitle: "Random, Clock & On-Course", screen: "puttingChoose", available: true, Illustration: PuttingIllustration },
+  { key: "putting", label: "PUTTING", subtitle: "5 drills + on-course", screen: "puttingChoose", available: true, Illustration: PuttingIllustration },
   {
     key: "compete",
     label: "COMPETE",
@@ -14511,6 +14861,20 @@ function PuttingChooseScreen({ onNavigate }) {
       Illustration: PuttingClockIllustration,
     },
     {
+      key: "startline",
+      label: "START LINE",
+      subtitle: "10 putts through a gate — how many get through clean",
+      screen: "puttingStartLineIntro",
+      Illustration: PuttingStartLineIllustration,
+    },
+    {
+      key: "pace",
+      label: "PACE CONTROL",
+      subtitle: "Random distances, scored on proximity to the hole",
+      screen: "puttingPaceSetup",
+      Illustration: PuttingPaceIllustration,
+    },
+    {
       key: "course",
       label: "ON COURSE",
       subtitle: "Track a real round, hole by hole — you enter every putt",
@@ -15337,6 +15701,620 @@ function PuttingClockSummaryScreen({ session, onPlayAgain, onExit, storageError,
         <SectionLabel>Putt by putt</SectionLabel>
         <div style={{ marginTop: 4 }}>
           <PuttLog putts={session.putts} units={units} />
+        </div>
+      </div>
+
+      {storageError && (
+        <div style={{ color: COLORS.flag, fontSize: 11, marginTop: 8, fontFamily: "'JetBrains Mono', monospace" }}>
+          Couldn't save this round to history — it's still shown above.
+        </div>
+      )}
+
+      <button
+        onClick={onPlayAgain}
+        style={{
+          width: "100%",
+          marginTop: 14,
+          padding: "13px 0",
+          borderRadius: 12,
+          border: "none",
+          background: COLORS.flag,
+          color: COLORS.cream,
+          fontFamily: "'Bebas Neue', sans-serif",
+          fontSize: 20,
+          letterSpacing: 1,
+          cursor: "pointer",
+        }}
+      >
+        {perfect ? "GO AGAIN" : "PLAY AGAIN"}
+      </button>
+
+      <div
+        onClick={onExit}
+        style={{
+          textAlign: "center",
+          marginTop: 12,
+          color: COLORS.creamDim,
+          fontFamily: "'JetBrains Mono', monospace",
+          fontSize: 11,
+          cursor: "pointer",
+          textDecoration: "underline",
+          textUnderlineOffset: 3,
+        }}
+      >
+        Back to Putting
+      </div>
+    </div>
+  );
+}
+
+// ===== Putting — "Start Line" gate drill screens =====
+function PuttingStartLineIntroScreen({ history, onStart }) {
+  const best = history.length ? Math.max(...history.map((s) => s.made)) : null;
+  return (
+    <div>
+      <div style={{ marginBottom: 12 }}>
+        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 24, letterSpacing: 1, lineHeight: 1 }}>
+          START LINE
+        </div>
+        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
+          10 putts through a 15in gate
+        </div>
+      </div>
+
+      <Card>
+        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 13, color: COLORS.cream, lineHeight: 1.6 }}>
+          Set up a gate about 15 inches wide, 15 inches in front of your putter face — two tees or
+          alignment sticks work fine. Hit 10 putts, aiming to roll the ball through the gate
+          without touching either side. Play all 10 for real, then come back and enter how many
+          got through clean — no need to confirm make or miss one at a time.
+        </div>
+
+        {best !== null && (
+          <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
+            <StatBox label="BEST SCORE" value={`${best}/10`} valueColor={best === 10 ? COLORS.fairwayLight : COLORS.cream} />
+            <StatBox label="ROUNDS PLAYED" value={history.length} />
+          </div>
+        )}
+      </Card>
+
+      <button
+        onClick={onStart}
+        style={{
+          width: "100%",
+          marginTop: 14,
+          padding: "13px 0",
+          borderRadius: 12,
+          border: "none",
+          background: COLORS.flag,
+          color: COLORS.cream,
+          fontFamily: "'Bebas Neue', sans-serif",
+          fontSize: 22,
+          letterSpacing: 2,
+          cursor: "pointer",
+        }}
+      >
+        START DRILL
+      </button>
+    </div>
+  );
+}
+
+function PuttingStartLinePlayScreen({ madeInput, setMadeInput, onSubmit, onExit }) {
+  const parsed = parseInt(madeInput, 10);
+  const valid = madeInput !== "" && !isNaN(parsed) && parsed >= 0 && parsed <= 10;
+
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim }}>
+          START LINE — 10 PUTTS
+        </div>
+        <div
+          onClick={onExit}
+          style={{
+            fontFamily: "'JetBrains Mono', monospace",
+            fontSize: 10,
+            color: COLORS.creamDim,
+            cursor: "pointer",
+            textDecoration: "underline",
+            textUnderlineOffset: 3,
+          }}
+        >
+          EXIT
+        </div>
+      </div>
+
+      <Card>
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontSize: 11, color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", letterSpacing: 1.5 }}>
+            GATE — 15IN WIDE, 15IN AHEAD
+          </div>
+          <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 13, color: COLORS.creamDim, marginTop: 8, lineHeight: 1.5 }}>
+            Play all 10 putts through the gate, then enter how many got through cleanly.
+          </div>
+        </div>
+
+        <div style={{ marginTop: 18 }}>
+          <div
+            style={{
+              fontSize: 10,
+              color: COLORS.creamDim,
+              fontFamily: "'JetBrains Mono', monospace",
+              marginBottom: 6,
+              textAlign: "center",
+              letterSpacing: 1,
+            }}
+          >
+            PUTTS THROUGH THE GATE
+          </div>
+          <input
+            type="number"
+            inputMode="numeric"
+            value={madeInput}
+            onChange={(e) => setMadeInput(e.target.value)}
+            placeholder="0"
+            autoFocus
+            style={{
+              width: "100%",
+              textAlign: "center",
+              background: COLORS.turfDark,
+              border: `1px solid ${COLORS.creamDim}33`,
+              borderRadius: 10,
+              color: COLORS.cream,
+              fontFamily: "'Bebas Neue', sans-serif",
+              fontSize: 48,
+              padding: "10px 12px",
+              boxSizing: "border-box",
+            }}
+          />
+          <div
+            style={{
+              textAlign: "center",
+              fontFamily: "'JetBrains Mono', monospace",
+              fontSize: 11,
+              color: COLORS.creamDim,
+              marginTop: 6,
+            }}
+          >
+            out of 10
+          </div>
+        </div>
+
+        <button
+          onClick={onSubmit}
+          disabled={!valid}
+          style={{
+            width: "100%",
+            marginTop: 16,
+            padding: "13px 0",
+            borderRadius: 12,
+            border: "none",
+            background: !valid ? `${COLORS.fairway}66` : COLORS.flag,
+            color: COLORS.cream,
+            fontFamily: "'Bebas Neue', sans-serif",
+            fontSize: 20,
+            letterSpacing: 1,
+            cursor: !valid ? "not-allowed" : "pointer",
+          }}
+        >
+          SUBMIT SCORE
+        </button>
+      </Card>
+    </div>
+  );
+}
+
+function PuttingStartLineSummaryScreen({ session, onPlayAgain, onExit, storageError }) {
+  const perfect = session.made === session.total;
+  const pct = Math.round((session.made / session.total) * 100);
+
+  return (
+    <div>
+      <Card>
+        <div style={{ textAlign: "center", marginBottom: 4 }}>
+          <div style={{ fontSize: 11, color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", letterSpacing: 2 }}>
+            {perfect ? "PERFECT SCORE!" : "DRILL COMPLETE"}
+          </div>
+          <div
+            style={{
+              fontFamily: "'Bebas Neue', sans-serif",
+              fontSize: 56,
+              lineHeight: 1,
+              color: perfect ? COLORS.fairwayLight : COLORS.cream,
+              marginTop: 4,
+            }}
+          >
+            {session.made}
+            <span style={{ fontSize: 22, color: COLORS.creamDim }}> / {session.total}</span>
+          </div>
+          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: COLORS.creamDim, marginTop: 4 }}>
+            {pct}% through the gate
+          </div>
+          {perfect && (
+            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: COLORS.fairwayLight, marginTop: 4 }}>
+              ★ Every putt through clean.
+            </div>
+          )}
+        </div>
+      </Card>
+
+      {storageError && (
+        <div style={{ color: COLORS.flag, fontSize: 11, marginTop: 8, fontFamily: "'JetBrains Mono', monospace" }}>
+          Couldn't save this round to history — it's still shown above.
+        </div>
+      )}
+
+      <button
+        onClick={onPlayAgain}
+        style={{
+          width: "100%",
+          marginTop: 14,
+          padding: "13px 0",
+          borderRadius: 12,
+          border: "none",
+          background: COLORS.flag,
+          color: COLORS.cream,
+          fontFamily: "'Bebas Neue', sans-serif",
+          fontSize: 20,
+          letterSpacing: 1,
+          cursor: "pointer",
+        }}
+      >
+        {perfect ? "GO AGAIN" : "PLAY AGAIN"}
+      </button>
+
+      <div
+        onClick={onExit}
+        style={{
+          textAlign: "center",
+          marginTop: 12,
+          color: COLORS.creamDim,
+          fontFamily: "'JetBrains Mono', monospace",
+          fontSize: 11,
+          cursor: "pointer",
+          textDecoration: "underline",
+          textUnderlineOffset: 3,
+        }}
+      >
+        Back to Putting
+      </div>
+    </div>
+  );
+}
+
+// ===== Putting — "Pace Control" screens =====
+function PuttingPaceSetupScreen({ selectedDistances, onToggleDistance, puttsPerDistance, setPuttsPerDistance, onStart, onViewAnalysis, units }) {
+  const canStart = selectedDistances.length > 0;
+  const totalPutts = selectedDistances.length * puttsPerDistance;
+  const maxPoints = totalPutts * 3;
+  const unitLabel = shortUnitLabel(units);
+
+  return (
+    <div>
+      <div style={{ marginBottom: 12 }}>
+        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 24, letterSpacing: 1, lineHeight: 1 }}>
+          PACE CONTROL
+        </div>
+        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
+          Random distances, scored on proximity to the hole
+        </div>
+      </div>
+
+      <Card>
+        <SectionLabel>Distances to include</SectionLabel>
+        <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
+          {PACE_DISTANCES_FT.map((ft) => (
+            <div
+              key={ft}
+              onClick={() => onToggleDistance(ft)}
+              style={{
+                flex: 1,
+                textAlign: "center",
+                padding: "12px 4px",
+                borderRadius: 8,
+                border: selectedDistances.includes(ft) ? `2px solid ${COLORS.fairwayLight}` : `1px solid ${COLORS.creamDim}33`,
+                background: selectedDistances.includes(ft) ? COLORS.fairway : "transparent",
+                color: COLORS.cream,
+                fontFamily: "'Bebas Neue', sans-serif",
+                fontSize: 16,
+                cursor: "pointer",
+              }}
+            >
+              {ftToUnitRound(ft, units)}
+              {unitLabel}
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      <Card style={{ marginTop: 10 }}>
+        <SectionLabel>Putts per distance</SectionLabel>
+        <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+          <PillOption label={3} active={puttsPerDistance === 3} onClick={() => setPuttsPerDistance(3)} />
+          <PillOption label={5} active={puttsPerDistance === 5} onClick={() => setPuttsPerDistance(5)} />
+        </div>
+      </Card>
+
+      <Card style={{ marginTop: 10 }}>
+        <SectionLabel>Scoring</SectionLabel>
+        <div style={{ marginTop: 8 }}>
+          {PACE_POINT_OPTIONS.map((o, i) => (
+            <div
+              key={o.points}
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                padding: "5px 0",
+                borderTop: i > 0 ? `1px solid ${COLORS.creamDim}15` : "none",
+                fontFamily: "'JetBrains Mono', monospace",
+                fontSize: 12,
+              }}
+            >
+              <span style={{ color: pacePointColor(o.points) }}>{o.label}</span>
+              <span style={{ color: COLORS.creamDim }}>{o.radiusLabel}</span>
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      {canStart && (
+        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 10, textAlign: "center" }}>
+          {totalPutts} putt{totalPutts === 1 ? "" : "s"} total · {maxPoints} max points
+        </div>
+      )}
+
+      <button
+        onClick={onStart}
+        disabled={!canStart}
+        style={{
+          width: "100%",
+          marginTop: 10,
+          padding: "13px 0",
+          borderRadius: 12,
+          border: "none",
+          background: !canStart ? `${COLORS.fairway}66` : COLORS.flag,
+          color: COLORS.cream,
+          fontFamily: "'Bebas Neue', sans-serif",
+          fontSize: 22,
+          letterSpacing: 2,
+          cursor: !canStart ? "not-allowed" : "pointer",
+        }}
+      >
+        START DRILL
+      </button>
+      {!canStart && (
+        <div style={{ color: COLORS.creamDim, fontSize: 11, marginTop: 8, fontFamily: "'JetBrains Mono', monospace", textAlign: "center" }}>
+          Select at least one distance.
+        </div>
+      )}
+
+      {onViewAnalysis && (
+        <div
+          onClick={onViewAnalysis}
+          style={{
+            textAlign: "center",
+            marginTop: 12,
+            color: COLORS.creamDim,
+            fontFamily: "'JetBrains Mono', monospace",
+            fontSize: 11,
+            cursor: "pointer",
+            textDecoration: "underline",
+            textUnderlineOffset: 3,
+          }}
+        >
+          View analysis
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PuttingPacePlayScreen({ putts, currentIndex, onRecordPoints, onExit, units }) {
+  const current = putts[currentIndex];
+  const unitLabel = shortUnitLabel(units);
+
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim }}>
+          PUTT {currentIndex + 1} OF {putts.length}
+        </div>
+        <div
+          onClick={onExit}
+          style={{
+            fontFamily: "'JetBrains Mono', monospace",
+            fontSize: 10,
+            color: COLORS.creamDim,
+            cursor: "pointer",
+            textDecoration: "underline",
+            textUnderlineOffset: 3,
+          }}
+        >
+          EXIT
+        </div>
+      </div>
+
+      <Card>
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontSize: 12, color: COLORS.sand, fontFamily: "'JetBrains Mono', monospace", letterSpacing: 2 }}>
+            PUTT FROM
+          </div>
+          <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 56, lineHeight: 1, color: COLORS.cream, marginTop: 2 }}>
+            {ftToUnitRound(current.targetFt, units)}
+            <span style={{ fontSize: 20, marginLeft: 6, color: COLORS.creamDim }}>{unitLabel}</span>
+          </div>
+        </div>
+
+        <div style={{ marginTop: 18 }}>
+          <div style={{ fontSize: 10, color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", marginBottom: 8, textAlign: "center" }}>
+            HOW CLOSE DID IT FINISH?
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+            {PACE_POINT_OPTIONS.map((o) => (
+              <button
+                key={o.points}
+                onClick={() => onRecordPoints(o.points)}
+                style={{
+                  padding: "16px 4px",
+                  borderRadius: 10,
+                  border: `2px solid ${pacePointColor(o.points)}`,
+                  background: "transparent",
+                  color: COLORS.cream,
+                  fontFamily: "'Bebas Neue', sans-serif",
+                  fontSize: 18,
+                  letterSpacing: 1,
+                  cursor: "pointer",
+                }}
+              >
+                {o.label}
+              </button>
+            ))}
+          </div>
+          <div
+            style={{
+              marginTop: 10,
+              fontFamily: "'JetBrains Mono', monospace",
+              fontSize: 10,
+              color: COLORS.creamDim,
+              textAlign: "center",
+              lineHeight: 1.7,
+            }}
+          >
+            {PACE_POINT_OPTIONS.map((o) => `${o.points} = ${o.radiusLabel}`).join("  ·  ")}
+          </div>
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+function paceRoundStats(session) {
+  const pct = session.maxPoints > 0 ? Math.round((session.totalPoints / session.maxPoints) * 100) : 0;
+  const avgPoints = session.putts.length ? avg(session.putts.map((p) => p.points || 0)) : 0;
+  return { pct, avgPoints };
+}
+
+function PaceLog({ putts, units, onEditPoints }) {
+  const unitLabel = shortUnitLabel(units);
+  return (
+    <div
+      style={{
+        border: `1px solid ${COLORS.creamDim}22`,
+        borderRadius: 10,
+        overflow: "hidden",
+        fontFamily: "'JetBrains Mono', monospace",
+        fontSize: 12,
+      }}
+    >
+      <div style={{ display: "flex", padding: "8px 12px", background: `${COLORS.turf}aa`, color: COLORS.creamDim }}>
+        <div style={{ flex: 1 }}>#</div>
+        <div style={{ flex: 2 }}>DISTANCE</div>
+        <div style={{ width: 60, textAlign: "right" }}>PTS</div>
+      </div>
+      {putts.map((p, i) => (
+        <div
+          key={i}
+          onClick={onEditPoints ? () => onEditPoints(i) : undefined}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            padding: "7px 12px",
+            borderTop: i > 0 ? `1px solid ${COLORS.creamDim}11` : "none",
+            color: COLORS.cream,
+            cursor: onEditPoints ? "pointer" : "default",
+          }}
+        >
+          <div style={{ flex: 1, color: COLORS.creamDim }}>{i + 1}</div>
+          <div style={{ flex: 2 }}>
+            {ftToUnitRound(p.targetFt, units)}
+            {unitLabel}
+          </div>
+          <div style={{ width: 60, textAlign: "right", color: pacePointColor(p.points) }}>{p.points ?? "—"}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function PuttingPaceSummaryScreen({ session, onPlayAgain, onExit, storageError, units }) {
+  const { pct, avgPoints } = paceRoundStats(session);
+  const perfect = session.totalPoints === session.maxPoints;
+  const unitLabel = shortUnitLabel(units);
+
+  const byDistance = [...new Set(session.putts.map((p) => p.targetFt))]
+    .sort((a, b) => a - b)
+    .map((ft) => {
+      const puttsAtFt = session.putts.filter((p) => p.targetFt === ft);
+      return {
+        targetFt: ft,
+        total: puttsAtFt.reduce((a, p) => a + (p.points || 0), 0),
+        max: puttsAtFt.length * 3,
+        count: puttsAtFt.length,
+      };
+    });
+
+  return (
+    <div>
+      <Card>
+        <div style={{ textAlign: "center", marginBottom: 4 }}>
+          <div style={{ fontSize: 11, color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", letterSpacing: 2 }}>
+            {perfect ? "PERFECT ROUND!" : "DRILL COMPLETE"}
+          </div>
+          <div
+            style={{
+              fontFamily: "'Bebas Neue', sans-serif",
+              fontSize: 56,
+              lineHeight: 1,
+              color: perfect ? COLORS.fairwayLight : COLORS.cream,
+              marginTop: 4,
+            }}
+          >
+            {session.totalPoints}
+            <span style={{ fontSize: 22, color: COLORS.creamDim }}> / {session.maxPoints}</span>
+          </div>
+          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: COLORS.creamDim, marginTop: 4 }}>
+            {pct}% of max points
+          </div>
+        </div>
+
+        <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
+          <StatBox label="AVG PTS / PUTT" value={avgPoints.toFixed(1)} valueColor={paceRagColor((avgPoints / 3) * 100)} />
+          <StatBox label="PUTTS" value={session.putts.length} />
+        </div>
+      </Card>
+
+      <div style={{ marginTop: 10 }}>
+        <SectionLabel>By distance</SectionLabel>
+        <div style={{ marginTop: 6 }}>
+          {byDistance.map((b, i) => (
+            <div
+              key={b.targetFt}
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                padding: "6px 0",
+                borderTop: i > 0 ? `1px solid ${COLORS.creamDim}15` : "none",
+                fontFamily: "'JetBrains Mono', monospace",
+                fontSize: 12,
+              }}
+            >
+              <span style={{ color: COLORS.creamDim }}>
+                {ftToUnitRound(b.targetFt, units)}
+                {unitLabel} ({b.count} putts)
+              </span>
+              <span style={{ color: paceRagColor((b.total / b.max) * 100) }}>
+                {b.total}/{b.max}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ marginTop: 14 }}>
+        <SectionLabel>Putt by putt</SectionLabel>
+        <div style={{ marginTop: 4 }}>
+          <PaceLog putts={session.putts} units={units} />
         </div>
       </div>
 
@@ -16355,6 +17333,14 @@ function FeetPicker({ min, max, onMin, onMax, onPreset, activePresetLabel }) {
   );
 }
 
+const PUTTING_SUBTABS = [
+  { key: "practice", label: "RANDOM" },
+  { key: "clock", label: "AROUND THE CLOCK" },
+  { key: "startline", label: "START LINE" },
+  { key: "pace", label: "PACE CONTROL" },
+  { key: "course", label: "ON COURSE" },
+];
+
 function PuttingAnalysisHub({
   history,
   loaded,
@@ -16364,67 +17350,46 @@ function PuttingAnalysisHub({
   clockLoaded,
   onDeleteClockSession,
   onEditClockSessionShot,
+  startLineHistory,
+  startLineLoaded,
+  onDeleteStartLineSession,
+  onEditStartLineSession,
+  paceHistory,
+  paceLoaded,
+  onDeletePaceSession,
+  onEditPacePutt,
   units,
 }) {
-  const [subTab, setSubTab] = useState("practice"); // practice | course | clock
+  const [subTab, setSubTab] = useState("practice"); // practice | clock | startline | pace | course
 
   const practiceHistory = history.filter((s) => s.type !== "course");
   const courseHistory = history.filter((s) => s.type === "course");
 
   return (
     <div>
-      <div style={{ display: "flex", gap: 6, marginBottom: 16 }}>
-        <button
-          onClick={() => setSubTab("practice")}
-          style={{
-            flex: 1,
-            padding: "9px 4px",
-            borderRadius: 8,
-            border: subTab === "practice" ? `1px solid ${COLORS.fairwayLight}` : `1px solid ${COLORS.creamDim}33`,
-            background: subTab === "practice" ? COLORS.fairway : "transparent",
-            color: subTab === "practice" ? COLORS.cream : COLORS.creamDim,
-            fontFamily: "'JetBrains Mono', monospace",
-            fontSize: 11,
-            letterSpacing: 0.5,
-            cursor: "pointer",
-          }}
-        >
-          RANDOM
-        </button>
-        <button
-          onClick={() => setSubTab("clock")}
-          style={{
-            flex: 1,
-            padding: "9px 4px",
-            borderRadius: 8,
-            border: subTab === "clock" ? `1px solid ${COLORS.fairwayLight}` : `1px solid ${COLORS.creamDim}33`,
-            background: subTab === "clock" ? COLORS.fairway : "transparent",
-            color: subTab === "clock" ? COLORS.cream : COLORS.creamDim,
-            fontFamily: "'JetBrains Mono', monospace",
-            fontSize: 11,
-            letterSpacing: 0.5,
-            cursor: "pointer",
-          }}
-        >
-          AROUND THE CLOCK
-        </button>
-        <button
-          onClick={() => setSubTab("course")}
-          style={{
-            flex: 1,
-            padding: "9px 4px",
-            borderRadius: 8,
-            border: subTab === "course" ? `1px solid ${COLORS.fairwayLight}` : `1px solid ${COLORS.creamDim}33`,
-            background: subTab === "course" ? COLORS.fairway : "transparent",
-            color: subTab === "course" ? COLORS.cream : COLORS.creamDim,
-            fontFamily: "'JetBrains Mono', monospace",
-            fontSize: 11,
-            letterSpacing: 0.5,
-            cursor: "pointer",
-          }}
-        >
-          ON COURSE
-        </button>
+      {/* Five sub-tabs now — wraps to two rows on narrow screens rather than squeezing each
+          label unreadably thin. */}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 16 }}>
+        {PUTTING_SUBTABS.map((t) => (
+          <button
+            key={t.key}
+            onClick={() => setSubTab(t.key)}
+            style={{
+              flex: "1 1 30%",
+              padding: "9px 4px",
+              borderRadius: 8,
+              border: subTab === t.key ? `1px solid ${COLORS.fairwayLight}` : `1px solid ${COLORS.creamDim}33`,
+              background: subTab === t.key ? COLORS.fairway : "transparent",
+              color: subTab === t.key ? COLORS.cream : COLORS.creamDim,
+              fontFamily: "'JetBrains Mono', monospace",
+              fontSize: 11,
+              letterSpacing: 0.5,
+              cursor: "pointer",
+            }}
+          >
+            {t.label}
+          </button>
+        ))}
       </div>
 
       {subTab === "practice" && (
@@ -16442,6 +17407,23 @@ function PuttingAnalysisHub({
           loaded={clockLoaded}
           onDeleteSession={onDeleteClockSession}
           onEditSessionShot={onEditClockSessionShot}
+          units={units}
+        />
+      )}
+      {subTab === "startline" && (
+        <PuttingStartLineAnalysisBody
+          history={startLineHistory}
+          loaded={startLineLoaded}
+          onDeleteSession={onDeleteStartLineSession}
+          onEditSession={onEditStartLineSession}
+        />
+      )}
+      {subTab === "pace" && (
+        <PuttingPaceAnalysisBody
+          history={paceHistory}
+          loaded={paceLoaded}
+          onDeleteSession={onDeletePaceSession}
+          onEditPutt={onEditPacePutt}
           units={units}
         />
       )}
@@ -16628,6 +17610,700 @@ function ClockRoundRow({ session, isFirst, onDelete, onView }) {
       >
         ×
       </div>
+    </div>
+  );
+}
+
+// ===== Start Line's own analysis tab — same "simpler than the full trend charts" reasoning as
+// Around the Clock: a fixed 10-putt gate drill, score history + overview is what's useful. =====
+function StartLineEditModal({ session, onSave, onCancel }) {
+  const [madeInput, setMadeInput] = useState(String(session.made));
+  const parsed = parseInt(madeInput, 10);
+  const valid = madeInput !== "" && !isNaN(parsed) && parsed >= 0 && parsed <= 10;
+
+  return (
+    <div
+      onClick={onCancel}
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(10,22,15,0.75)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 24,
+        zIndex: 50,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: COLORS.turf,
+          border: `1px solid ${COLORS.creamDim}33`,
+          borderRadius: 14,
+          padding: 20,
+          maxWidth: 360,
+          width: "100%",
+        }}
+      >
+        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 20, letterSpacing: 1, color: COLORS.cream }}>
+          EDIT SCORE
+        </div>
+
+        <div style={{ marginTop: 14 }}>
+          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginBottom: 6 }}>
+            PUTTS THROUGH THE GATE (OF 10)
+          </div>
+          <input
+            type="number"
+            inputMode="numeric"
+            value={madeInput}
+            onChange={(e) => setMadeInput(e.target.value)}
+            autoFocus
+            style={{
+              width: "100%",
+              background: COLORS.turfDark,
+              border: `1px solid ${COLORS.creamDim}33`,
+              borderRadius: 8,
+              color: COLORS.cream,
+              fontFamily: "'Bebas Neue', sans-serif",
+              fontSize: 24,
+              padding: "8px 12px",
+              boxSizing: "border-box",
+            }}
+          />
+        </div>
+
+        <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
+          <button
+            onClick={onCancel}
+            style={{
+              flex: 1,
+              padding: "11px 0",
+              borderRadius: 10,
+              border: `1px solid ${COLORS.creamDim}33`,
+              background: "transparent",
+              color: COLORS.creamDim,
+              fontFamily: "'Bebas Neue', sans-serif",
+              fontSize: 15,
+              cursor: "pointer",
+            }}
+          >
+            CANCEL
+          </button>
+          <button
+            onClick={() => valid && onSave(parsed)}
+            disabled={!valid}
+            style={{
+              flex: 1,
+              padding: "11px 0",
+              borderRadius: 10,
+              border: "none",
+              background: valid ? COLORS.fairway : `${COLORS.fairway}66`,
+              color: COLORS.cream,
+              fontFamily: "'Bebas Neue', sans-serif",
+              fontSize: 15,
+              cursor: valid ? "pointer" : "not-allowed",
+            }}
+          >
+            SAVE
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StartLineRoundRow({ session, isFirst, onDelete, onEdit }) {
+  const [confirming, setConfirming] = useState(false);
+  const touchStartX = useRef(null);
+
+  function handleTouchStart(e) {
+    touchStartX.current = e.touches[0].clientX;
+  }
+  function handleTouchEnd(e) {
+    if (touchStartX.current == null) return;
+    const dx = e.changedTouches[0].clientX - touchStartX.current;
+    if (dx < -40) setConfirming(true);
+    touchStartX.current = null;
+  }
+
+  if (confirming) {
+    return (
+      <div style={{ padding: "6px 8px" }}>
+        <DeleteConfirmBar
+          onConfirm={() => {
+            setConfirming(false);
+            onDelete();
+          }}
+          onCancel={() => setConfirming(false)}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+      onClick={onEdit}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        padding: "7px 12px",
+        borderTop: isFirst ? "none" : `1px solid ${COLORS.creamDim}11`,
+        color: COLORS.cream,
+        cursor: "pointer",
+      }}
+    >
+      <div style={{ flex: 1.3, color: COLORS.creamDim }}>
+        {new Date(session.date).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "2-digit" })}
+      </div>
+      <div style={{ flex: 1, textAlign: "right", color: session.made === session.total ? COLORS.fairwayLight : COLORS.cream }}>
+        {session.made}/{session.total}
+      </div>
+      <div
+        onClick={(e) => {
+          e.stopPropagation();
+          setConfirming(true);
+        }}
+        title="Delete"
+        style={{ width: 20, textAlign: "right", cursor: "pointer", color: COLORS.creamDim, fontSize: 14 }}
+      >
+        ×
+      </div>
+    </div>
+  );
+}
+
+function PuttingStartLineAnalysisBody({ history, loaded, onDeleteSession, onEditSession }) {
+  const [timescale, setTimescale] = useState("all");
+  const [editingId, setEditingId] = useState(null);
+  const editingSession = editingId ? history.find((s) => s.id === editingId) : null;
+
+  if (!loaded) {
+    return <div style={{ color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace" }}>Loading rounds…</div>;
+  }
+
+  const filtered = filterByTimescale(history, timescale);
+
+  if (filtered.length === 0) {
+    return (
+      <div>
+        <TimescalePicker value={timescale} onChange={setTimescale} />
+        <div style={{ color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", fontSize: 13, marginTop: 10 }}>
+          No Start Line rounds in this window yet. Play the drill to see it here.
+        </div>
+      </div>
+    );
+  }
+
+  const bestScore = Math.max(...filtered.map((s) => s.made));
+  const avgScore = avg(filtered.map((s) => s.made));
+  const perfectRounds = filtered.filter((s) => s.made === s.total).length;
+  const trendData = [...filtered]
+    .sort((a, b) => new Date(a.date) - new Date(b.date))
+    .map((s) => ({
+      dateLabel: new Date(s.date).toLocaleDateString(undefined, { month: "short", day: "numeric" }),
+      made: s.made,
+    }));
+
+  return (
+    <div>
+      <TimescalePicker value={timescale} onChange={setTimescale} />
+
+      <Card style={{ marginBottom: 14, marginTop: 12 }}>
+        <SectionLabel>Overview</SectionLabel>
+        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginTop: 2 }}>
+          10 putts through a 15in gate
+        </div>
+        <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
+          <StatBox label="ROUNDS PLAYED" value={filtered.length} />
+          <StatBox label="BEST SCORE" value={`${bestScore}/10`} valueColor={bestScore === 10 ? COLORS.fairwayLight : COLORS.cream} />
+        </div>
+        <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
+          <StatBox label="AVG SCORE" value={`${avgScore.toFixed(1)}/10`} />
+          <StatBox label="AVG %" value={`${Math.round((avgScore / 10) * 100)}%`} />
+        </div>
+        {perfectRounds > 0 && (
+          <div style={{ marginTop: 10, fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: COLORS.fairwayLight }}>
+            ★ {perfectRounds} perfect round{perfectRounds === 1 ? "" : "s"} (10/10)
+          </div>
+        )}
+      </Card>
+
+      {trendData.length > 1 && (
+        <Card style={{ marginBottom: 14 }}>
+          <SectionLabel>Trend</SectionLabel>
+          <div style={{ height: 140, marginTop: 8 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={trendData} margin={{ top: 6, right: 6, left: -22, bottom: 0 }}>
+                <CartesianGrid vertical={false} stroke={`${COLORS.creamDim}22`} />
+                <XAxis
+                  dataKey="dateLabel"
+                  tick={{ fill: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", fontSize: 9 }}
+                  axisLine={{ stroke: `${COLORS.creamDim}33` }}
+                  tickLine={false}
+                />
+                <YAxis
+                  domain={[0, 10]}
+                  tick={{ fill: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", fontSize: 9 }}
+                  axisLine={false}
+                  tickLine={false}
+                  width={26}
+                />
+                <Tooltip
+                  contentStyle={{
+                    background: COLORS.turfDark,
+                    border: `1px solid ${COLORS.creamDim}33`,
+                    borderRadius: 8,
+                    fontFamily: "'JetBrains Mono', monospace",
+                    fontSize: 11,
+                  }}
+                  labelStyle={{ color: COLORS.creamDim }}
+                  itemStyle={{ color: COLORS.cream }}
+                />
+                <Line type="monotone" dataKey="made" stroke={COLORS.fairwayLight} strokeWidth={2} dot={{ r: 3 }} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </Card>
+      )}
+
+      <CollapsibleSection title="All rounds" count={filtered.length}>
+        <div
+          style={{
+            border: `1px solid ${COLORS.creamDim}22`,
+            borderRadius: 10,
+            overflow: "hidden",
+            fontFamily: "'JetBrains Mono', monospace",
+            fontSize: 12,
+          }}
+        >
+          <div style={{ display: "flex", padding: "8px 12px", background: `${COLORS.turf}aa`, color: COLORS.creamDim }}>
+            <div style={{ flex: 1.3 }}>DATE</div>
+            <div style={{ flex: 1, textAlign: "right" }}>SCORE</div>
+            <div style={{ width: 20 }} />
+          </div>
+          <div style={{ maxHeight: 320, overflowY: "auto" }}>
+            {[...filtered]
+              .sort((a, b) => new Date(b.date) - new Date(a.date))
+              .map((s, i) => (
+                <StartLineRoundRow
+                  key={s.id}
+                  session={s}
+                  isFirst={i === 0}
+                  onDelete={() => onDeleteSession(s.id)}
+                  onEdit={() => setEditingId(s.id)}
+                />
+              ))}
+          </div>
+        </div>
+      </CollapsibleSection>
+
+      {editingSession && (
+        <StartLineEditModal
+          session={editingSession}
+          onSave={(newMade) => {
+            onEditSession(editingSession.id, newMade);
+            setEditingId(null);
+          }}
+          onCancel={() => setEditingId(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+// ===== Pace Control's own analysis tab =====
+function PacePuttEditModal({ putt, units, onSave, onCancel }) {
+  const [points, setPoints] = useState(putt.points);
+  const unitLabel = shortUnitLabel(units);
+
+  return (
+    <div
+      onClick={onCancel}
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(10,22,15,0.75)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 24,
+        zIndex: 50,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: COLORS.turf,
+          border: `1px solid ${COLORS.creamDim}33`,
+          borderRadius: 14,
+          padding: 20,
+          maxWidth: 360,
+          width: "100%",
+        }}
+      >
+        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 20, letterSpacing: 1, color: COLORS.cream }}>
+          EDIT PUTT
+        </div>
+        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 4 }}>
+          From {ftToUnitRound(putt.targetFt, units)}
+          {unitLabel}
+        </div>
+
+        <div style={{ marginTop: 14 }}>
+          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginBottom: 6 }}>
+            POINTS
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+            {PACE_POINT_OPTIONS.map((o) => (
+              <button
+                key={o.points}
+                onClick={() => setPoints(o.points)}
+                style={{
+                  padding: "10px 4px",
+                  borderRadius: 8,
+                  border: points === o.points ? `2px solid ${COLORS.fairwayLight}` : `1px solid ${COLORS.creamDim}33`,
+                  background: points === o.points ? COLORS.fairway : "transparent",
+                  color: COLORS.cream,
+                  fontFamily: "'Bebas Neue', sans-serif",
+                  fontSize: 14,
+                  cursor: "pointer",
+                }}
+              >
+                {o.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
+          <button
+            onClick={onCancel}
+            style={{
+              flex: 1,
+              padding: "11px 0",
+              borderRadius: 10,
+              border: `1px solid ${COLORS.creamDim}33`,
+              background: "transparent",
+              color: COLORS.creamDim,
+              fontFamily: "'Bebas Neue', sans-serif",
+              fontSize: 15,
+              cursor: "pointer",
+            }}
+          >
+            CANCEL
+          </button>
+          <button
+            onClick={() => onSave(points)}
+            style={{
+              flex: 1,
+              padding: "11px 0",
+              borderRadius: 10,
+              border: "none",
+              background: COLORS.fairway,
+              color: COLORS.cream,
+              fontFamily: "'Bebas Neue', sans-serif",
+              fontSize: 15,
+              cursor: "pointer",
+            }}
+          >
+            SAVE
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PaceRoundRow({ session, isFirst, onDelete, onView }) {
+  const [confirming, setConfirming] = useState(false);
+  const touchStartX = useRef(null);
+  const { pct } = paceRoundStats(session);
+
+  function handleTouchStart(e) {
+    touchStartX.current = e.touches[0].clientX;
+  }
+  function handleTouchEnd(e) {
+    if (touchStartX.current == null) return;
+    const dx = e.changedTouches[0].clientX - touchStartX.current;
+    if (dx < -40) setConfirming(true);
+    touchStartX.current = null;
+  }
+
+  if (confirming) {
+    return (
+      <div style={{ padding: "6px 8px" }}>
+        <DeleteConfirmBar
+          onConfirm={() => {
+            setConfirming(false);
+            onDelete();
+          }}
+          onCancel={() => setConfirming(false)}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+      onClick={onView}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        padding: "7px 12px",
+        borderTop: isFirst ? "none" : `1px solid ${COLORS.creamDim}11`,
+        color: COLORS.cream,
+        cursor: "pointer",
+      }}
+    >
+      <div style={{ flex: 1.2, color: COLORS.creamDim }}>
+        {new Date(session.date).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "2-digit" })}
+      </div>
+      <div style={{ flex: 1.3, color: COLORS.creamDim, fontSize: 11 }}>{session.distances.map((d) => `${d}ft`).join("/")}</div>
+      <div style={{ width: 65, textAlign: "right", color: paceRagColor(pct) }}>
+        {session.totalPoints}/{session.maxPoints}
+      </div>
+      <div
+        onClick={(e) => {
+          e.stopPropagation();
+          setConfirming(true);
+        }}
+        title="Delete"
+        style={{ width: 20, textAlign: "right", cursor: "pointer", color: COLORS.creamDim, fontSize: 14 }}
+      >
+        ×
+      </div>
+    </div>
+  );
+}
+
+// Historical-round detail + edit view for Pace Control rounds. Reuses PaceLog for display and
+// PacePuttEditModal for amending an individual putt's points, same pattern as
+// PuttingSessionDetailModal/PuttShotEditModal for regular putting practice.
+function PaceRoundDetailModal({ session, units, onEditPutt, onClose }) {
+  const [editingPuttIndex, setEditingPuttIndex] = useState(null);
+  const { pct, avgPoints } = paceRoundStats(session);
+
+  function handleSave(newPoints) {
+    onEditPutt(editingPuttIndex, newPoints);
+    setEditingPuttIndex(null);
+  }
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(10,22,15,0.75)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 24,
+        zIndex: 50,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: COLORS.turf,
+          border: `1px solid ${COLORS.creamDim}33`,
+          borderRadius: 14,
+          padding: 20,
+          maxWidth: 380,
+          width: "100%",
+          maxHeight: "85vh",
+          overflowY: "auto",
+        }}
+      >
+        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 20, letterSpacing: 1, color: COLORS.cream }}>
+          ROUND DETAIL
+        </div>
+        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 4 }}>
+          {new Date(session.date).toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" })}
+          {"  ·  "}
+          {session.distances.map((d) => `${d}ft`).join("/")} · {session.puttsPerDistance}/distance
+        </div>
+
+        <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
+          <StatBox label="SCORE" value={`${session.totalPoints}/${session.maxPoints}`} valueColor={paceRagColor(pct)} />
+          <StatBox label="AVG PTS / PUTT" value={avgPoints.toFixed(1)} />
+        </div>
+
+        <div style={{ marginTop: 16 }}>
+          <SectionLabel>Putt by putt — tap a putt to amend</SectionLabel>
+          <div style={{ marginTop: 6 }}>
+            <PaceLog putts={session.putts} units={units} onEditPoints={setEditingPuttIndex} />
+          </div>
+        </div>
+
+        <button
+          onClick={onClose}
+          style={{
+            width: "100%",
+            marginTop: 16,
+            padding: "11px 0",
+            borderRadius: 10,
+            border: `1px solid ${COLORS.creamDim}33`,
+            background: "transparent",
+            color: COLORS.creamDim,
+            fontFamily: "'Bebas Neue', sans-serif",
+            fontSize: 15,
+            cursor: "pointer",
+          }}
+        >
+          CLOSE
+        </button>
+      </div>
+
+      {editingPuttIndex !== null && (
+        <div onClick={(e) => e.stopPropagation()}>
+          <PacePuttEditModal
+            putt={session.putts[editingPuttIndex]}
+            units={units}
+            onSave={handleSave}
+            onCancel={() => setEditingPuttIndex(null)}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PuttingPaceAnalysisBody({ history, loaded, onDeleteSession, onEditPutt, units }) {
+  const [timescale, setTimescale] = useState("all");
+  const [selectedRoundId, setSelectedRoundId] = useState(null);
+  const selectedRound = selectedRoundId ? history.find((s) => s.id === selectedRoundId) : null;
+  const unitLabel = shortUnitLabel(units);
+
+  if (!loaded) {
+    return <div style={{ color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace" }}>Loading rounds…</div>;
+  }
+
+  const filtered = filterByTimescale(history, timescale);
+
+  if (filtered.length === 0) {
+    return (
+      <div>
+        <TimescalePicker value={timescale} onChange={setTimescale} />
+        <div style={{ color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", fontSize: 13, marginTop: 10 }}>
+          No Pace Control rounds in this window yet. Play the drill to see it here.
+        </div>
+      </div>
+    );
+  }
+
+  const totalPoints = filtered.reduce((a, s) => a + s.totalPoints, 0);
+  const maxPoints = filtered.reduce((a, s) => a + s.maxPoints, 0);
+  const overallPct = maxPoints > 0 ? Math.round((totalPoints / maxPoints) * 100) : 0;
+  const allPutts = filtered.flatMap((s) => s.putts);
+  const avgPointsPerPutt = allPutts.length ? avg(allPutts.map((p) => p.points || 0)) : 0;
+
+  const distanceBuckets = PACE_DISTANCES_FT.map((ft) => {
+    const puttsAtFt = allPutts.filter((p) => p.targetFt === ft);
+    if (!puttsAtFt.length) return null;
+    const total = puttsAtFt.reduce((a, p) => a + (p.points || 0), 0);
+    const max = puttsAtFt.length * 3;
+    return { targetFt: ft, count: puttsAtFt.length, total, max, pct: Math.round((total / max) * 100) };
+  }).filter(Boolean);
+
+  return (
+    <div>
+      <TimescalePicker value={timescale} onChange={setTimescale} />
+
+      <Card style={{ marginBottom: 14, marginTop: 12 }}>
+        <SectionLabel>Overview</SectionLabel>
+        <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
+          <StatBox label="ROUNDS PLAYED" value={filtered.length} />
+          <StatBox label="OVERALL %" value={`${overallPct}%`} valueColor={paceRagColor(overallPct)} />
+        </div>
+        <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
+          <StatBox label="AVG PTS / PUTT" value={avgPointsPerPutt.toFixed(1)} valueColor={paceRagColor((avgPointsPerPutt / 3) * 100)} />
+          <StatBox label="TOTAL PUTTS" value={allPutts.length} />
+        </div>
+      </Card>
+
+      {distanceBuckets.length > 0 && (
+        <Card style={{ marginBottom: 14 }}>
+          <SectionLabel>By distance</SectionLabel>
+          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginTop: 2 }}>
+            Across every round in this window
+          </div>
+          <div style={{ marginTop: 8 }}>
+            {distanceBuckets.map((b, i) => (
+              <div
+                key={b.targetFt}
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  padding: "8px 0",
+                  borderTop: i > 0 ? `1px solid ${COLORS.creamDim}15` : "none",
+                }}
+              >
+                <div>
+                  <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 20, color: COLORS.cream }}>
+                    {ftToUnitRound(b.targetFt, units)}
+                    {unitLabel}
+                  </div>
+                  <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim }}>
+                    {b.count} putts
+                  </div>
+                </div>
+                <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 22, color: paceRagColor(b.pct) }}>
+                  {b.total}/{b.max}
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      <CollapsibleSection title="All rounds" count={filtered.length}>
+        <div
+          style={{
+            border: `1px solid ${COLORS.creamDim}22`,
+            borderRadius: 10,
+            overflow: "hidden",
+            fontFamily: "'JetBrains Mono', monospace",
+            fontSize: 12,
+          }}
+        >
+          <div style={{ display: "flex", padding: "8px 12px", background: `${COLORS.turf}aa`, color: COLORS.creamDim }}>
+            <div style={{ flex: 1.2 }}>DATE</div>
+            <div style={{ flex: 1.3 }}>DISTANCES</div>
+            <div style={{ width: 65, textAlign: "right" }}>SCORE</div>
+            <div style={{ width: 20 }} />
+          </div>
+          <div style={{ maxHeight: 320, overflowY: "auto" }}>
+            {[...filtered]
+              .sort((a, b) => new Date(b.date) - new Date(a.date))
+              .map((s, i) => (
+                <PaceRoundRow
+                  key={s.id}
+                  session={s}
+                  isFirst={i === 0}
+                  onDelete={() => onDeleteSession(s.id)}
+                  onView={() => setSelectedRoundId(s.id)}
+                />
+              ))}
+          </div>
+        </div>
+      </CollapsibleSection>
+
+      {selectedRound && (
+        <PaceRoundDetailModal
+          session={selectedRound}
+          units={units}
+          onEditPutt={(puttIndex, newPoints) => onEditPutt(selectedRound.id, puttIndex, newPoints)}
+          onClose={() => setSelectedRoundId(null)}
+        />
+      )}
     </div>
   );
 }
