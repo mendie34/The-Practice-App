@@ -604,6 +604,10 @@ function sessionTrendData(sessions, filterMin, filterMax) {
         avgMissPct: avg(shots.map((sh) => (sh.target ? (sh.diff / sh.target) * 100 : 0))),
         avgMissYds: avg(shots.map((sh) => sh.diff)),
         avgSG: avg(shots.map((sh) => sgForApproachShot(sh.target, sh.actual))),
+        // Live-computed from the currently active baseline, same as everywhere else this scoring
+        // appears — so this trend re-shapes immediately if the player changes baseline later, no
+        // stored/frozen values to go stale.
+        roundToPar: shots.reduce((a, sh) => a + scoreForDistanceShot(sh.target, sh.actual), 0),
         shotCount: shots.length,
       };
     })
@@ -782,8 +786,13 @@ function computeOffsets(handicapKey) {
 // site in the app picks up the active baseline without needing it threaded through as a prop.
 // Kept in sync with React state (which drives persistence + re-renders) via applyBaseline().
 let currentOffsets = computeOffsets("tour");
+// Tracked alongside currentDistanceScoreBands purely so the info modal below can show which
+// baseline's bands are currently active (e.g. "SCRATCH") without needing baselineHandicap
+// threaded down as a prop through every screen that wants to explain the scoring.
+let currentBaselineKey = "tour";
 function applyBaseline(handicapKey) {
   currentOffsets = computeOffsets(handicapKey);
+  currentBaselineKey = handicapKey;
   currentDistanceScoreBands = DISTANCE_SCORE_BAND_SETS[handicapKey] || DISTANCE_SCORE_BAND_SETS.tour;
 }
 
@@ -908,6 +917,147 @@ function toParColor(score) {
   if (score < 0) return COLORS.fairwayLight;
   if (score === 0) return COLORS.cream;
   return COLORS.flag;
+}
+
+function activeDistanceScoreBaselineLabel() {
+  return BASELINE_OPTIONS.find((b) => b.key === currentBaselineKey)?.label || "PGA TOUR";
+}
+
+// Small circular "i" button, inline rather than absolutely-positioned like HomeInfoButton (that
+// one's built for corner-of-a-tile placement on Home; this sits right next to a text label).
+function InlineInfoButton({ onClick }) {
+  return (
+    <button
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
+      style={{
+        width: 16,
+        height: 16,
+        borderRadius: "50%",
+        border: `1.5px solid ${COLORS.creamDim}`,
+        background: "transparent",
+        color: COLORS.creamDim,
+        fontFamily: "'Inter', sans-serif",
+        fontWeight: 700,
+        fontSize: 9,
+        lineHeight: 1,
+        padding: 0,
+        cursor: "pointer",
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        marginLeft: 6,
+        flexShrink: 0,
+      }}
+    >
+      i
+    </button>
+  );
+}
+
+// Explains the Par/Birdie/Eagle scoring, reading the CURRENTLY ACTIVE bands/baseline directly
+// from the module-level state above — so if the player has "Scratch" selected in Settings, this
+// shows the Scratch numbers, not a hardcoded PGA Tour explanation.
+function DistanceScoreInfoModal({ onClose }) {
+  const bands = currentDistanceScoreBands;
+  const rows = bands.map((b, i) =>
+    b.maxMissPct === Infinity
+      ? { label: b.label, desc: `More than ${bands[i - 1].maxMissPct}% off target` }
+      : { label: b.label, desc: `Within ${b.maxMissPct}% of target` }
+  );
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(10,22,15,0.75)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 24,
+        zIndex: 50,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: COLORS.turf,
+          border: `1px solid ${COLORS.creamDim}33`,
+          borderRadius: 14,
+          padding: 20,
+          maxWidth: 360,
+          width: "100%",
+          maxHeight: "85vh",
+          overflowY: "auto",
+        }}
+      >
+        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 20, letterSpacing: 1, color: COLORS.cream }}>
+          PAR SCORING
+        </div>
+        <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 12, color: COLORS.cream, lineHeight: 1.55, marginTop: 8 }}>
+          Each shot is scored on how close it landed to your target, as a percentage of that
+          target distance — so the same bands work fairly whether you're hitting a wedge or a
+          long iron. It's a separate measure from strokes gained: this is "did you hit your
+          number," not shot value. Miss direction (long or short) doesn't matter.
+        </div>
+        <div
+          style={{
+            marginTop: 12,
+            fontFamily: "'JetBrains Mono', monospace",
+            fontSize: 10,
+            color: COLORS.creamDim,
+            letterSpacing: 1,
+          }}
+        >
+          CURRENT BASELINE: {activeDistanceScoreBaselineLabel()}
+        </div>
+        <div style={{ marginTop: 8, border: `1px solid ${COLORS.creamDim}22`, borderRadius: 10, overflow: "hidden" }}>
+          {rows.map((r, i) => (
+            <div
+              key={r.label}
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                padding: "8px 12px",
+                borderTop: i === 0 ? "none" : `1px solid ${COLORS.creamDim}11`,
+                fontFamily: "'JetBrains Mono', monospace",
+                fontSize: 12,
+              }}
+            >
+              <div style={{ color: toParColor(bands[i].score), fontWeight: 600 }}>{r.label}</div>
+              <div style={{ color: COLORS.creamDim, fontSize: 11 }}>{r.desc}</div>
+            </div>
+          ))}
+        </div>
+        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginTop: 10, lineHeight: 1.5 }}>
+          Change your baseline in Settings to switch bands (currently PGA Tour and Scratch have
+          their own — other levels use the PGA Tour bands for now).
+        </div>
+        <button
+          onClick={onClose}
+          style={{
+            width: "100%",
+            marginTop: 14,
+            padding: "10px 0",
+            borderRadius: 10,
+            border: "none",
+            background: COLORS.fairway,
+            color: COLORS.cream,
+            fontFamily: "'Bebas Neue', sans-serif",
+            fontSize: 16,
+            letterSpacing: 1,
+            cursor: "pointer",
+          }}
+        >
+          GOT IT
+        </button>
+      </div>
+    </div>
+  );
 }
 
 // ===== PGA Tour short-game baselines (strokes gained), rough + sand lies =====
@@ -5576,6 +5726,7 @@ function PracticeScreen({
   const shotNum = shots.length + 1;
   const unitLabel = longUnitLabel(units);
   const isRating = mode === "rating";
+  const [showScoreInfo, setShowScoreInfo] = useState(false);
 
   return (
     <div>
@@ -5713,34 +5864,42 @@ function PracticeScreen({
       )}
 
       {!isRating && (
-        <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
-          <StatBox
-            label="PREVIOUS SHOT"
-            value={
-              shots.length
-                ? labelForDistanceShot(shots[shots.length - 1].target, shots[shots.length - 1].actual)
-                : "—"
-            }
-            valueColor={
-              shots.length
-                ? toParColor(scoreForDistanceShot(shots[shots.length - 1].target, shots[shots.length - 1].actual))
-                : COLORS.cream
-            }
-          />
-          <StatBox
-            label="ROUND TO PAR"
-            value={
-              shots.length
-                ? formatToPar(shots.reduce((a, s) => a + scoreForDistanceShot(s.target, s.actual), 0))
-                : "E"
-            }
-            valueColor={
-              shots.length
-                ? toParColor(shots.reduce((a, s) => a + scoreForDistanceShot(s.target, s.actual), 0))
-                : COLORS.cream
-            }
-          />
-        </div>
+        <>
+          <div style={{ display: "flex", alignItems: "center", marginTop: 10 }}>
+            <div style={{ fontSize: 10, color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", letterSpacing: 1 }}>
+              PAR SCORING
+            </div>
+            <InlineInfoButton onClick={() => setShowScoreInfo(true)} />
+          </div>
+          <div style={{ display: "flex", gap: 10, marginTop: 6 }}>
+            <StatBox
+              label="PREVIOUS SHOT"
+              value={
+                shots.length
+                  ? labelForDistanceShot(shots[shots.length - 1].target, shots[shots.length - 1].actual)
+                  : "—"
+              }
+              valueColor={
+                shots.length
+                  ? toParColor(scoreForDistanceShot(shots[shots.length - 1].target, shots[shots.length - 1].actual))
+                  : COLORS.cream
+              }
+            />
+            <StatBox
+              label="ROUND TO PAR"
+              value={
+                shots.length
+                  ? formatToPar(shots.reduce((a, s) => a + scoreForDistanceShot(s.target, s.actual), 0))
+                  : "E"
+              }
+              valueColor={
+                shots.length
+                  ? toParColor(shots.reduce((a, s) => a + scoreForDistanceShot(s.target, s.actual), 0))
+                  : COLORS.cream
+              }
+            />
+          </div>
+        </>
       )}
 
       {shots.length > 0 && (
@@ -5765,6 +5924,8 @@ function PracticeScreen({
           onCancel={onCancelEditShot}
         />
       )}
+
+      {showScoreInfo && <DistanceScoreInfoModal onClose={() => setShowScoreInfo(false)} />}
     </div>
   );
 }
@@ -5808,6 +5969,7 @@ function ShotLog({ shots, units, onEditShot }) {
         <div style={{ flex: 1 }}>ACTUAL</div>
         <div style={{ width: 50, textAlign: "right" }}>MISS</div>
         <div style={{ width: 50, textAlign: "right" }}>SG</div>
+        <div style={{ width: 36, textAlign: "right" }}>PAR</div>
       </div>
       <div style={{ maxHeight: 150, overflowY: "auto" }}>
         {/* Newest shot first — display order only. Each row keeps its original index (i) for
@@ -5816,6 +5978,10 @@ function ShotLog({ shots, units, onEditShot }) {
         {shots.map((s, i) => i).reverse().map((i) => {
           const s = shots[i];
           const sg = sgForApproachShot(s.target, s.actual);
+          // Par/Birdie/Eagle score, computed live from the currently active baseline's bands —
+          // same as SG above, this is never stored, so it recolors historical shots if the
+          // player later changes their baseline in Settings.
+          const parScore = scoreForDistanceShot(s.target, s.actual);
           return (
             <div
               key={i}
@@ -5842,6 +6008,7 @@ function ShotLog({ shots, units, onEditShot }) {
                 {unitLabel}
               </div>
               <div style={{ width: 50, textAlign: "right", color: sgRagColor(sg) }}>{formatSG(sg)}</div>
+              <div style={{ width: 36, textAlign: "right", color: toParColor(parScore) }}>{formatToPar(parScore)}</div>
             </div>
           );
         })}
@@ -5900,6 +6067,7 @@ function RatingLog({ shots, units, onEditShot }) {
 function SummaryScreen({ shots, minDist, maxDist, onNewSession, storageError, units, feedback }) {
   const isRating = shots.length > 0 && shots[0].rating !== undefined;
   const unitLabel = longUnitLabel(units);
+  const [showScoreInfo, setShowScoreInfo] = useState(false);
 
   if (isRating) {
     const avgRating = avg(shots.map((s) => s.rating));
@@ -5987,7 +6155,13 @@ function SummaryScreen({ shots, minDist, maxDist, onNewSession, storageError, un
           <StatBox label="TOTAL MISS" value={`${fmt1(ydsToUnit(total, units))}${unitLabel}`} />
           <StatBox label="AVG MISS" value={`${fmt1(ydsToUnit(average, units))}${unitLabel}`} />
         </div>
-        <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", marginTop: 8 }}>
+          <div style={{ fontSize: 10, color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", letterSpacing: 1 }}>
+            PAR SCORING
+          </div>
+          <InlineInfoButton onClick={() => setShowScoreInfo(true)} />
+        </div>
+        <div style={{ display: "flex", gap: 10, marginTop: 6 }}>
           <StatBox label="ROUND TO PAR" value={formatToPar(roundToPar)} valueColor={toParColor(roundToPar)} />
         </div>
         <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
@@ -6046,6 +6220,8 @@ function SummaryScreen({ shots, minDist, maxDist, onNewSession, storageError, un
       >
         NEW SESSION
       </button>
+
+      {showScoreInfo && <DistanceScoreInfoModal onClose={() => setShowScoreInfo(false)} />}
     </div>
   );
 }
@@ -6254,7 +6430,9 @@ function YardagePicker({ min, max, onMin, onMax, onPreset, activePresetLabel }) 
   );
 }
 
-function ChartTooltip({ active, payload, label, suffix }) {
+// `formatter`, when given, replaces the default "value.toFixed(1) + suffix" rendering entirely —
+// used for values like to-par scores where "+2" / "E" reads far better than "2.0".
+function ChartTooltip({ active, payload, label, suffix, formatter }) {
   if (!active || !payload || !payload.length) return null;
   return (
     <div
@@ -6271,8 +6449,14 @@ function ChartTooltip({ active, payload, label, suffix }) {
       <div style={{ color: COLORS.creamDim, marginBottom: 2 }}>{label}</div>
       {payload.map((p, i) => (
         <div key={i}>
-          {p.value.toFixed(1)}
-          {suffix}
+          {formatter ? (
+            formatter(p.value)
+          ) : (
+            <>
+              {p.value.toFixed(1)}
+              {suffix}
+            </>
+          )}
         </div>
       ))}
     </div>
@@ -8235,6 +8419,7 @@ function RangeAnalysisBody({ history, loaded, onDeleteSession, onEditSessionShot
   const [tab, setTab] = useState("insights"); // insights | graphs
   const [printMode, triggerPrint] = usePrintMode();
   const [timescale, setTimescale] = useState("all");
+  const [showScoreInfo, setShowScoreInfo] = useState(false);
   const [minYds, setMinYds] = useState(0);
   const [maxYds, setMaxYds] = useState(300);
   const [activePreset, setActivePreset] = useState("All");
@@ -8471,6 +8656,56 @@ function RangeAnalysisBody({ history, loaded, onDeleteSession, onEditSessionShot
                   </ResponsiveContainer>
                 </div>
               </Card>
+
+              <Card style={{ marginBottom: 14 }}>
+                <div style={{ display: "flex", alignItems: "center" }}>
+                  <SectionLabel>Par scoring over time</SectionLabel>
+                  <InlineInfoButton onClick={() => setShowScoreInfo(true)} />
+                </div>
+                <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
+                  Round to par per session, {activeDistanceScoreBaselineLabel()} baseline, {minYds}-{maxYds}y shots only
+                </div>
+                <div style={{ height: 200, marginTop: 12 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={trend} margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
+                      <CartesianGrid stroke={`${COLORS.creamDim}22`} vertical={false} />
+                      <XAxis
+                        dataKey="dateLabel"
+                        tick={{ fill: COLORS.creamDim, fontSize: 10, fontFamily: "JetBrains Mono, monospace" }}
+                        axisLine={{ stroke: `${COLORS.creamDim}33` }}
+                        tickLine={false}
+                      />
+                      <YAxis
+                        tick={{ fill: COLORS.creamDim, fontSize: 10, fontFamily: "JetBrains Mono, monospace" }}
+                        axisLine={{ stroke: `${COLORS.creamDim}33` }}
+                        tickLine={false}
+                        tickFormatter={formatToPar}
+                        allowDecimals={false}
+                      />
+                      <ReferenceLine y={0} stroke={COLORS.creamDim} strokeDasharray="3 3" strokeOpacity={0.5} />
+                      <Tooltip content={<ChartTooltip formatter={formatToPar} />} />
+                      <Line
+                        type="monotone"
+                        dataKey="roundToPar"
+                        stroke={COLORS.sand}
+                        strokeWidth={2}
+                        dot={(props) => (
+                          <circle
+                            key={props.payload.date}
+                            cx={props.cx}
+                            cy={props.cy}
+                            r={3}
+                            fill={toParColor(props.payload.roundToPar)}
+                          />
+                        )}
+                        activeDot={{ r: 5 }}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </Card>
+
+              {showScoreInfo && <DistanceScoreInfoModal onClose={() => setShowScoreInfo(false)} />}
 
               <Card>
                 <SectionLabel>Strokes gained by distance band</SectionLabel>
