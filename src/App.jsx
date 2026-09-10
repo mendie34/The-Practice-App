@@ -20,6 +20,7 @@ import {
   watchMyCoachLinks,
   applyToCoach,
   withdrawCoachRequest,
+  disconnectCoachLink,
 } from "./storage.js";
 
 export const FONT_IMPORT = `@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
@@ -4226,6 +4227,13 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
             onClearAllSampleData={clearAllSampleDataForAllSections}
             myCoachLinks={myCoachLinks}
             onOpenAddCoach={() => setScreen("addCoach")}
+            onDisconnectCoach={async (coachId) => {
+              try {
+                await disconnectCoachLink(profileId, coachId);
+              } catch (e) {
+                alert(e.message || "Couldn't disconnect — try again.");
+              }
+            }}
           />
         )}
 
@@ -5912,6 +5920,7 @@ function SettingsScreen({
   onClearAllSampleData,
   myCoachLinks,
   onOpenAddCoach,
+  onDisconnectCoach,
 }) {
   // Most recent link (by requestedAt) determines what the Coach card shows — a player can have
   // more than one row here over time (e.g. a declined request followed by a new one to a
@@ -5920,6 +5929,7 @@ function SettingsScreen({
     myCoachLinks && myCoachLinks.length
       ? [...myCoachLinks].sort((a, b) => (b.requestedAt || 0) - (a.requestedAt || 0))[0]
       : null;
+  const [confirmingDisconnect, setConfirmingDisconnect] = useState(false);
   return (
     <div>
       <div style={{ marginBottom: 16 }}>
@@ -6182,6 +6192,73 @@ function SettingsScreen({
             <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.fairwayLight, marginTop: 4 }}>
               Connected — they can see your stats
             </div>
+            {!confirmingDisconnect && (
+              <button
+                onClick={() => setConfirmingDisconnect(true)}
+                style={{
+                  width: "100%",
+                  marginTop: 10,
+                  padding: "10px 0",
+                  borderRadius: 10,
+                  border: `1px solid ${COLORS.creamDim}33`,
+                  background: "transparent",
+                  color: COLORS.creamDim,
+                  fontFamily: "'JetBrains Mono', monospace",
+                  fontSize: 11,
+                  letterSpacing: 0.5,
+                  cursor: "pointer",
+                }}
+              >
+                DISCONNECT COACH
+              </button>
+            )}
+            {confirmingDisconnect && (
+              <>
+                <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 10, lineHeight: 1.5 }}>
+                  Remove {currentCoachLink.coachName}? They'll lose access to your stats and you'll
+                  need to send a new request to reconnect.
+                </div>
+                <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+                  <button
+                    onClick={() => setConfirmingDisconnect(false)}
+                    style={{
+                      flex: 1,
+                      padding: "10px 0",
+                      borderRadius: 10,
+                      border: `1px solid ${COLORS.creamDim}33`,
+                      background: "transparent",
+                      color: COLORS.creamDim,
+                      fontFamily: "'Bebas Neue', sans-serif",
+                      fontSize: 14,
+                      letterSpacing: 0.5,
+                      cursor: "pointer",
+                    }}
+                  >
+                    CANCEL
+                  </button>
+                  <button
+                    onClick={() => {
+                      setConfirmingDisconnect(false);
+                      onDisconnectCoach(currentCoachLink.coachId);
+                    }}
+                    style={{
+                      flex: 1,
+                      padding: "10px 0",
+                      borderRadius: 10,
+                      border: `1px solid ${COLORS.flag}66`,
+                      background: "transparent",
+                      color: COLORS.flag,
+                      fontFamily: "'Bebas Neue', sans-serif",
+                      fontSize: 14,
+                      letterSpacing: 0.5,
+                      cursor: "pointer",
+                    }}
+                  >
+                    DISCONNECT
+                  </button>
+                </div>
+              </>
+            )}
           </>
         )}
         {currentCoachLink && currentCoachLink.status === "declined" && (
