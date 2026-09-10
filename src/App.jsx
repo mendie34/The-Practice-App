@@ -784,6 +784,7 @@ function computeOffsets(handicapKey) {
 let currentOffsets = computeOffsets("tour");
 function applyBaseline(handicapKey) {
   currentOffsets = computeOffsets(handicapKey);
+  currentDistanceScoreBands = DISTANCE_SCORE_BAND_SETS[handicapKey] || DISTANCE_SCORE_BAND_SETS.tour;
 }
 
 // Strokes gained for a single putt: baseline expected putts from this distance, minus what was
@@ -849,6 +850,64 @@ function sgForApproachShot(targetYds, actualYds) {
   const missYds = Math.abs(actualYds - targetYds);
   const missFt = missYds * 3;
   return pgaBaselineApproach(targetYds) - pgaBaselinePutts(missFt) - 1 - currentOffsets.approach;
+}
+
+// ===== Distance Control scoring — Par/Birdie/Eagle/Bogey/Double, based on miss % of target =====
+// Deliberately separate from strokes gained above: SG measures shot value against a scratch/tour
+// baseline, this measures "did you hit your number" as a simple golf-scoring analogy. Miss % is
+// used (rather than an absolute yardage window) so the same bands work at wedge distance and
+// long-iron distance alike. Direction of the miss doesn't matter (long or short score the same),
+// matching how AVG MISS above is already an unsigned distance.
+//
+// Adaptive by ability, reusing the SAME baseline/handicap tiers as the Settings SG-baseline
+// selector (BASELINE_OPTIONS/HANDICAP_STROKES_LOST_PER_ROUND above) — when the player changes
+// their baseline in Settings, these bands change with it via applyBaseline() below. Only "tour"
+// and "scratch" have real numbers so far; the user is still working out ratios for the
+// higher-handicap tiers, so any tier without its own entry falls back to the tour bands (same
+// fallback convention computeOffsets() already uses for the SG offsets).
+const DISTANCE_SCORE_BAND_SETS = {
+  tour: [
+    { maxMissPct: 1, score: -2, label: "EAGLE" },
+    { maxMissPct: 3, score: -1, label: "BIRDIE" },
+    { maxMissPct: 5, score: 0, label: "PAR" },
+    { maxMissPct: 7, score: 1, label: "BOGEY" },
+    { maxMissPct: Infinity, score: 2, label: "DOUBLE" },
+  ],
+  scratch: [
+    { maxMissPct: 3, score: -2, label: "EAGLE" },
+    { maxMissPct: 5, score: -1, label: "BIRDIE" },
+    { maxMissPct: 7, score: 0, label: "PAR" },
+    { maxMissPct: 10, score: 1, label: "BOGEY" },
+    { maxMissPct: Infinity, score: 2, label: "DOUBLE" },
+  ],
+};
+
+// Kept in sync with the active baseline via applyBaseline() above, same pattern as currentOffsets.
+let currentDistanceScoreBands = DISTANCE_SCORE_BAND_SETS.tour;
+
+function distanceScoreBand(targetYds, actualYds) {
+  const missPct = targetYds > 0 ? (Math.abs(actualYds - targetYds) / targetYds) * 100 : 0;
+  return currentDistanceScoreBands.find((b) => missPct <= b.maxMissPct);
+}
+
+function scoreForDistanceShot(targetYds, actualYds) {
+  return distanceScoreBand(targetYds, actualYds).score;
+}
+
+function labelForDistanceShot(targetYds, actualYds) {
+  return distanceScoreBand(targetYds, actualYds).label;
+}
+
+// Standard golf to-par formatting: 0 -> "E", positive -> "+n", negative -> "-n".
+function formatToPar(score) {
+  if (score === 0) return "E";
+  return score > 0 ? `+${score}` : `${score}`;
+}
+
+function toParColor(score) {
+  if (score < 0) return COLORS.fairwayLight;
+  if (score === 0) return COLORS.cream;
+  return COLORS.flag;
 }
 
 // ===== PGA Tour short-game baselines (strokes gained), rough + sand lies =====
@@ -5653,6 +5712,37 @@ function PracticeScreen({
         </div>
       )}
 
+      {!isRating && (
+        <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
+          <StatBox
+            label="PREVIOUS SHOT"
+            value={
+              shots.length
+                ? labelForDistanceShot(shots[shots.length - 1].target, shots[shots.length - 1].actual)
+                : "—"
+            }
+            valueColor={
+              shots.length
+                ? toParColor(scoreForDistanceShot(shots[shots.length - 1].target, shots[shots.length - 1].actual))
+                : COLORS.cream
+            }
+          />
+          <StatBox
+            label="ROUND TO PAR"
+            value={
+              shots.length
+                ? formatToPar(shots.reduce((a, s) => a + scoreForDistanceShot(s.target, s.actual), 0))
+                : "E"
+            }
+            valueColor={
+              shots.length
+                ? toParColor(shots.reduce((a, s) => a + scoreForDistanceShot(s.target, s.actual), 0))
+                : COLORS.cream
+            }
+          />
+        </div>
+      )}
+
       {shots.length > 0 && (
         <div style={{ marginTop: 10 }}>
           <SectionLabel>This session — tap a shot to amend</SectionLabel>
@@ -5877,6 +5967,7 @@ function SummaryScreen({ shots, minDist, maxDist, onNewSession, storageError, un
   const worst = shots.reduce((w, s) => (s.diff > w.diff ? s : w), shots[0]);
   const avgSG = avg(shots.map((s) => sgForApproachShot(s.target, s.actual)));
   const totalSG = shots.reduce((a, s) => a + sgForApproachShot(s.target, s.actual), 0);
+  const roundToPar = shots.reduce((a, s) => a + scoreForDistanceShot(s.target, s.actual), 0);
 
   return (
     <div>
@@ -5895,6 +5986,9 @@ function SummaryScreen({ shots, minDist, maxDist, onNewSession, storageError, un
         <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
           <StatBox label="TOTAL MISS" value={`${fmt1(ydsToUnit(total, units))}${unitLabel}`} />
           <StatBox label="AVG MISS" value={`${fmt1(ydsToUnit(average, units))}${unitLabel}`} />
+        </div>
+        <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
+          <StatBox label="ROUND TO PAR" value={formatToPar(roundToPar)} valueColor={toParColor(roundToPar)} />
         </div>
         <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
           <StatBox
@@ -6230,7 +6324,9 @@ function SettingsScreen({
         <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 4, lineHeight: 1.5 }}>
           Strokes gained everywhere in the app is measured against this level. Round-level data
           converted to a flat per-shot offset — a useful approximation, not a precise
-          distance-calibrated model like the PGA Tour numbers.
+          distance-calibrated model like the PGA Tour numbers. Distance Control's Par/Birdie/Eagle
+          scoring also follows this level where bands have been set up for it (currently PGA Tour
+          and Scratch — other levels use the PGA Tour bands until their own are added).
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 6, marginTop: 12 }}>
           {BASELINE_OPTIONS.map((b) => (
