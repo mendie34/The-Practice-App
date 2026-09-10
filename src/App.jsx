@@ -12,7 +12,15 @@ import {
   ResponsiveContainer,
   ReferenceLine,
 } from "recharts";
-import { loadAllAppData, exportProfileData, importProfileData } from "./storage.js";
+import {
+  loadAllAppData,
+  exportProfileData,
+  importProfileData,
+  searchCoaches,
+  watchMyCoachLinks,
+  applyToCoach,
+  withdrawCoachRequest,
+} from "./storage.js";
 
 export const FONT_IMPORT = `@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
 @media print {
@@ -194,6 +202,7 @@ const BACK_MAP = {
   puttingClockSummary: "puttingClockIntro",
   analysis: "home",
   settings: "home",
+  addCoach: "settings",
   competeChoose: "home",
   competeSetup: "competeChoose",
   competePlay: "competeSetup",
@@ -1922,6 +1931,17 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
   const [shortActiveSaved, setShortActiveSaved] = useState(null);
   const [shortSessionFeedback, setShortSessionFeedback] = useState(null);
   const [shortResultInput, setShortResultInput] = useState("");
+
+  // ===== Add Coach: live subscription to every coachLinks doc naming this player (any status),
+  // so Settings can show "pending" / "connected" / "declined" against each coach without a
+  // manual refresh. Separate Firestore collection from this profile's own app data above, so it
+  // gets its own small effect rather than folding into the consolidated load below. =====
+  const [myCoachLinks, setMyCoachLinks] = useState([]);
+  useEffect(() => {
+    if (!profileId) return;
+    const unsub = watchMyCoachLinks(profileId, setMyCoachLinks);
+    return unsub;
+  }, [profileId]);
 
   // Single consolidated load — fetches every stored key for this profile in one parallel batch
   // (loadAllAppDataDemo), rather than 7 separate effects each doing their own round-trip(s).
@@ -4204,6 +4224,17 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
             ]}
             onLoadAllSampleData={loadSampleDataForAllSections}
             onClearAllSampleData={clearAllSampleDataForAllSections}
+            myCoachLinks={myCoachLinks}
+            onOpenAddCoach={() => setScreen("addCoach")}
+          />
+        )}
+
+        {screen === "addCoach" && (
+          <AddCoachScreen
+            profileId={profileId}
+            profileName={profileName}
+            myCoachLinks={myCoachLinks}
+            onBack={() => setScreen("settings")}
           />
         )}
 
@@ -5879,7 +5910,16 @@ function SettingsScreen({
   sampleDataAreas,
   onLoadAllSampleData,
   onClearAllSampleData,
+  myCoachLinks,
+  onOpenAddCoach,
 }) {
+  // Most recent link (by requestedAt) determines what the Coach card shows — a player can have
+  // more than one row here over time (e.g. a declined request followed by a new one to a
+  // different coach), but only the latest is relevant to surface on Settings.
+  const currentCoachLink =
+    myCoachLinks && myCoachLinks.length
+      ? [...myCoachLinks].sort((a, b) => (b.requestedAt || 0) - (a.requestedAt || 0))[0]
+      : null;
   return (
     <div>
       <div style={{ marginBottom: 16 }}>
@@ -6079,6 +6119,100 @@ function SettingsScreen({
       </Card>
 
       <Card style={{ marginTop: 12 }}>
+        <SectionLabel>Coach</SectionLabel>
+        {!currentCoachLink && (
+          <>
+            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 4, lineHeight: 1.5 }}>
+              Search for your coach and send them a request — once they approve it, they'll be
+              able to see your stats and help you focus your practice.
+            </div>
+            <button
+              onClick={onOpenAddCoach}
+              style={{
+                width: "100%",
+                marginTop: 10,
+                padding: "11px 0",
+                borderRadius: 10,
+                border: `1px solid ${COLORS.fairwayLight}66`,
+                background: "transparent",
+                color: COLORS.fairwayLight,
+                fontFamily: "'Bebas Neue', sans-serif",
+                fontSize: 15,
+                letterSpacing: 0.5,
+                cursor: "pointer",
+              }}
+            >
+              ADD COACH
+            </button>
+          </>
+        )}
+        {currentCoachLink && currentCoachLink.status === "pending" && (
+          <>
+            <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 18, marginTop: 6, color: COLORS.cream }}>
+              {currentCoachLink.coachName}
+            </div>
+            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.sand, marginTop: 4 }}>
+              Request pending — waiting for them to approve
+            </div>
+            <button
+              onClick={onOpenAddCoach}
+              style={{
+                width: "100%",
+                marginTop: 10,
+                padding: "10px 0",
+                borderRadius: 10,
+                border: `1px solid ${COLORS.creamDim}33`,
+                background: "transparent",
+                color: COLORS.creamDim,
+                fontFamily: "'JetBrains Mono', monospace",
+                fontSize: 11,
+                letterSpacing: 0.5,
+                cursor: "pointer",
+              }}
+            >
+              VIEW / MANAGE
+            </button>
+          </>
+        )}
+        {currentCoachLink && currentCoachLink.status === "approved" && (
+          <>
+            <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 18, marginTop: 6, color: COLORS.cream }}>
+              {currentCoachLink.coachName}
+            </div>
+            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.fairwayLight, marginTop: 4 }}>
+              Connected — they can see your stats
+            </div>
+          </>
+        )}
+        {currentCoachLink && currentCoachLink.status === "declined" && (
+          <>
+            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 4, lineHeight: 1.5 }}>
+              Your request to {currentCoachLink.coachName} wasn't accepted. You can search for a
+              different coach, or try again.
+            </div>
+            <button
+              onClick={onOpenAddCoach}
+              style={{
+                width: "100%",
+                marginTop: 10,
+                padding: "11px 0",
+                borderRadius: 10,
+                border: `1px solid ${COLORS.fairwayLight}66`,
+                background: "transparent",
+                color: COLORS.fairwayLight,
+                fontFamily: "'Bebas Neue', sans-serif",
+                fontSize: 15,
+                letterSpacing: 0.5,
+                cursor: "pointer",
+              }}
+            >
+              ADD COACH
+            </button>
+          </>
+        )}
+      </Card>
+
+      <Card style={{ marginTop: 12 }}>
         <SectionLabel>Sample data</SectionLabel>
         <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 4, lineHeight: 1.5 }}>
           Load 10 generated sample sessions into every section at once to try out Analysis, or
@@ -6129,6 +6263,189 @@ function SettingsScreen({
           CLEAR ALL SECTIONS
         </button>
       </Card>
+
+      <button
+        onClick={onBack}
+        style={{
+          width: "100%",
+          marginTop: 14,
+          padding: "13px 0",
+          borderRadius: 12,
+          border: `1px solid ${COLORS.creamDim}33`,
+          background: "transparent",
+          color: COLORS.cream,
+          fontFamily: "'Bebas Neue', sans-serif",
+          fontSize: 18,
+          letterSpacing: 1,
+          cursor: "pointer",
+        }}
+      >
+        BACK
+      </button>
+    </div>
+  );
+}
+
+// ===== Add Coach: search coaches by name/email, apply, and track request status. Coach profiles
+// live in a small shared "coaches" collection in the same Firebase project the Coach app writes
+// to — see storage.js's searchCoaches/applyToCoach/withdrawCoachRequest. =====
+function CoachSearchResultCard({ coach, link, onApply, applying }) {
+  const status = link ? link.status : null;
+  return (
+    <Card style={{ marginBottom: 8 }}>
+      <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 18, color: COLORS.cream }}>{coach.name}</div>
+      {coach.bio && (
+        <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 12, color: COLORS.creamDim, marginTop: 4, lineHeight: 1.45 }}>
+          {coach.bio}
+        </div>
+      )}
+      <div style={{ marginTop: 10 }}>
+        {status === "approved" && (
+          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.fairwayLight }}>
+            Connected — they can see your stats
+          </div>
+        )}
+        {status === "pending" && (
+          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.sand }}>
+            Request pending
+          </div>
+        )}
+        {(status === "declined" || !status) && (
+          <button
+            onClick={() => onApply(coach)}
+            disabled={applying}
+            style={{
+              width: "100%",
+              padding: "9px 0",
+              borderRadius: 10,
+              border: `1px solid ${COLORS.fairwayLight}66`,
+              background: "transparent",
+              color: COLORS.fairwayLight,
+              fontFamily: "'Bebas Neue', sans-serif",
+              fontSize: 14,
+              letterSpacing: 0.5,
+              cursor: applying ? "not-allowed" : "pointer",
+            }}
+          >
+            {applying ? "SENDING…" : status === "declined" ? "APPLY AGAIN" : "APPLY"}
+          </button>
+        )}
+      </div>
+    </Card>
+  );
+}
+
+function AddCoachScreen({ profileId, profileName, myCoachLinks, onBack }) {
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState(null); // null = not searched yet
+  const [loading, setLoading] = useState(false);
+  const [applyingCoachId, setApplyingCoachId] = useState(null);
+  const [error, setError] = useState(null);
+
+  const linkByCoachId = {};
+  for (const l of myCoachLinks || []) linkByCoachId[l.coachId] = l;
+
+  async function runSearch(text) {
+    setLoading(true);
+    setError(null);
+    try {
+      const coaches = await searchCoaches(text);
+      setResults(coaches);
+    } catch (e) {
+      setError("Couldn't reach the server — check your connection and try again.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleApply(coach) {
+    setApplyingCoachId(coach.id);
+    try {
+      await applyToCoach(profileId, profileName || "Player", coach.email || "", coach.id, coach.name);
+    } catch (e) {
+      setError("Couldn't send that request — try again.");
+    } finally {
+      setApplyingCoachId(null);
+    }
+  }
+
+  return (
+    <div>
+      <div style={{ marginBottom: 16 }}>
+        <SectionLabel>SETTINGS · COACH</SectionLabel>
+        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 24, marginTop: 2 }}>Add a coach</div>
+      </div>
+
+      <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+        <input
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && runSearch(query)}
+          placeholder="Search by name or email"
+          style={{
+            flex: 1,
+            background: COLORS.turfDark,
+            border: `1px solid ${COLORS.creamDim}33`,
+            borderRadius: 8,
+            color: COLORS.cream,
+            fontFamily: "'Inter', sans-serif",
+            fontSize: 15,
+            padding: "10px 12px",
+            boxSizing: "border-box",
+          }}
+          autoFocus
+        />
+        <button
+          onClick={() => runSearch(query)}
+          style={{
+            padding: "0 16px",
+            borderRadius: 8,
+            border: "none",
+            background: COLORS.fairway,
+            color: COLORS.cream,
+            fontFamily: "'Bebas Neue', sans-serif",
+            fontSize: 14,
+            letterSpacing: 0.5,
+            cursor: "pointer",
+          }}
+        >
+          SEARCH
+        </button>
+      </div>
+
+      {error && (
+        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: COLORS.flag, marginBottom: 12 }}>{error}</div>
+      )}
+
+      {results === null && !loading && (
+        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, opacity: 0.75, lineHeight: 1.5 }}>
+          Search for your coach by name, or leave it blank and tap Search to see every coach
+          currently on The Practice App.
+        </div>
+      )}
+
+      {loading && (
+        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim }}>Searching…</div>
+      )}
+
+      {results !== null && !loading && results.length === 0 && (
+        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, opacity: 0.75 }}>
+          No coaches found for that search.
+        </div>
+      )}
+
+      {results !== null &&
+        !loading &&
+        results.map((coach) => (
+          <CoachSearchResultCard
+            key={coach.id}
+            coach={coach}
+            link={linkByCoachId[coach.id]}
+            onApply={handleApply}
+            applying={applyingCoachId === coach.id}
+          />
+        ))}
 
       <button
         onClick={onBack}
