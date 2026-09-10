@@ -284,3 +284,12 @@ export async function applyToCoach(playerId, playerName, playerEmail, coachId, c
 export async function withdrawCoachRequest(playerId, coachId) {
   await deleteDoc(coachLinkDocRef(playerId, coachId));
 }
+
+// Ends an APPROVED coach connection. Either the player (disconnecting from their coach in
+// Settings) or the coach (removing the player from their roster, in the Coach app) can call the
+// equivalent of this — this copy lives in the player app since that's the only place it's wired
+// up so far. Firestore rules only allow this while status is "approved"; the doc is simply
+// deleted, same as withdrawing a pending request, since there's nothing else to leave behind.
+export async function disconnectCoachLink(playerId, coachId) {
+  await deleteDoc(coachLinkDocRef(playerId, coachId));
+}
