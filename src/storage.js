@@ -293,3 +293,128 @@ export async function withdrawCoachRequest(playerId, coachId) {
 export async function disconnectCoachLink(playerId, coachId) {
   await deleteDoc(coachLinkDocRef(playerId, coachId));
 }
+
+// ===== Add Friend — search players, send/accept/decline/withdraw a friend request =====
+//
+// Same pattern as Add Coach above, with one structural difference: coach links are asymmetric
+// (player always applies, coach always approves), friend links are symmetric — either side can
+// send, either side can approve. A friendLinks doc id therefore can't be `${playerId}_${coachId}`
+// the way coachLinks is (that only works because "coach" and "player" are fixed roles) — instead
+// it's the two uids SORTED then joined, so a link gets exactly one doc no matter who initiates.
+//
+// This will need its own entry in firestore.rules alongside coachLinks': a player can create a
+// friendLinks doc naming themselves as playerA or playerB, can read any doc naming them, can
+// update status only on a doc naming them where they are NOT requestedBy (i.e. you can't approve
+// your own outgoing request), and can delete a doc naming them (covers both withdrawing your own
+// pending request and removing an approved friend).
+
+function friendLinkId(uidA, uidB) {
+  return [uidA, uidB].sort().join("_");
+}
+function friendLinkDocRef(uidA, uidB) {
+  return doc(db, "friendLinks", friendLinkId(uidA, uidB));
+}
+
+// Other players' profiles live in the same `users` collection this file already reads for
+// getUserProfile/saveUserProfile. Unlike searchCoaches, this deliberately does NOT support a
+// blank query returning everyone — coaches are a small, discoverable directory; players are not,
+// so this behaves like a lookup (name or email match) rather than a browsable list of every user.
+export async function searchPlayers(queryText, excludeUid) {
+  const q = (queryText || "").trim().toLowerCase();
+  if (!q) return [];
+  const snap = await getDocs(collection(db, "users"));
+  const results = [];
+  snap.forEach((d) => {
+    if (d.id === excludeUid) return;
+    const data = d.data();
+    const name = (data.name || "").toLowerCase();
+    const email = (data.email || "").toLowerCase();
+    if (name.includes(q) || email.includes(q)) {
+      results.push({ id: d.id, name: data.name || "Player", email: data.email || "" });
+    }
+  });
+  return results.slice(0, 20);
+}
+
+// Creates (or re-reads, if one already exists) a pending friend request. playerName is this
+// player's own profile value, passed in from App.jsx, same reasoning as applyToCoach's
+// playerName/playerEmail args above.
+export async function sendFriendRequest(profileId, profileName, targetId, targetName) {
+  const ref = friendLinkDocRef(profileId, targetId);
+  const existing = await getDoc(ref);
+  if (existing.exists()) return existing.data();
+  const payload = {
+    playerA: profileId,
+    playerB: targetId,
+    playerAName: profileName || "Player",
+    playerBName: targetName || "Player",
+    status: "pending",
+    requestedBy: profileId,
+    requestedAt: Date.now(),
+    respondedAt: null,
+  };
+  await setDoc(ref, payload);
+  return payload;
+}
+
+// Live-subscribes to every friendLinks doc naming this player (any status), normalized so the UI
+// doesn't need to know which side of playerA/playerB it's looking at, and doesn't need two
+// separate lists for "sent" vs "received" — direction is derived from requestedBy instead.
+// Needs two queries (one per side) since Firestore can't OR across two different fields in one
+// query; combined and re-emitted together whenever either side updates.
+export function watchMyFriendLinks(profileId, cb) {
+  const qA = query(collection(db, "friendLinks"), where("playerA", "==", profileId));
+  const qB = query(collection(db, "friendLinks"), where("playerB", "==", profileId));
+
+  let latestA = [];
+  let latestB = [];
+  function emit() {
+    const combined = [...latestA, ...latestB].map((d) => {
+      const isA = d.playerA === profileId;
+      return {
+        id: d.id,
+        friendId: isA ? d.playerB : d.playerA,
+        friendName: isA ? d.playerBName : d.playerAName,
+        status: d.status,
+        direction: d.requestedBy === profileId ? "sent" : "received",
+        requestedAt: d.requestedAt,
+      };
+    });
+    cb(combined);
+  }
+
+  const unsubA = onSnapshot(qA, (snap) => {
+    latestA = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    emit();
+  });
+  const unsubB = onSnapshot(qB, (snap) => {
+    latestB = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    emit();
+  });
+
+  return () => {
+    unsubA();
+    unsubB();
+  };
+}
+
+// linkId is the friendLinks doc id (App.jsx has this from the link object watchMyFriendLinks
+// handed it) — accept/decline/withdraw/remove all just need the id, not both uids again.
+export async function acceptFriendRequest(linkId) {
+  await setDoc(doc(db, "friendLinks", linkId), { status: "approved", respondedAt: Date.now() }, { merge: true });
+}
+
+export async function declineFriendRequest(linkId) {
+  await setDoc(doc(db, "friendLinks", linkId), { status: "declined", respondedAt: Date.now() }, { merge: true });
+}
+
+// Cancel a request YOU sent, while it's still pending.
+export async function withdrawFriendRequest(linkId) {
+  await deleteDoc(doc(db, "friendLinks", linkId));
+}
+
+// Ends an approved friendship. Either side can call this, same as disconnectCoachLink can be
+// called by either player or coach — deletes the doc, nothing else to leave behind.
+export async function removeFriend(linkId) {
+  await deleteDoc(doc(db, "friendLinks", linkId));
+}
