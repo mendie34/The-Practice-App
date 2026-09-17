@@ -59,6 +59,257 @@ export const LOGO_SRC = "/logo.png";
 // keeps the plain icon + a live PlayerBadge since baked-in text is illegible at 20px.
 export const LOGO_PLAYER_SRC = "/logo-player.png";
 
+// ---------------------------------------------------------------------------
+// SHARE RESULT — dynamic shareable image card + caption, used across every
+// summary/results screen. See HANDOFF.md for the design rationale (demo-first
+// workflow, tone-adapts-to-result, why this is canvas rather than the SVG ->
+// Image -> canvas.toBlob pattern used by buildWedgeMatrixSVG/buildGappingChartSVG
+// above — this card is only ever rasterized for sharing, never shown inline in
+// the app UI, so there's no separate on-screen-SVG use case to justify that
+// extra indirection here).
+// ---------------------------------------------------------------------------
+
+// Lazily created + cached so repeated shares in one session don't reload the image.
+let _shareLogoImg = null;
+function getShareLogoImg() {
+  if (!_shareLogoImg) {
+    _shareLogoImg = new Image();
+    _shareLogoImg.src = LOGO_SRC;
+  }
+  return _shareLogoImg;
+}
+
+function shareRoundRectPath(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+function drawShareLogoBadge(ctx, cx, cy, size) {
+  const img = getShareLogoImg();
+  // public/logo.png is 532x532 with the real artwork filling only the top-left 512x512 — the
+  // remaining strip along the right/bottom is a white export margin baked into that file. Crop
+  // it out via the source rect rather than shipping a second, edited image asset.
+  const r = size * 0.16;
+  ctx.save();
+  shareRoundRectPath(ctx, cx - size / 2, cy - size / 2, size, size, r);
+  ctx.clip();
+  if (img.complete && img.naturalWidth > 0) {
+    ctx.drawImage(img, 0, 0, 512, 512, cx - size / 2, cy - size / 2, size, size);
+  } else {
+    // Logo hasn't loaded yet (e.g. very first share of the session) — flat fill so the badge
+    // area isn't just blank/transparent while it loads.
+    ctx.fillStyle = COLORS.turf;
+    ctx.fillRect(cx - size / 2, cy - size / 2, size, size);
+  }
+  ctx.restore();
+}
+
+function shareWrapCenteredText(ctx, text, cx, y, maxWidth, lineHeight) {
+  const words = text.split(" ");
+  let line = "";
+  const lines = [];
+  words.forEach((w) => {
+    const test = line ? `${line} ${w}` : w;
+    if (ctx.measureText(test).width > maxWidth && line) {
+      lines.push(line);
+      line = w;
+    } else {
+      line = test;
+    }
+  });
+  lines.push(line);
+  lines.forEach((l, i) => ctx.fillText(l, cx, y + i * lineHeight));
+}
+
+// stats: up to 3 [label, value] pairs shown in the row below the hero number.
+function drawShareCard(canvas, { badge, hero, heroLabel, heroGood, stats }) {
+  const ctx = canvas.getContext("2d");
+  const W = canvas.width;
+  const H = canvas.height;
+
+  const grad = ctx.createLinearGradient(0, 0, 0, H);
+  grad.addColorStop(0, COLORS.turfDark);
+  grad.addColorStop(1, "#0e1d16");
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, W, H);
+
+  // Subtle diagonal fairway-stripe texture, same trick as the mown-grass look elsewhere in the app.
+  ctx.save();
+  ctx.globalAlpha = 0.05;
+  ctx.fillStyle = COLORS.cream;
+  for (let i = -H; i < W; i += 90) {
+    ctx.beginPath();
+    ctx.moveTo(i, 0);
+    ctx.lineTo(i + 45, 0);
+    ctx.lineTo(i + 45 + H, H);
+    ctx.lineTo(i + H, H);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.restore();
+
+  ctx.textAlign = "center";
+
+  ctx.fillStyle = COLORS.cream;
+  ctx.font = "600 30px 'JetBrains Mono', monospace";
+  ctx.fillText("THE PRACTICE APP", W / 2, 70);
+
+  drawShareLogoBadge(ctx, W / 2, 195, 190);
+
+  ctx.font = "700 28px 'JetBrains Mono', monospace";
+  const badgeW = ctx.measureText(badge).width + 60;
+  ctx.fillStyle = COLORS.turf;
+  shareRoundRectPath(ctx, W / 2 - badgeW / 2, 310, badgeW, 60, 30);
+  ctx.fill();
+  ctx.fillStyle = COLORS.sand;
+  ctx.fillText(badge, W / 2, 350);
+
+  const heroColor = heroGood ? COLORS.fairwayLight : COLORS.flag;
+  ctx.fillStyle = heroColor;
+  ctx.font = "700 260px 'Bebas Neue', sans-serif";
+  ctx.fillText(hero, W / 2, 650);
+
+  ctx.fillStyle = COLORS.creamDim;
+  ctx.font = "600 30px 'JetBrains Mono', monospace";
+  ctx.fillText(heroLabel, W / 2, 710);
+
+  ctx.strokeStyle = `${COLORS.creamDim}33`;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(140, 790);
+  ctx.lineTo(W - 140, 790);
+  ctx.stroke();
+
+  const statY = 900;
+  const colW = (W - 160) / 3;
+  stats.slice(0, 3).forEach((st, i) => {
+    const cx = 80 + colW * i + colW / 2;
+    ctx.fillStyle = COLORS.cream;
+    ctx.font = "700 58px 'Bebas Neue', sans-serif";
+    ctx.fillText(st[1], cx, statY);
+    ctx.fillStyle = COLORS.creamDim;
+    ctx.font = "500 20px 'JetBrains Mono', monospace";
+    shareWrapCenteredText(ctx, st[0], cx, statY + 40, colW - 10, 24);
+  });
+
+  const dateStr = new Date().toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" });
+  ctx.fillStyle = COLORS.creamDim;
+  ctx.font = "500 26px 'JetBrains Mono', monospace";
+  ctx.fillText(dateStr, W / 2, H - 110);
+
+  ctx.fillStyle = COLORS.sand;
+  ctx.font = "600 24px 'JetBrains Mono', monospace";
+  ctx.fillText("TRACK YOUR GAME → THEPRACTICEAPP.CO.UK", W / 2, H - 60);
+}
+
+function generateShareCardBlob(cardData) {
+  return new Promise((resolve) => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 1080;
+    canvas.height = 1350;
+    const img = getShareLogoImg();
+    const draw = () => {
+      drawShareCard(canvas, cardData);
+      canvas.toBlob(resolve, "image/png");
+    };
+    // Wait for the logo to actually be ready at least once so the very first share of a session
+    // doesn't render the plain-fill placeholder in drawShareLogoBadge.
+    if (img.complete && img.naturalWidth > 0) {
+      draw();
+    } else {
+      img.onload = draw;
+      img.onerror = draw;
+    }
+  });
+}
+
+// ShareResultButton — the caller (each Summary screen) computes its own hero stat, mood, caption
+// and hashtags from its own local session data, same as it already computes its own StatBoxes.
+// This component only knows how to render the card and run the share/fallback flow.
+function ShareResultButton({ badge, hero, heroLabel, heroGood, stats, caption, hashtags }) {
+  const [status, setStatus] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  async function handleShare() {
+    setBusy(true);
+    setStatus("");
+    try {
+      const blob = await generateShareCardBlob({ badge, hero, heroLabel, heroGood, stats });
+      const file = new File([blob], "practice-app-result.png", { type: "image/png" });
+      const fullCaption = `${caption}\n\n${hashtags.join(" ")}`;
+
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        try {
+          await navigator.share({ files: [file], title: "My Practice App Result", text: fullCaption });
+          setStatus("Shared!");
+        } catch (e) {
+          if (e.name !== "AbortError") setStatus("Share cancelled.");
+        }
+      } else {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "practice-app-result.png";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+        try {
+          await navigator.clipboard.writeText(fullCaption);
+          setStatus("Image downloaded, caption copied — paste both into Instagram or Facebook.");
+        } catch (e) {
+          setStatus("Image downloaded. Copy the caption yourself to post it.");
+        }
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div style={{ marginTop: 10 }}>
+      <button
+        onClick={handleShare}
+        disabled={busy}
+        style={{
+          width: "100%",
+          padding: "13px 0",
+          borderRadius: 12,
+          border: `1px solid ${COLORS.sand}`,
+          background: "transparent",
+          color: COLORS.sand,
+          fontFamily: "'Bebas Neue', sans-serif",
+          fontSize: 20,
+          letterSpacing: 2,
+          cursor: busy ? "not-allowed" : "pointer",
+          opacity: busy ? 0.6 : 1,
+        }}
+      >
+        {busy ? "PREPARING…" : "SHARE RESULT"}
+      </button>
+      {status && (
+        <div
+          style={{
+            fontFamily: "'JetBrains Mono', monospace",
+            fontSize: 11,
+            color: COLORS.creamDim,
+            marginTop: 6,
+            textAlign: "center",
+            lineHeight: 1.4,
+          }}
+        >
+          {status}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function PlayerBadge({ style }) {
   return (
     <div
@@ -6492,6 +6743,24 @@ function SummaryScreen({ shots, minDist, maxDist, onNewSession, storageError, un
           </div>
         )}
 
+        <ShareResultButton
+          badge="RANGE SESSION"
+          hero={`${avgRating.toFixed(1)}/5`}
+          heroLabel="AVG RATING"
+          heroGood={avgRating >= 3}
+          stats={[
+            ["SHOTS", String(shots.length)],
+            ["BEST", `${best.rating}/5`],
+            ["WORST", `${worst.rating}/5`],
+          ]}
+          caption={
+            avgRating >= 3
+              ? `Averaged ${avgRating.toFixed(1)}/5 on the range today. Working on repeatable contact, shot by shot. @The_golfpracticeapp`
+              : `Tough range session today, averaging ${avgRating.toFixed(1)}/5. Logging it anyway — the reps still count. @The_golfpracticeapp`
+          }
+          hashtags={["#golf", "#golfpractice", "#strokesgained", "#golfswing", "#golftraining", "#ThePracticeApp"]}
+        />
+
         <button
           onClick={onNewSession}
           style={{
@@ -6586,6 +6855,24 @@ function SummaryScreen({ shots, minDist, maxDist, onNewSession, storageError, un
           Couldn't save this session to history — it's still shown above.
         </div>
       )}
+
+      <ShareResultButton
+        badge="RANGE SESSION"
+        hero={formatSG(avgSG)}
+        heroLabel="AVG STROKES GAINED / SHOT"
+        heroGood={avgSG >= 0}
+        stats={[
+          ["SHOTS", String(shots.length)],
+          ["TOTAL SG", formatSG(totalSG)],
+          ["ROUND TO PAR", formatToPar(roundToPar)],
+        ]}
+        caption={
+          avgSG >= 0
+            ? `${formatSG(avgSG)} strokes gained per shot on the range today. Dialing in the distance control, one shot at a time. @The_golfpracticeapp`
+            : `Grinding through a tricky range session today. Numbers weren't pretty, but the reps count. @The_golfpracticeapp`
+        }
+        hashtags={["#golf", "#golfpractice", "#strokesgained", "#golfswing", "#golftraining", "#ThePracticeApp"]}
+      />
 
       <button
         onClick={onNewSession}
@@ -11235,6 +11522,26 @@ function TeeAccuracySummaryScreen({ shots, fairwayWidth, onNewSession, storageEr
         </div>
       )}
 
+      <ShareResultButton
+        badge="RANGE SESSION"
+        hero={`${hitPct.toFixed(0)}%`}
+        heroLabel="FAIRWAYS HIT"
+        heroGood={hitPct >= 50}
+        stats={[
+          ["SHOTS", String(shots.length)],
+          ["HIT / TOTAL", `${hitCount}/${shots.length}`],
+          clubStats.length > 0
+            ? [CLUB_LABELS[clubStats.reduce((b, c) => (c.hitPct > b.hitPct ? c : b), clubStats[0]).club], `${clubStats.reduce((b, c) => (c.hitPct > b.hitPct ? c : b), clubStats[0]).hitPct.toFixed(0)}%`]
+            : ["FAIRWAY", `${ydsToUnitRound(fairwayWidth, units)}${unitLabel}`],
+        ]}
+        caption={
+          hitPct >= 50
+            ? `${hitPct.toFixed(0)}% fairways hit off the tee today. Building a driver I can trust. @The_golfpracticeapp`
+            : `Tee accuracy needed some work today at ${hitPct.toFixed(0)}% fairways hit. Back to the range to sort it out. @The_golfpracticeapp`
+        }
+        hashtags={["#golf", "#golfpractice", "#driver", "#golfswing", "#golftraining", "#ThePracticeApp"]}
+      />
+
       <button
         onClick={onNewSession}
         style={{
@@ -13559,6 +13866,16 @@ function CompeteSummaryScreen({
         />
       )}
 
+      <ShareResultButton
+        badge="RANGE COMPETITION"
+        hero={`${totals[leaderboard[0]] || 0}PT`}
+        heroLabel={`${leaderboard[0]} WINS`}
+        heroGood={true}
+        stats={leaderboard.slice(0, 3).map((p) => [p, `${totals[p] || 0}pt`])}
+        caption={`${leaderboard[0]} won our Range competition today — ${roundResults.length} round${roundResults.length === 1 ? "" : "s"} down to the wire. @The_golfpracticeapp`}
+        hashtags={["#golf", "#golfpractice", "#golfswing", "#golfbuddies", "#ThePracticeApp", "#golfer"]}
+      />
+
       <button
         onClick={onNewCompetition}
         style={{
@@ -14379,6 +14696,16 @@ function ShortGameCompeteSummaryScreen({
         />
       )}
 
+      <ShareResultButton
+        badge="SHORT GAME COMPETITION"
+        hero={`${totals[leaderboard[0]] || 0}PT`}
+        heroLabel={`${leaderboard[0]} WINS`}
+        heroGood={true}
+        stats={leaderboard.slice(0, 3).map((p) => [p, `${totals[p] || 0}pt`])}
+        caption={`${leaderboard[0]} won our Short Game competition today — ${roundResults.length} round${roundResults.length === 1 ? "" : "s"} down to the wire. @The_golfpracticeapp`}
+        hashtags={["#golf", "#shortgame", "#golfpractice", "#golfbuddies", "#ThePracticeApp", "#golfer"]}
+      />
+
       <button
         onClick={onNewCompetition}
         style={{
@@ -14842,6 +15169,16 @@ function PuttingCompeteSummaryScreen({
           onCancel={onCancelEdit}
         />
       )}
+
+      <ShareResultButton
+        badge="PUTTING COMPETITION"
+        hero={`${bestTally}`}
+        heroLabel={`${leaderboard[0]} WINS (PUTTS)`}
+        heroGood={true}
+        stats={leaderboard.slice(0, 3).map((p) => [p, `${tallies[p] || 0} putts`])}
+        caption={`${leaderboard[0]} won our Putting competition today — ${holeResults.length} hole${holeResults.length === 1 ? "" : "s"} down to the wire. @The_golfpracticeapp`}
+        hashtags={["#golf", "#putting", "#golfpractice", "#golfbuddies", "#ThePracticeApp", "#golfer"]}
+      />
 
       <button
         onClick={onNewCompetition}
@@ -15643,6 +15980,24 @@ function ShortGameSummaryScreen({ shots, onNewSession, storageError, units, feed
           Couldn't save this session to history — it's still shown above.
         </div>
       )}
+
+      <ShareResultButton
+        badge="SHORT GAME SESSION"
+        hero={formatSG(avgSG)}
+        heroLabel="AVG STROKES GAINED / SHOT"
+        heroGood={avgSG >= 0}
+        stats={[
+          ["SHOTS", String(shots.length)],
+          [`AVG ${shortLabel.toUpperCase()} FROM HOLE`, `${fmt1(ftToUnit(avgResultFt, units))}${shortLabel}`],
+          ["ROUND TO PAR", formatToPar(roundToPar)],
+        ]}
+        caption={
+          avgSG >= 0
+            ? `${formatSG(avgSG)} strokes gained per shot around the greens today. Short game is starting to click. @The_golfpracticeapp`
+            : `Short game needed some work today. Back on the practice green until it's dialed back in. @The_golfpracticeapp`
+        }
+        hashtags={["#golf", "#shortgame", "#golfpractice", "#upanddown", "#golfer", "#ThePracticeApp"]}
+      />
 
       <button
         onClick={onNewSession}
@@ -16538,6 +16893,26 @@ function PuttingClockSummaryScreen({ session, onPlayAgain, onExit, storageError,
         </div>
       )}
 
+      <ShareResultButton
+        badge="PUTTING SESSION"
+        hero={`${session.made}/8`}
+        heroLabel="AROUND THE CLOCK"
+        heroGood={session.made >= 5}
+        stats={[
+          ["DRILL", "CLOCK"],
+          ["AVG SG/PUTT", formatSG(avgSG)],
+          ["TOTAL SG", formatSG(totalSG)],
+        ]}
+        caption={
+          perfect
+            ? `Perfect round on Around the Clock today — every putt from 3 to 10ft, clean sweep. @The_golfpracticeapp`
+            : session.made >= 5
+            ? `${session.made}/8 on Around the Clock today. Putting is starting to feel more repeatable. @The_golfpracticeapp`
+            : `Rough day on Around the Clock today. Logging it anyway — the only way through is more reps. @The_golfpracticeapp`
+        }
+        hashtags={["#golf", "#putting", "#golfpractice", "#strokesgained", "#golftips", "#ThePracticeApp"]}
+      />
+
       <button
         onClick={onPlayAgain}
         style={{
@@ -16772,6 +17147,25 @@ function PuttingStartLineSummaryScreen({ session, onPlayAgain, onExit, storageEr
           Couldn't save this round to history — it's still shown above.
         </div>
       )}
+
+      <ShareResultButton
+        badge="PUTTING SESSION"
+        hero={`${session.made}/${session.total}`}
+        heroLabel="THROUGH THE GATE"
+        heroGood={pct >= 70}
+        stats={[
+          ["DRILL", "START LINE"],
+          ["ACCURACY", `${pct}%`],
+        ]}
+        caption={
+          perfect
+            ? `Perfect score on Start Line today — every putt through the gate clean. @The_golfpracticeapp`
+            : pct >= 70
+            ? `${pct}% through the gate on Start Line today. Start line is looking solid. @The_golfpracticeapp`
+            : `Start Line drill needed some work today at ${pct}% through the gate. Logging it anyway. @The_golfpracticeapp`
+        }
+        hashtags={["#golf", "#putting", "#golfpractice", "#golftips", "#ThePracticeApp", "#golfer"]}
+      />
 
       <button
         onClick={onPlayAgain}
@@ -17151,6 +17545,26 @@ function PuttingPaceSummaryScreen({ session, onPlayAgain, onExit, storageError, 
           Couldn't save this round to history — it's still shown above.
         </div>
       )}
+
+      <ShareResultButton
+        badge="PUTTING SESSION"
+        hero={`${pct}%`}
+        heroLabel="OF MAX PACE POINTS"
+        heroGood={pct >= 60}
+        stats={[
+          ["DRILL", "PACE CONTROL"],
+          ["AVG PTS/PUTT", avgPoints.toFixed(1)],
+          ["PUTTS", String(session.putts.length)],
+        ]}
+        caption={
+          perfect
+            ? `Perfect round on Pace Control today — max points on every putt. @The_golfpracticeapp`
+            : pct >= 60
+            ? `${pct}% of max points on Pace Control today. Speed control is coming together. @The_golfpracticeapp`
+            : `Pace Control needed some work today at ${pct}% of max points. Logging it anyway. @The_golfpracticeapp`
+        }
+        hashtags={["#golf", "#putting", "#golfpractice", "#golftips", "#ThePracticeApp", "#golfer"]}
+      />
 
       <button
         onClick={onPlayAgain}
@@ -17727,6 +18141,32 @@ function PuttingSummaryScreen({ putts, onNewSession, storageError, units, feedba
           Couldn't save this session to history — it's still shown above.
         </div>
       )}
+
+      <ShareResultButton
+        badge="PUTTING SESSION"
+        hero={`${onePuttPct.toFixed(0)}%`}
+        heroLabel="ONE-PUTT PERCENTAGE"
+        heroGood={onePuttPct >= 50}
+        stats={
+          isOnCourse
+            ? [
+                ["PUTTS", String(putts.length)],
+                ["AVG SG/PUTT", formatSG(avgSG)],
+                ["3+ PUTTS", String(threePutts)],
+              ]
+            : [
+                ["PUTTS", String(putts.length)],
+                ["AVG SG/PUTT", formatSG(avgSG)],
+                ["1-PUTTS", String(onePutts)],
+              ]
+        }
+        caption={
+          onePuttPct >= 50
+            ? `${onePuttPct.toFixed(0)}% one-putts today on the practice green. Putting is finally starting to click. @The_golfpracticeapp`
+            : `Rough day on the greens today. Logging it anyway — the only way through is more reps. @The_golfpracticeapp`
+        }
+        hashtags={["#golf", "#putting", "#golfpractice", "#strokesgained", "#golftips", "#ThePracticeApp"]}
+      />
 
       <button
         onClick={onNewSession}
@@ -18377,7 +18817,7 @@ function PuttingOverviewAnalysisBody({
           Blended across Random Practice, Around the Clock &amp; On Course — the three drills that
           score in strokes gained. Start Line and Pace Control use their own scoring, shown below.
         </div>
-        {sgRows.length >= 4 && (
+        {combinedSessionSG.length >= 4 && (
           <div style={{ marginTop: 10, fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}>
             {Math.abs(blendedTrendDelta) < 0.03 ? (
               <span style={{ color: COLORS.creamDim }}>◆ Steady across this period</span>
