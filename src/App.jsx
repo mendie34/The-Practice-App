@@ -1992,7 +1992,7 @@ function computePuttCompeteTallies(players, holeResults) {
   return totals;
 }
 
-export default function GolfPracticeApp({ onSwitchProfile, profileName, profileId, profileHandicap }) {
+export default function GolfPracticeApp({ onSwitchProfile, onCreateProfile, profileName, profileId, profileHandicap }) {
   const [screen, setScreen] = useState("home"); // home | setup | practice | summary | analysis | shortgame | putting | puttingPractice | puttingSummary
   const [shotCount, setShotCount] = useState(10);
   const [minDist, setMinDist] = useState(50);
@@ -4619,6 +4619,7 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
             onBack={goHome}
             profileName={profileName}
             onSwitchProfile={onSwitchProfile}
+            onCreateProfile={onCreateProfile}
             onExportData={() => exportProfileData(profileId, profileName || "profile")}
             onImportData={async (file) => {
               try {
@@ -6480,6 +6481,7 @@ function SettingsScreen({
   onBack,
   profileName,
   onSwitchProfile,
+  onCreateProfile,
   onExportData,
   onImportData,
   sampleDataAreas,
@@ -6676,6 +6678,35 @@ function SettingsScreen({
               style={{ display: "none" }}
             />
           </label>
+        </div>
+        <button
+          onClick={onCreateProfile}
+          style={{
+            width: "100%",
+            marginTop: 12,
+            padding: "10px 0",
+            borderRadius: 10,
+            border: `1px solid ${COLORS.fairwayLight}`,
+            background: "transparent",
+            color: COLORS.fairwayLight,
+            fontFamily: "'JetBrains Mono', monospace",
+            fontSize: 11,
+            letterSpacing: 0.5,
+            cursor: "pointer",
+          }}
+        >
+          + CREATE NEW PROFILE
+        </button>
+        <div
+          style={{
+            fontFamily: "'Inter', sans-serif",
+            fontSize: 11,
+            color: COLORS.creamDim,
+            marginTop: 6,
+            lineHeight: 1.4,
+          }}
+        >
+          Starts fresh setup for a new player. This profile stays saved — switch back to it anytime.
         </div>
         <button
           onClick={onSwitchProfile}
@@ -19224,27 +19255,51 @@ function suggestBaselineFromHandicap(handicap) {
   return BASELINE_SKILL_ORDER[Math.max(0, idx - 1)];
 }
 
-export function ProfileSetupWizard({ onComplete }) {
-  const [step, setStep] = useState("name"); // name | handicap | device | device-method | baseline
-  const [name, setName] = useState("");
+export function ProfileSetupWizard({ onComplete, initialFirstName = "", initialSurname = "", initialEmail = "" }) {
+  // handicap | baseline | tracking | device | device-method | coach | emailopt | done
+  // Name and email are already collected at sign-up (see AuthGate.jsx) and passed in as props —
+  // asking again here would just duplicate the account-creation form, so there's no identity step.
+  const [step, setStep] = useState("handicap");
+  const [firstName] = useState(initialFirstName);
+  const [surname] = useState(initialSurname);
+  const [email] = useState(initialEmail);
   const [handicap, setHandicap] = useState("");
+  const [units, setUnits] = useState("imperial"); // imperial | metric
+  const [baseline, setBaseline] = useState("tour");
+  const [trackingMode, setTrackingMode] = useState("sg"); // sg | points (points not built yet)
   const [device, setDevice] = useState(null); // "yes" | "no"
   const [deviceMethod, setDeviceMethod] = useState(null); // "distance" | "rating"
-  const [baseline, setBaseline] = useState("tour");
+  const [hasCoach, setHasCoach] = useState(null); // "yes" | "no"
+  const [coachQuery, setCoachQuery] = useState("");
+  const [monthlyEmailOptIn, setMonthlyEmailOptIn] = useState(null); // "yes" | "no"
 
-  function handleNameNext() {
-    if (!name.trim()) return;
-    setStep("handicap");
-  }
+  const TOTAL_STEPS = 6;
+  const STEP_NUMBER = {
+    handicap: 1,
+    baseline: 2,
+    tracking: 3,
+    device: 4,
+    "device-method": 4,
+    coach: 5,
+    emailopt: 6,
+  };
 
   function handleHandicapNext() {
     setBaseline(suggestBaselineFromHandicap(handicap));
+    setStep("baseline");
+  }
+
+  function handleBaselineNext() {
+    setStep("tracking");
+  }
+
+  function handleTrackingNext() {
     setStep("device");
   }
 
   function handleDeviceYes() {
     setDevice("yes");
-    setStep("baseline");
+    setStep("coach");
   }
 
   function handleDeviceNo() {
@@ -19254,20 +19309,114 @@ export function ProfileSetupWizard({ onComplete }) {
 
   function handleDeviceMethod(method) {
     setDeviceMethod(method);
-    setStep("baseline");
+    setStep("coach");
   }
 
-  function handleBaselineConfirm() {
+  function handleCoachNo() {
+    setHasCoach("no");
+    setStep("emailopt");
+  }
+
+  function handleCoachNext() {
+    if (hasCoach === "yes" && !coachQuery.trim()) return;
+    setStep("emailopt");
+  }
+
+  function handleEmailOptNext() {
+    if (!monthlyEmailOptIn) return;
+    setStep("done");
+  }
+
+  function handleFinish() {
     const rangeTrackingMode = device === "yes" ? "distance" : deviceMethod;
     onComplete({
-      name,
+      name: `${firstName.trim()} ${surname.trim()}`.trim(),
+      firstName: firstName.trim(),
+      surname: surname.trim(),
+      email: email.trim(),
       handicap: handicap.trim() === "" ? null : handicap,
-      rangeTrackingMode,
+      units,
       baselineHandicap: baseline,
+      trackingMode,
+      rangeTrackingMode,
+      hasCoach: hasCoach === "yes",
+      // Not yet a resolved coach — just the player's own search text, carried through so the
+      // app can open AddCoachScreen pre-filled with it rather than blind-applying to a guess.
+      pendingCoachQuery: hasCoach === "yes" ? coachQuery.trim() : null,
+      monthlyEmailOptIn: monthlyEmailOptIn === "yes",
+      onboardingComplete: true,
     });
   }
 
   const cardStyle = { maxWidth: 420, margin: "0 auto" };
+  const stepLabel = STEP_NUMBER[step] ? `STEP ${STEP_NUMBER[step]} OF ${TOTAL_STEPS}` : "ALL SET";
+
+  const inputStyle = {
+    width: "100%",
+    marginTop: 10,
+    background: COLORS.turfDark,
+    border: `1px solid ${COLORS.creamDim}33`,
+    borderRadius: 8,
+    color: COLORS.cream,
+    fontFamily: "'Inter', sans-serif",
+    fontSize: 16,
+    padding: "10px 12px",
+    boxSizing: "border-box",
+  };
+
+  const primaryBtnStyle = (enabled) => ({
+    width: "100%",
+    marginTop: 14,
+    padding: "12px 0",
+    borderRadius: 10,
+    border: "none",
+    background: enabled ? COLORS.fairway : `${COLORS.fairway}66`,
+    color: COLORS.cream,
+    fontFamily: "'Bebas Neue', sans-serif",
+    fontSize: 18,
+    letterSpacing: 1,
+    cursor: enabled ? "pointer" : "not-allowed",
+  });
+
+  const confirmBtnStyle = {
+    width: "100%",
+    marginTop: 14,
+    padding: "12px 0",
+    borderRadius: 10,
+    border: "none",
+    background: COLORS.flag,
+    color: COLORS.cream,
+    fontFamily: "'Bebas Neue', sans-serif",
+    fontSize: 18,
+    letterSpacing: 1,
+    cursor: "pointer",
+  };
+
+  const outlineBtnStyle = {
+    flex: 1,
+    padding: "12px 0",
+    borderRadius: 10,
+    border: `1px solid ${COLORS.creamDim}33`,
+    background: "transparent",
+    color: COLORS.cream,
+    fontFamily: "'Bebas Neue', sans-serif",
+    fontSize: 18,
+    letterSpacing: 1,
+    cursor: "pointer",
+  };
+
+  const flagBtnStyle = {
+    flex: 1,
+    padding: "12px 0",
+    borderRadius: 10,
+    border: "none",
+    background: COLORS.flag,
+    color: COLORS.cream,
+    fontFamily: "'Bebas Neue', sans-serif",
+    fontSize: 18,
+    letterSpacing: 1,
+    cursor: "pointer",
+  };
 
   return (
     <div
@@ -19283,58 +19432,14 @@ export function ProfileSetupWizard({ onComplete }) {
       <style>{FONT_IMPORT}</style>
       <div style={cardStyle}>
         <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginBottom: 14 }}>
-          {{ name: "STEP 1 OF 4", handicap: "STEP 2 OF 4", device: "STEP 3 OF 4", "device-method": "STEP 3 OF 4", baseline: "STEP 4 OF 4" }[step]}
+          {stepLabel}
         </div>
-
-        {step === "name" && (
-          <Card>
-            <SectionLabel>What's your name?</SectionLabel>
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleNameNext()}
-              placeholder="Your name"
-              autoFocus
-              style={{
-                width: "100%",
-                marginTop: 10,
-                background: COLORS.turfDark,
-                border: `1px solid ${COLORS.creamDim}33`,
-                borderRadius: 8,
-                color: COLORS.cream,
-                fontFamily: "'Inter', sans-serif",
-                fontSize: 16,
-                padding: "10px 12px",
-                boxSizing: "border-box",
-              }}
-            />
-            <button
-              onClick={handleNameNext}
-              disabled={!name.trim()}
-              style={{
-                width: "100%",
-                marginTop: 14,
-                padding: "12px 0",
-                borderRadius: 10,
-                border: "none",
-                background: !name.trim() ? `${COLORS.fairway}66` : COLORS.fairway,
-                color: COLORS.cream,
-                fontFamily: "'Bebas Neue', sans-serif",
-                fontSize: 18,
-                letterSpacing: 1,
-                cursor: !name.trim() ? "not-allowed" : "pointer",
-              }}
-            >
-              CONTINUE
-            </button>
-          </Card>
-        )}
 
         {step === "handicap" && (
           <Card>
-            <SectionLabel>What's your handicap?</SectionLabel>
+            <SectionLabel>{firstName ? `Hi ${firstName}, let's set a few things up` : "What's your handicap?"}</SectionLabel>
             <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 4 }}>
-              Helps suggest a sensible starting point on the next screen — you can leave this blank.
+              First, what's your handicap? Helps suggest a sensible starting point on the next screen — you can leave this blank.
             </div>
             <input
               type="number"
@@ -19357,23 +19462,137 @@ export function ProfileSetupWizard({ onComplete }) {
                 boxSizing: "border-box",
               }}
             />
-            <button
-              onClick={handleHandicapNext}
-              style={{
-                width: "100%",
-                marginTop: 14,
-                padding: "12px 0",
-                borderRadius: 10,
-                border: "none",
-                background: COLORS.fairway,
-                color: COLORS.cream,
-                fontFamily: "'Bebas Neue', sans-serif",
-                fontSize: 18,
-                letterSpacing: 1,
-                cursor: "pointer",
-              }}
-            >
+            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginTop: 16 }}>
+              UNITS
+            </div>
+            <div style={{ display: "flex", marginTop: 8, borderRadius: 8, overflow: "hidden", border: `1px solid ${COLORS.creamDim}33` }}>
+              {[
+                { key: "imperial", label: "YARDS" },
+                { key: "metric", label: "METRES" },
+              ].map((u) => (
+                <div
+                  key={u.key}
+                  onClick={() => setUnits(u.key)}
+                  style={{
+                    flex: 1,
+                    textAlign: "center",
+                    padding: "9px 0",
+                    fontFamily: "'JetBrains Mono', monospace",
+                    fontSize: 11,
+                    cursor: "pointer",
+                    background: units === u.key ? COLORS.fairway : "transparent",
+                    color: units === u.key ? COLORS.cream : COLORS.creamDim,
+                  }}
+                >
+                  {u.label}
+                </div>
+              ))}
+            </div>
+            <button onClick={handleHandicapNext} style={primaryBtnStyle(true)}>
               {handicap.trim() ? "CONTINUE" : "SKIP — I DON'T TRACK ONE"}
+            </button>
+          </Card>
+        )}
+
+        {step === "baseline" && (
+          <Card>
+            <SectionLabel>Choose your strokes gained baseline</SectionLabel>
+            <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 15, color: COLORS.cream, marginTop: 8, lineHeight: 1.5 }}>
+              Every shot you log gets compared to this skill level.
+            </div>
+            <InfoToggle
+              label="What's this?"
+              text="Strokes gained measures each shot against how a player at your chosen level would be expected to do from the same spot. Pick PGA Tour to compare yourself against professionals, or a handicap level to compare against golfers closer to your own game — your numbers will look very different depending on which you pick, but neither is 'more correct,' just a different yardstick."
+            />
+            {handicap.trim() && (
+              <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.sand, marginTop: 10 }}>
+                Based on the handicap you entered, we've suggested {BASELINE_OPTIONS.find((b) => b.key === baseline)?.label} below — tap any option to change it, then confirm.
+              </div>
+            )}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 6, marginTop: 14 }}>
+              {BASELINE_OPTIONS.map((b) => (
+                <button
+                  key={b.key}
+                  onClick={() => setBaseline(b.key)}
+                  style={{
+                    padding: "9px 2px",
+                    borderRadius: 8,
+                    border: baseline === b.key ? `2px solid ${COLORS.fairwayLight}` : `1px solid ${COLORS.creamDim}33`,
+                    background: baseline === b.key ? COLORS.fairway : "transparent",
+                    color: baseline === b.key ? COLORS.cream : COLORS.creamDim,
+                    fontFamily: "'JetBrains Mono', monospace",
+                    fontSize: 10,
+                    letterSpacing: 0.3,
+                    cursor: "pointer",
+                  }}
+                >
+                  {b.label}
+                </button>
+              ))}
+            </div>
+            <button onClick={handleBaselineNext} style={confirmBtnStyle}>
+              CONTINUE — {BASELINE_OPTIONS.find((b) => b.key === baseline)?.label}
+            </button>
+          </Card>
+        )}
+
+        {step === "tracking" && (
+          <Card>
+            <SectionLabel>How do you want to track performance?</SectionLabel>
+            <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 15, color: COLORS.cream, marginTop: 8, lineHeight: 1.5 }}>
+              This decides how your stats are scored across the app.
+            </div>
+            {[
+              {
+                key: "sg",
+                title: "STROKES GAINED",
+                badge: null,
+                desc: "Every shot measured against your chosen baseline. What the app uses today.",
+              },
+              {
+                key: "points",
+                title: "POINTS",
+                badge: "COMING SOON",
+                desc: "A simpler points-based score. Choosing it now just sets your preference for when it launches — you'll use Strokes Gained until then.",
+              },
+            ].map((opt) => (
+              <div
+                key={opt.key}
+                onClick={() => setTrackingMode(opt.key)}
+                style={{
+                  border: trackingMode === opt.key ? `2px solid ${COLORS.fairwayLight}` : `1px solid ${COLORS.creamDim}33`,
+                  background: trackingMode === opt.key ? `${COLORS.fairway}59` : "transparent",
+                  borderRadius: 10,
+                  padding: 14,
+                  marginTop: 10,
+                  cursor: "pointer",
+                }}
+              >
+                <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 18, letterSpacing: 0.5, color: COLORS.cream, display: "flex", alignItems: "center", gap: 8 }}>
+                  {opt.title}
+                  {opt.badge && (
+                    <span
+                      style={{
+                        fontFamily: "'JetBrains Mono', monospace",
+                        fontSize: 9,
+                        letterSpacing: 0.5,
+                        background: COLORS.sand,
+                        color: COLORS.turfDark,
+                        padding: "2px 7px",
+                        borderRadius: 5,
+                      }}
+                    >
+                      {opt.badge}
+                    </span>
+                  )}
+                </div>
+                <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 12.5, color: COLORS.creamDim, marginTop: 4, lineHeight: 1.4 }}>
+                  {opt.desc}
+                </div>
+              </div>
+            ))}
+            <button onClick={handleTrackingNext} style={primaryBtnStyle(true)}>
+              CONTINUE
             </button>
           </Card>
         )}
@@ -19389,38 +19608,10 @@ export function ProfileSetupWizard({ onComplete }) {
               text="This can also include range tracking facilities such as TopTracer or Trackman Range."
             />
             <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
-              <button
-                onClick={handleDeviceYes}
-                style={{
-                  flex: 1,
-                  padding: "12px 0",
-                  borderRadius: 10,
-                  border: "none",
-                  background: COLORS.flag,
-                  color: COLORS.cream,
-                  fontFamily: "'Bebas Neue', sans-serif",
-                  fontSize: 18,
-                  letterSpacing: 1,
-                  cursor: "pointer",
-                }}
-              >
+              <button onClick={handleDeviceYes} style={flagBtnStyle}>
                 YES
               </button>
-              <button
-                onClick={handleDeviceNo}
-                style={{
-                  flex: 1,
-                  padding: "12px 0",
-                  borderRadius: 10,
-                  border: `1px solid ${COLORS.creamDim}33`,
-                  background: "transparent",
-                  color: COLORS.cream,
-                  fontFamily: "'Bebas Neue', sans-serif",
-                  fontSize: 18,
-                  letterSpacing: 1,
-                  cursor: "pointer",
-                }}
-              >
+              <button onClick={handleDeviceNo} style={outlineBtnStyle}>
                 NO
               </button>
             </div>
@@ -19486,59 +19677,116 @@ export function ProfileSetupWizard({ onComplete }) {
           </Card>
         )}
 
-        {step === "baseline" && (
+        {step === "coach" && (
           <Card>
-            <SectionLabel>Choose your strokes gained baseline</SectionLabel>
+            <SectionLabel>Do you have a coach you'd like to add?</SectionLabel>
             <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 15, color: COLORS.cream, marginTop: 8, lineHeight: 1.5 }}>
-              Every shot you log gets compared to this skill level.
+              They'll be able to see your logged sessions and progress.
             </div>
-            <InfoToggle
-              label="What's this?"
-              text="Strokes gained measures each shot against how a player at your chosen level would be expected to do from the same spot. Pick PGA Tour to compare yourself against professionals, or a handicap level to compare against golfers closer to your own game — your numbers will look very different depending on which you pick, but neither is 'more correct,' just a different yardstick."
-            />
-            {handicap.trim() && (
-              <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.sand, marginTop: 10 }}>
-                Based on the handicap you entered, we've suggested {BASELINE_OPTIONS.find((b) => b.key === baseline)?.label} below — tap any option to change it, then confirm.
-              </div>
+            <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
+              <button
+                onClick={() => setHasCoach("yes")}
+                style={hasCoach === "yes" ? flagBtnStyle : outlineBtnStyle}
+              >
+                YES
+              </button>
+              <button onClick={handleCoachNo} style={hasCoach === "no" ? primaryBtnStyle(true) : outlineBtnStyle}>
+                NO
+              </button>
+            </div>
+            {hasCoach === "yes" && (
+              <>
+                <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginTop: 14 }}>
+                  COACH'S EMAIL OR INVITE CODE
+                </div>
+                <input
+                  value={coachQuery}
+                  onChange={(e) => setCoachQuery(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleCoachNext()}
+                  placeholder="coach@email.com"
+                  autoFocus
+                  style={inputStyle}
+                />
+                <button onClick={handleCoachNext} disabled={!coachQuery.trim()} style={primaryBtnStyle(!!coachQuery.trim())}>
+                  CONTINUE
+                </button>
+              </>
             )}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 6, marginTop: 14 }}>
-              {BASELINE_OPTIONS.map((b) => (
-                <button
-                  key={b.key}
-                  onClick={() => setBaseline(b.key)}
+            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginTop: 12, textAlign: "center", lineHeight: 1.5 }}>
+              You can add or change this anytime in Settings → Coaches.
+            </div>
+          </Card>
+        )}
+
+        {step === "emailopt" && (
+          <Card>
+            <SectionLabel>Want a monthly performance email?</SectionLabel>
+            <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 15, color: COLORS.cream, marginTop: 8, lineHeight: 1.5 }}>
+              Once a month we'll send a short recap of your Range, Short Game and Putting — strengths, trends, and what's worth focusing on.
+            </div>
+            <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
+              <button
+                onClick={() => setMonthlyEmailOptIn("yes")}
+                style={monthlyEmailOptIn === "yes" ? flagBtnStyle : outlineBtnStyle}
+              >
+                YES, SEND IT
+              </button>
+              <button
+                onClick={() => setMonthlyEmailOptIn("no")}
+                style={monthlyEmailOptIn === "no" ? primaryBtnStyle(true) : outlineBtnStyle}
+              >
+                NO THANKS
+              </button>
+            </div>
+            {monthlyEmailOptIn && (
+              <button onClick={handleEmailOptNext} style={primaryBtnStyle(true)}>
+                CONTINUE
+              </button>
+            )}
+          </Card>
+        )}
+
+        {step === "done" && (
+          <Card>
+            <SectionLabel style={{ textAlign: "center" }}>
+              {`YOU'RE ALL SET, ${firstName.trim() ? firstName.trim().toUpperCase() : "PLAYER"}`}
+            </SectionLabel>
+            <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 15, color: COLORS.cream, marginTop: 8, lineHeight: 1.5, textAlign: "center" }}>
+              Here's what we've set up:
+            </div>
+            <div style={{ marginTop: 12 }}>
+              {[
+                ["NAME", `${firstName} ${surname}`.trim()],
+                ["EMAIL", email],
+                ["HANDICAP", handicap.trim() || "Not tracked"],
+                ["SG BASELINE", BASELINE_OPTIONS.find((b) => b.key === baseline)?.label],
+                ["UNITS", units === "imperial" ? "Yards" : "Metres"],
+                ["TRACKING", trackingMode === "sg" ? "Strokes Gained" : "Points (soon)"],
+                ["LAUNCH MONITOR", device === "yes" ? "Yes" : deviceMethod === "distance" ? "No — entering distances" : "No — rating shots out of 5"],
+                ["COACH", hasCoach === "yes" ? coachQuery : "Skipped"],
+                ["MONTHLY EMAIL", monthlyEmailOptIn === "yes" ? "Subscribed" : "Off"],
+              ].map(([k, v]) => (
+                <div
+                  key={k}
                   style={{
-                    padding: "9px 2px",
-                    borderRadius: 8,
-                    border: baseline === b.key ? `2px solid ${COLORS.fairwayLight}` : `1px solid ${COLORS.creamDim}33`,
-                    background: baseline === b.key ? COLORS.fairway : "transparent",
-                    color: baseline === b.key ? COLORS.cream : COLORS.creamDim,
-                    fontFamily: "'JetBrains Mono', monospace",
-                    fontSize: 10,
-                    letterSpacing: 0.3,
-                    cursor: "pointer",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    padding: "9px 0",
+                    borderBottom: `1px solid ${COLORS.creamDim}1f`,
+                    fontSize: 13,
                   }}
                 >
-                  {b.label}
-                </button>
+                  <span style={{ fontFamily: "'JetBrains Mono', monospace", color: COLORS.creamDim, fontSize: 11, letterSpacing: 0.3 }}>
+                    {k}
+                  </span>
+                  <span style={{ fontFamily: "'Inter', sans-serif", color: COLORS.cream, fontWeight: 600, textAlign: "right" }}>
+                    {v}
+                  </span>
+                </div>
               ))}
             </div>
-            <button
-              onClick={handleBaselineConfirm}
-              style={{
-                width: "100%",
-                marginTop: 14,
-                padding: "12px 0",
-                borderRadius: 10,
-                border: "none",
-                background: COLORS.flag,
-                color: COLORS.cream,
-                fontFamily: "'Bebas Neue', sans-serif",
-                fontSize: 18,
-                letterSpacing: 1,
-                cursor: "pointer",
-              }}
-            >
-              CONFIRM — {BASELINE_OPTIONS.find((b) => b.key === baseline)?.label}
+            <button onClick={handleFinish} style={primaryBtnStyle(true)}>
+              ENTER THE PRACTICE APP
             </button>
           </Card>
         )}

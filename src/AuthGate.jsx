@@ -103,16 +103,22 @@ function LoadingScreen() {
 }
 
 function AuthScreen({ mode, setMode, onSubmit, submitting, error }) {
+  const [firstName, setFirstName] = useState("");
+  const [surname, setSurname] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(true);
   const isSignUp = mode === "signup";
-  const canSubmit = email.trim() !== "" && password.length >= 6 && !submitting;
+  const canSubmit =
+    email.trim() !== "" &&
+    password.length >= 6 &&
+    !submitting &&
+    (!isSignUp || (firstName.trim() !== "" && surname.trim() !== ""));
 
   function handleSubmit(e) {
     e.preventDefault();
     if (!canSubmit) return;
-    onSubmit(email.trim(), password, remember);
+    onSubmit(email.trim(), password, remember, isSignUp ? { firstName: firstName.trim(), surname: surname.trim() } : null);
   }
 
   return (
@@ -127,6 +133,30 @@ function AuthScreen({ mode, setMode, onSubmit, submitting, error }) {
           {isSignUp ? "CREATE ACCOUNT" : "LOG IN"}
         </div>
 
+        {isSignUp && (
+          <>
+            <div style={labelStyle}>FIRST NAME</div>
+            <input
+              type="text"
+              autoComplete="given-name"
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
+              placeholder="First name"
+              style={inputStyle}
+              autoFocus
+            />
+            <div style={labelStyle}>SURNAME</div>
+            <input
+              type="text"
+              autoComplete="family-name"
+              value={surname}
+              onChange={(e) => setSurname(e.target.value)}
+              placeholder="Surname"
+              style={inputStyle}
+            />
+          </>
+        )}
+
         <div style={labelStyle}>EMAIL</div>
         <input
           type="email"
@@ -135,7 +165,7 @@ function AuthScreen({ mode, setMode, onSubmit, submitting, error }) {
           onChange={(e) => setEmail(e.target.value)}
           placeholder="you@example.com"
           style={inputStyle}
-          autoFocus
+          autoFocus={!isSignUp}
         />
 
         <div style={labelStyle}>PASSWORD</div>
@@ -255,6 +285,9 @@ export default function AuthGate() {
   // resolved (migrated or skipped).
   const [migrationCandidates, setMigrationCandidates] = useState(null);
   const [migrationBusy, setMigrationBusy] = useState(false);
+  // {firstName, surname} captured at sign-up, purely to pre-fill ProfileSetupWizard — cleared
+  // once the wizard finishes and the real profile doc is saved.
+  const [pendingName, setPendingName] = useState(null);
 
   useEffect(() => {
     const unsub = watchAuthState(async (fbUser) => {
@@ -283,7 +316,7 @@ export default function AuthGate() {
     return unsub;
   }, []);
 
-  async function handleAuthSubmit(email, password, remember) {
+  async function handleAuthSubmit(email, password, remember, nameInfo) {
     setSubmitting(true);
     setAuthError(null);
     try {
@@ -292,6 +325,9 @@ export default function AuthGate() {
         // to migrate it right after — see legacyLocalData.js. Read-only, never touches the data.
         const localProfiles = await findLegacyLocalProfiles();
         await signUp(email, password, remember);
+        // Held in state (not yet saved to Firestore) purely to pre-fill the wizard below — it's
+        // written for real in handleWizardComplete once the wizard is actually finished.
+        if (nameInfo) setPendingName(nameInfo);
         if (localProfiles.length) setMigrationCandidates(localProfiles);
       } else {
         await signIn(email, password, remember);
@@ -305,6 +341,20 @@ export default function AuthGate() {
   }
 
   function handleSwitchProfile() {
+    // Ordinary sign-out — someone logging back in either to this same account or a different
+    // existing one. Reset to "signin" explicitly in case mode was left on "signup" from an
+    // abandoned attempt earlier in the session (AuthGate itself never unmounts on sign-out).
+    setMode("signin");
+    signOutUser();
+  }
+
+  function handleCreateProfile() {
+    // "Create New Profile" from Settings — each profile is its own login (see AuthGate.jsx
+    // note above GolfPracticeApp), so this just signs the current one out and lands straight
+    // on the Create Account form instead of Log In, skipping the extra tap. A genuinely new
+    // account has no profile doc yet, so onAuthStateChanged naturally routes it through
+    // ProfileSetupWizard once they sign up — no separate wiring needed for that part.
+    setMode("signup");
     signOutUser();
   }
 
@@ -320,18 +370,29 @@ export default function AuthGate() {
 
   async function handleWizardComplete(payload) {
     const uid = user.uid;
-    const profileDoc = { name: payload.name, handicap: payload.handicap, createdAt: Date.now() };
+    const profileDoc = {
+      name: payload.name,
+      handicap: payload.handicap,
+      email: payload.email,
+      trackingMode: payload.trackingMode,
+      hasCoach: payload.hasCoach,
+      pendingCoachQuery: payload.pendingCoachQuery,
+      monthlyEmailOptIn: payload.monthlyEmailOptIn,
+      onboardingComplete: payload.onboardingComplete,
+      createdAt: Date.now(),
+    };
     await saveUserProfile(uid, profileDoc);
     await window.storage.set(
       "settings:preferences",
       JSON.stringify({
         baselineHandicap: payload.baselineHandicap || "tour",
-        units: "imperial",
+        units: payload.units || "imperial",
         rangeTrackingMode: payload.rangeTrackingMode || "distance",
       }),
       false
     );
     setProfile(profileDoc);
+    setPendingName(null);
     setAuthState("ready");
   }
 
@@ -356,12 +417,20 @@ export default function AuthGate() {
         />
       );
     }
-    return <ProfileSetupWizard onComplete={handleWizardComplete} />;
+    return (
+      <ProfileSetupWizard
+        onComplete={handleWizardComplete}
+        initialFirstName={pendingName ? pendingName.firstName : ""}
+        initialSurname={pendingName ? pendingName.surname : ""}
+        initialEmail={user.email || ""}
+      />
+    );
   }
 
   return (
     <GolfPracticeApp
       onSwitchProfile={handleSwitchProfile}
+      onCreateProfile={handleCreateProfile}
       profileName={profile ? profile.name : ""}
       profileId={user.uid}
       profileHandicap={profile ? profile.handicap : null}
