@@ -30,6 +30,7 @@ import {
   declineFriendRequest,
   withdrawFriendRequest,
   removeFriend,
+  getPlayerSectionHistories,
 } from "./storage.js";
 
 export const FONT_IMPORT = `@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
@@ -5373,8 +5374,10 @@ export default function GolfPracticeApp({ onSwitchProfile, onCreateProfile, prof
 
         {screen === "compareResults" && compareEntries && (
           <CompareResultsScreen
+            profileId={profileId}
             profileName={profileName}
             entries={compareEntries}
+            myHistories={{ range: history, tee: teeHistory, shortGame: shortHistory, putting: puttHistory }}
             onBack={() => {
               setCompareEntries(null);
               setScreen("compareFriends");
@@ -14288,17 +14291,6 @@ function CompeteChooseScreen({ onNavigate }) {
 const MAX_COMPARE = 5;
 const COMPARE_COLORS = [COLORS.fairwayLight, COLORS.sand, COLORS.flag, COLORS.cream, COLORS.fairway];
 
-const COMPARE_BASELINE_OPTIONS = [
-  { key: "tour", label: "PGA TOUR", offset: 0 },
-  { key: "scratch", label: "SCRATCH", offset: 0.05 },
-  { key: "5", label: "5 HCP", offset: 0.12 },
-  { key: "10", label: "10 HCP", offset: 0.2 },
-  { key: "15", label: "15 HCP", offset: 0.28 },
-  { key: "20", label: "20 HCP", offset: 0.35 },
-  { key: "25", label: "25 HCP", offset: 0.42 },
-  { key: "30", label: "30 HCP", offset: 0.5 },
-];
-
 const COMPARE_SECTION_META = [
   { key: "range", label: "RANGE", metricType: "sg" },
   { key: "teeAccuracy", label: "TEE ACCURACY", metricType: "pct" },
@@ -14307,28 +14299,6 @@ const COMPARE_SECTION_META = [
   { key: "puttingCourse", label: "PUTTING — ON COURSE", metricType: "sg" },
 ];
 
-// Deterministic per-person sample stats so the same friend/you always shows the same numbers
-// within a session, rather than reshuffling every render — same trick as the coach app's version.
-function compareSeededRandom(seedStr) {
-  let seed = 0;
-  for (let i = 0; i < seedStr.length; i++) seed = (seed * 31 + seedStr.charCodeAt(i)) % 2147483647;
-  return function () {
-    seed = (seed * 16807) % 2147483647;
-    return (seed - 1) / 2147483646;
-  };
-}
-function buildCompareSampleStats(id) {
-  const rng = compareSeededRandom(String(id));
-  const sgVal = (spread, base) => Number((base + (rng() - 0.5) * spread).toFixed(2));
-  const pctVal = (min, max) => Math.round(min + rng() * (max - min));
-  return {
-    range: { overallAvgSG: sgVal(0.5, 0.05) },
-    teeAccuracy: { overallHitPct: pctVal(40, 75) },
-    shortGame: { overallAvgSG: sgVal(0.4, 0.0) },
-    puttingPractice: { overallAvgSG: sgVal(0.35, 0.02) },
-    puttingCourse: { overallAvgSG: sgVal(0.4, -0.03) },
-  };
-}
 
 function FriendRequestCard({ link, onAccept, onDecline, busy }) {
   return (
@@ -14887,22 +14857,74 @@ function CompareBarChart({ title, subtitle, data, isPct }) {
 }
 
 // entries: [{ id, name }] — "you" first, then selected friends, in that order.
-function CompareResultsScreen({ profileName, entries, onBack }) {
-  const [baselineKey, setBaselineKey] = useState("tour");
-  const baselineOption = COMPARE_BASELINE_OPTIONS.find((b) => b.key === baselineKey) || COMPARE_BASELINE_OPTIONS[0];
+// entries: [{ id, name }] — "you" first, then selected friends, in that order. myHistories is
+// the CURRENT player's own already-loaded session arrays (no fetch needed for "you" — they're
+// already in memory, same state AnalysisScreen uses); friends' data is fetched on demand via
+// getPlayerSectionHistories, gated by the approved-friendLinks rule extension.
+function CompareResultsScreen({ profileId, profileName, entries, myHistories, onBack }) {
+  const [friendData, setFriendData] = useState({});
+  const [loadingIds, setLoadingIds] = useState([]);
+  const [fetchErrorIds, setFetchErrorIds] = useState([]);
 
-  const compareEntries = entries.map((entry, i) => ({
-    entry,
-    color: COMPARE_COLORS[i % COMPARE_COLORS.length],
-    stats: buildCompareSampleStats(entry.id),
-  }));
+  const entryIdsKey = entries.map((e) => e.id).join(",");
 
-  function chartDataFor(sectionKey, isPct) {
-    return compareEntries.map((e) => {
-      const s = e.stats[sectionKey];
-      const value = isPct ? s.overallHitPct : Number((s.overallAvgSG + baselineOption.offset).toFixed(2));
-      return { name: e.entry.name.split(" ")[0], fullName: e.entry.name, value, color: e.color };
+  useEffect(() => {
+    const toFetch = entries.filter((e) => e.id !== profileId && !friendData[e.id]);
+    if (toFetch.length === 0) return;
+    setLoadingIds((prev) => [...new Set([...prev, ...toFetch.map((e) => e.id)])]);
+    Promise.all(
+      toFetch.map((e) =>
+        getPlayerSectionHistories(e.id)
+          .then((h) => ({ id: e.id, h, ok: true }))
+          .catch(() => ({ id: e.id, h: { range: [], tee: [], shortGame: [], putting: [] }, ok: false }))
+      )
+    ).then((results) => {
+      setFriendData((prev) => {
+        const next = { ...prev };
+        results.forEach((r) => {
+          next[r.id] = r.h;
+        });
+        return next;
+      });
+      setFetchErrorIds((prev) => [...prev, ...results.filter((r) => !r.ok).map((r) => r.id)]);
+      setLoadingIds((prev) => prev.filter((id) => !toFetch.some((e) => e.id === id)));
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entryIdsKey, profileId]);
+
+  const stillLoading = loadingIds.length > 0;
+
+  const compareEntries = entries.map((entry, i) => {
+    const histories = entry.id === profileId ? myHistories : friendData[entry.id];
+    let stats = null;
+    if (histories) {
+      const rangeDistance = (histories.range || []).filter((s) => s.mode !== "rating");
+      const puttingPractice = (histories.putting || []).filter((s) => s.type !== "course");
+      const puttingCourse = (histories.putting || []).filter((s) => s.type === "course");
+      stats = {
+        range: computeAnalysis(rangeDistance),
+        teeAccuracy: computeTeeAccuracyAnalysis(histories.tee || []),
+        shortGame: computeShortGameAnalysis(histories.shortGame || []),
+        puttingPractice: computePuttingAnalysis(puttingPractice),
+        puttingCourse: computePuttingAnalysis(puttingCourse),
+      };
+    }
+    return { entry, color: COMPARE_COLORS[i % COMPARE_COLORS.length], stats };
+  });
+
+  // Only entries with real data in this section get a bar — a 0 would look like "average", not
+  // "no data yet", so missing entries are named below the chart instead of faked into the chart.
+  function chartDataFor(sectionKey, isPct) {
+    return compareEntries
+      .filter((e) => e.stats && e.stats[sectionKey])
+      .map((e) => {
+        const s = e.stats[sectionKey];
+        const value = isPct ? Number(s.overallHitPct.toFixed(0)) : Number(s.overallAvgSG.toFixed(2));
+        return { name: e.entry.name.split(" ")[0], fullName: e.entry.name, value, color: e.color };
+      });
+  }
+  function missingNamesFor(sectionKey) {
+    return compareEntries.filter((e) => !e.stats || !e.stats[sectionKey]).map((e) => e.entry.name);
   }
 
   return (
@@ -14921,54 +14943,62 @@ function CompareResultsScreen({ profileName, entries, onBack }) {
         ))}
       </div>
 
-      <Card style={{ marginBottom: 18 }}>
-        <SectionLabel>BASELINE</SectionLabel>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginTop: 2 }}>
-          Applies to everyone here — doesn't affect Tee Accuracy, which isn't strokes-gained based
+      {stillLoading && (
+        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginBottom: 14 }}>
+          Loading real stats…
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 6, marginTop: 10 }}>
-          {COMPARE_BASELINE_OPTIONS.map((b) => (
-            <button
-              key={b.key}
-              onClick={() => setBaselineKey(b.key)}
-              style={{
-                padding: "9px 2px",
-                borderRadius: 8,
-                border: baselineKey === b.key ? `2px solid ${COLORS.fairwayLight}` : `1px solid ${COLORS.creamDim}33`,
-                background: baselineKey === b.key ? COLORS.fairway : "transparent",
-                color: baselineKey === b.key ? COLORS.cream : COLORS.creamDim,
-                fontFamily: "'JetBrains Mono', monospace",
-                fontSize: 10,
-                letterSpacing: 0.3,
-                cursor: "pointer",
-              }}
-            >
-              {b.label}
-            </button>
-          ))}
+      )}
+
+      {fetchErrorIds.length > 0 && (
+        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.flag, marginBottom: 14, lineHeight: 1.5 }}>
+          Couldn't load stats for {compareEntries.filter((e) => fetchErrorIds.includes(e.entry.id)).map((e) => e.entry.name).join(", ")}
+          — they may need to be an approved friend still.
+        </div>
+      )}
+
+      <Card style={{ marginBottom: 18 }}>
+        <SectionLabel>ABOUT THESE NUMBERS</SectionLabel>
+        <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 12.5, color: COLORS.creamDim, marginTop: 6, lineHeight: 1.5 }}>
+          Each person's strokes gained reflects whichever baseline they had set when they logged
+          each session — these are everyone's real numbers as originally recorded, not
+          recalculated against a single shared baseline.
         </div>
       </Card>
 
-      {COMPARE_SECTION_META.map((s) => (
-        <CompareBarChart
-          key={s.key}
-          title={s.label}
-          subtitle={s.metricType === "pct" ? "% fairways hit" : `Avg strokes gained vs ${baselineOption.label}`}
-          data={chartDataFor(s.key, s.metricType === "pct")}
-          isPct={s.metricType === "pct"}
-        />
-      ))}
-
-      <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginTop: 4, lineHeight: 1.5 }}>
-        Sample data for preview — live comparisons are coming once friends' stats can be shared
-        between accounts.
-      </div>
+      {COMPARE_SECTION_META.map((s) => {
+        const data = chartDataFor(s.key, s.metricType === "pct");
+        const missing = missingNamesFor(s.key);
+        return (
+          <div key={s.key}>
+            {data.length > 0 ? (
+              <CompareBarChart
+                title={s.label}
+                subtitle={s.metricType === "pct" ? "% fairways hit" : "Avg strokes gained per shot"}
+                data={data}
+                isPct={s.metricType === "pct"}
+              />
+            ) : (
+              <Card style={{ marginBottom: 14 }}>
+                <SectionLabel>{s.label}</SectionLabel>
+                <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 6 }}>
+                  No one here has logged {s.label} sessions yet.
+                </div>
+              </Card>
+            )}
+            {missing.length > 0 && data.length > 0 && (
+              <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginTop: -10, marginBottom: 14 }}>
+                No {s.label} data yet for {missing.join(", ")}
+              </div>
+            )}
+          </div>
+        );
+      })}
 
       <button
         onClick={onBack}
         style={{
           width: "100%",
-          marginTop: 16,
+          marginTop: 4,
           padding: "12px 0",
           borderRadius: 10,
           border: `1px solid ${COLORS.creamDim}44`,
