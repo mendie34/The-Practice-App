@@ -11,6 +11,7 @@ import {
   Tooltip,
   ResponsiveContainer,
   ReferenceLine,
+  LabelList,
 } from "recharts";
 import {
   auth,
@@ -22,6 +23,13 @@ import {
   applyToCoach,
   withdrawCoachRequest,
   disconnectCoachLink,
+  searchPlayers,
+  sendFriendRequest,
+  watchMyFriendLinks,
+  acceptFriendRequest,
+  declineFriendRequest,
+  withdrawFriendRequest,
+  removeFriend,
 } from "./storage.js";
 
 export const FONT_IMPORT = `@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
@@ -472,6 +480,9 @@ const BACK_MAP = {
   competePuttingSetup: "competeChoose",
   competePuttingPlay: "competePuttingSetup",
   competePuttingSummary: "competePuttingSetup",
+  compareFriends: "competeChoose",
+  addFriend: "compareFriends",
+  compareResults: "compareFriends",
 };
 
 const TIMESCALES = [
@@ -2628,7 +2639,7 @@ function computePuttCompeteTallies(players, holeResults) {
   return totals;
 }
 
-export default function GolfPracticeApp({ onSwitchProfile, profileName, profileId, profileHandicap }) {
+export default function GolfPracticeApp({ onSwitchProfile, onCreateProfile, profileName, profileId, profileHandicap }) {
   const [screen, setScreen] = useState("home"); // home | setup | practice | summary | analysis | shortgame | putting | puttingPractice | puttingSummary
   const [shotCount, setShotCount] = useState(9);
   const [minDist, setMinDist] = useState(50);
@@ -2840,6 +2851,20 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
     const unsub = watchMyCoachLinks(profileId, setMyCoachLinks);
     return unsub;
   }, [profileId]);
+
+  // Same pattern as myCoachLinks above, but for the symmetric friend-request system behind
+  // Compete > Compare. See storage-additions-friends.js for what this actually reads.
+  const [myFriendLinks, setMyFriendLinks] = useState([]);
+  useEffect(() => {
+    if (!profileId) return;
+    const unsub = watchMyFriendLinks(profileId, setMyFriendLinks);
+    return unsub;
+  }, [profileId]);
+
+  // Carries the chosen "you + friends" list from CompareFriendsScreen to CompareResultsScreen —
+  // simple prop-drilled state rather than overloading setScreen, since this is the one nav case
+  // in the app that needs to hand data forward along with the screen change.
+  const [compareEntries, setCompareEntries] = useState(null);
 
   // Single consolidated load — fetches every stored key for this profile in one parallel batch
   // (loadAllAppDataDemo), rather than 7 separate effects each doing their own round-trip(s).
@@ -5255,6 +5280,7 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
             onBack={goHome}
             profileName={profileName}
             onSwitchProfile={onSwitchProfile}
+            onCreateProfile={onCreateProfile}
             onExportData={() => exportProfileData(profileId, profileName || "profile")}
             onImportData={async (file) => {
               try {
@@ -5320,6 +5346,39 @@ export default function GolfPracticeApp({ onSwitchProfile, profileName, profileI
             profileName={profileName}
             myCoachLinks={myCoachLinks}
             onBack={() => setScreen("settings")}
+          />
+        )}
+
+        {screen === "compareFriends" && (
+          <CompareFriendsScreen
+            profileId={profileId}
+            profileName={profileName}
+            myFriendLinks={myFriendLinks}
+            onOpenAddFriend={() => setScreen("addFriend")}
+            onConfirmCompare={(entries) => {
+              setCompareEntries(entries);
+              setScreen("compareResults");
+            }}
+          />
+        )}
+
+        {screen === "addFriend" && (
+          <AddFriendScreen
+            profileId={profileId}
+            profileName={profileName}
+            myFriendLinks={myFriendLinks}
+            onBack={() => setScreen("compareFriends")}
+          />
+        )}
+
+        {screen === "compareResults" && compareEntries && (
+          <CompareResultsScreen
+            profileName={profileName}
+            entries={compareEntries}
+            onBack={() => {
+              setCompareEntries(null);
+              setScreen("compareFriends");
+            }}
           />
         )}
 
@@ -7152,6 +7211,7 @@ function SettingsScreen({
   onBack,
   profileName,
   onSwitchProfile,
+  onCreateProfile,
   onExportData,
   onImportData,
   sampleDataAreas,
@@ -7348,6 +7408,35 @@ function SettingsScreen({
               style={{ display: "none" }}
             />
           </label>
+        </div>
+        <button
+          onClick={onCreateProfile}
+          style={{
+            width: "100%",
+            marginTop: 12,
+            padding: "10px 0",
+            borderRadius: 10,
+            border: `1px solid ${COLORS.fairwayLight}`,
+            background: "transparent",
+            color: COLORS.fairwayLight,
+            fontFamily: "'JetBrains Mono', monospace",
+            fontSize: 11,
+            letterSpacing: 0.5,
+            cursor: "pointer",
+          }}
+        >
+          + CREATE NEW PROFILE
+        </button>
+        <div
+          style={{
+            fontFamily: "'Inter', sans-serif",
+            fontSize: 11,
+            color: COLORS.creamDim,
+            marginTop: 6,
+            lineHeight: 1.4,
+          }}
+        >
+          Starts fresh setup for a new player. This profile stays saved — switch back to it anytime.
         </div>
         <button
           onClick={onSwitchProfile}
@@ -9535,6 +9624,33 @@ function SectionLabel({ children }) {
 // These are original vector illustrations standing in for real photos.
 // Swap each <svg> below for an <img src="..." /> once real photos are ready —
 // wrap it in the same absolutely-positioned, inset:0, cover-fit container.
+
+function CompareIllustration() {
+  return (
+    <svg viewBox="0 0 400 240" preserveAspectRatio="xMidYMid slice" style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}>
+      <defs>
+        <linearGradient id="compareSky" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#E4DBC2" />
+          <stop offset="100%" stopColor="#4C8A68" />
+        </linearGradient>
+        <linearGradient id="compareGround" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#2F6B4F" />
+          <stop offset="100%" stopColor="#14291F" />
+        </linearGradient>
+      </defs>
+      <rect x="0" y="0" width="400" height="120" fill="url(#compareSky)" />
+      <rect x="0" y="120" width="400" height="120" fill="url(#compareGround)" />
+      {[
+        { x: 130, h: 60, fill: "#C9A66B" },
+        { x: 185, h: 95, fill: "#F1EAD6" },
+        { x: 240, h: 40, fill: "#C9A66B" },
+      ].map((bar, i) => (
+        <rect key={i} x={bar.x} y={150 - bar.h} width="38" height={bar.h} rx="4" fill={bar.fill} opacity="0.92" />
+      ))}
+      <line x1="90" y1="150" x2="310" y2="150" stroke="#F1EAD6" strokeWidth="2" opacity="0.5" />
+    </svg>
+  );
+}
 
 function RangeIllustration() {
   return (
@@ -14093,6 +14209,13 @@ function CompeteChooseScreen({ onNavigate }) {
       screen: "competeShortGameSetup",
       Illustration: ShortGameIllustration,
     },
+    {
+      key: "compare",
+      label: "COMPARE",
+      subtitle: "See how your stats stack up against friends",
+      screen: "compareFriends",
+      Illustration: CompareIllustration,
+    },
   ];
   return (
     <div>
@@ -14102,8 +14225,9 @@ function CompeteChooseScreen({ onNavigate }) {
           Choose what you're playing
         </div>
         <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 13, color: COLORS.cream, marginTop: 8, lineHeight: 1.5 }}>
-          2-4 players go head-to-head, taking turns each round and racking up points for whoever
-          gets closest — most points (or fewest putts in Putting) wins by the end.
+          2-4 players go head-to-head on the same device, taking turns each round and racking up
+          points for whoever gets closest — most points (or fewest putts in Putting) wins by the
+          end. Or skip the live round and Compare your practice stats against friends instead.
         </div>
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -14148,6 +14272,716 @@ function CompeteChooseScreen({ onNavigate }) {
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+// =============================================================================
+// ===== Compare — friend requests + stat comparison, ported from the coach
+// app's Compare screen (practice_app_coach_demo.jsx). Real per-friend stats
+// are deliberately still sample data here, same as the coach app's own compare
+// screen currently is — see storage-additions-friends.js for the backend piece
+// this depends on (an aggregated per-user stat summary a friend is allowed to
+// read, not raw shot history). =====
+// =============================================================================
+
+const MAX_COMPARE = 5;
+const COMPARE_COLORS = [COLORS.fairwayLight, COLORS.sand, COLORS.flag, COLORS.cream, COLORS.fairway];
+
+const COMPARE_BASELINE_OPTIONS = [
+  { key: "tour", label: "PGA TOUR", offset: 0 },
+  { key: "scratch", label: "SCRATCH", offset: 0.05 },
+  { key: "5", label: "5 HCP", offset: 0.12 },
+  { key: "10", label: "10 HCP", offset: 0.2 },
+  { key: "15", label: "15 HCP", offset: 0.28 },
+  { key: "20", label: "20 HCP", offset: 0.35 },
+  { key: "25", label: "25 HCP", offset: 0.42 },
+  { key: "30", label: "30 HCP", offset: 0.5 },
+];
+
+const COMPARE_SECTION_META = [
+  { key: "range", label: "RANGE", metricType: "sg" },
+  { key: "teeAccuracy", label: "TEE ACCURACY", metricType: "pct" },
+  { key: "shortGame", label: "SHORT GAME", metricType: "sg" },
+  { key: "puttingPractice", label: "PUTTING — PRACTICE", metricType: "sg" },
+  { key: "puttingCourse", label: "PUTTING — ON COURSE", metricType: "sg" },
+];
+
+// Deterministic per-person sample stats so the same friend/you always shows the same numbers
+// within a session, rather than reshuffling every render — same trick as the coach app's version.
+function compareSeededRandom(seedStr) {
+  let seed = 0;
+  for (let i = 0; i < seedStr.length; i++) seed = (seed * 31 + seedStr.charCodeAt(i)) % 2147483647;
+  return function () {
+    seed = (seed * 16807) % 2147483647;
+    return (seed - 1) / 2147483646;
+  };
+}
+function buildCompareSampleStats(id) {
+  const rng = compareSeededRandom(String(id));
+  const sgVal = (spread, base) => Number((base + (rng() - 0.5) * spread).toFixed(2));
+  const pctVal = (min, max) => Math.round(min + rng() * (max - min));
+  return {
+    range: { overallAvgSG: sgVal(0.5, 0.05) },
+    teeAccuracy: { overallHitPct: pctVal(40, 75) },
+    shortGame: { overallAvgSG: sgVal(0.4, 0.0) },
+    puttingPractice: { overallAvgSG: sgVal(0.35, 0.02) },
+    puttingCourse: { overallAvgSG: sgVal(0.4, -0.03) },
+  };
+}
+
+function FriendRequestCard({ link, onAccept, onDecline, busy }) {
+  return (
+    <Card style={{ marginBottom: 8, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <div>
+        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 18, color: COLORS.cream }}>{link.friendName}</div>
+        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginTop: 2 }}>
+          Wants to compare stats with you
+        </div>
+      </div>
+      <div style={{ display: "flex", gap: 6 }}>
+        <button
+          onClick={() => onDecline(link)}
+          disabled={busy}
+          style={{
+            padding: "8px 14px",
+            borderRadius: 8,
+            border: `1px solid ${COLORS.creamDim}44`,
+            background: "transparent",
+            color: COLORS.creamDim,
+            fontFamily: "'Bebas Neue', sans-serif",
+            fontSize: 14,
+            letterSpacing: 0.5,
+            cursor: busy ? "not-allowed" : "pointer",
+          }}
+        >
+          DECLINE
+        </button>
+        <button
+          onClick={() => onAccept(link)}
+          disabled={busy}
+          style={{
+            padding: "8px 14px",
+            borderRadius: 8,
+            border: "none",
+            background: COLORS.fairway,
+            color: COLORS.cream,
+            fontFamily: "'Bebas Neue', sans-serif",
+            fontSize: 14,
+            letterSpacing: 0.5,
+            cursor: busy ? "not-allowed" : "pointer",
+          }}
+        >
+          ACCEPT
+        </button>
+      </div>
+    </Card>
+  );
+}
+
+function FriendBlock({ friend, selectMode, selected, atCap, onClick }) {
+  const disabled = selectMode && atCap && !selected;
+  return (
+    <div
+      onClick={disabled ? undefined : onClick}
+      style={{
+        position: "relative",
+        aspectRatio: "1",
+        borderRadius: 12,
+        border: selected ? `2px solid ${COLORS.fairwayLight}` : `1px solid ${COLORS.creamDim}33`,
+        background: selected ? `${COLORS.fairway}55` : COLORS.turf,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 8,
+        cursor: disabled ? "not-allowed" : "pointer",
+        opacity: disabled ? 0.4 : 1,
+        textAlign: "center",
+      }}
+    >
+      <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 15, lineHeight: 1.15, color: COLORS.cream }}>
+        {friend.friendName}
+      </div>
+      {selected && (
+        <div
+          style={{
+            position: "absolute",
+            top: 6,
+            right: 6,
+            width: 18,
+            height: 18,
+            borderRadius: 9,
+            background: COLORS.fairwayLight,
+            color: COLORS.turfDark,
+            fontSize: 12,
+            fontFamily: "'JetBrains Mono', monospace",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          ✓
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Main Compare hub — pending requests to approve, sent requests you can withdraw, your friends
+// roster, and the entry point into selecting who to compare against.
+function CompareFriendsScreen({ profileId, profileName, myFriendLinks, onOpenAddFriend, onConfirmCompare }) {
+  const [busyId, setBusyId] = useState(null);
+  const [selectMode, setSelectMode] = useState(false);
+  const [selected, setSelected] = useState([]);
+  const [error, setError] = useState(null);
+
+  const received = myFriendLinks.filter((l) => l.status === "pending" && l.direction === "received");
+  const sent = myFriendLinks.filter((l) => l.status === "pending" && l.direction === "sent");
+  const friends = myFriendLinks.filter((l) => l.status === "approved");
+
+  async function handleAccept(link) {
+    setBusyId(link.id);
+    setError(null);
+    try {
+      await acceptFriendRequest(link.id);
+    } catch (e) {
+      setError("Couldn't accept that request — try again.");
+    } finally {
+      setBusyId(null);
+    }
+  }
+  async function handleDecline(link) {
+    setBusyId(link.id);
+    setError(null);
+    try {
+      await declineFriendRequest(link.id);
+    } catch (e) {
+      setError("Couldn't decline that request — try again.");
+    } finally {
+      setBusyId(null);
+    }
+  }
+  async function handleWithdraw(link) {
+    setBusyId(link.id);
+    setError(null);
+    try {
+      await withdrawFriendRequest(link.id);
+    } catch (e) {
+      setError("Couldn't cancel that request — try again.");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  function toggleSelect(friendId) {
+    setSelected((prev) => {
+      if (prev.includes(friendId)) return prev.filter((id) => id !== friendId);
+      if (prev.length >= MAX_COMPARE - 1) return prev; // -1 to leave a slot for "you"
+      return [...prev, friendId];
+    });
+  }
+
+  return (
+    <div>
+      <div style={{ marginBottom: 16 }}>
+        <SectionLabel>COMPETE · COMPARE</SectionLabel>
+        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 24, marginTop: 2 }}>
+          {selectMode ? `Select up to ${MAX_COMPARE - 1} friends` : "Friends"}
+        </div>
+      </div>
+
+      {error && (
+        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: COLORS.flag, marginBottom: 12 }}>{error}</div>
+      )}
+
+      {!selectMode && received.length > 0 && (
+        <>
+          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, letterSpacing: 1, marginBottom: 6 }}>
+            REQUESTS
+          </div>
+          {received.map((link) => (
+            <FriendRequestCard key={link.id} link={link} onAccept={handleAccept} onDecline={handleDecline} busy={busyId === link.id} />
+          ))}
+        </>
+      )}
+
+      {!selectMode && sent.length > 0 && (
+        <>
+          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, letterSpacing: 1, marginTop: 10, marginBottom: 6 }}>
+            SENT — AWAITING RESPONSE
+          </div>
+          {sent.map((link) => (
+            <Card key={link.id} style={{ marginBottom: 8, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 16, color: COLORS.cream }}>{link.friendName}</div>
+              <button
+                onClick={() => handleWithdraw(link)}
+                disabled={busyId === link.id}
+                style={{
+                  padding: "7px 12px",
+                  borderRadius: 8,
+                  border: `1px solid ${COLORS.creamDim}44`,
+                  background: "transparent",
+                  color: COLORS.creamDim,
+                  fontFamily: "'JetBrains Mono', monospace",
+                  fontSize: 11,
+                  cursor: busyId === link.id ? "not-allowed" : "pointer",
+                }}
+              >
+                CANCEL
+              </button>
+            </Card>
+          ))}
+        </>
+      )}
+
+      <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, letterSpacing: 1, marginTop: 10, marginBottom: 8 }}>
+        {friends.length > 0 ? "YOUR FRIENDS" : ""}
+      </div>
+
+      {friends.length === 0 ? (
+        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, opacity: 0.75, lineHeight: 1.5, marginBottom: 16 }}>
+          Add a friend to start comparing your practice stats — Range, Tee Accuracy, Short Game
+          and Putting, side by side.
+        </div>
+      ) : (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 16 }}>
+          {friends.map((f) => (
+            <FriendBlock
+              key={f.id}
+              friend={f}
+              selectMode={selectMode}
+              selected={selected.includes(f.friendId)}
+              atCap={selected.length >= MAX_COMPARE - 1}
+              onClick={() => toggleSelect(f.friendId)}
+            />
+          ))}
+        </div>
+      )}
+
+      {!selectMode ? (
+        <>
+          <button
+            onClick={onOpenAddFriend}
+            style={{
+              width: "100%",
+              padding: "13px 0",
+              borderRadius: 12,
+              border: `1px solid ${COLORS.fairwayLight}`,
+              background: "transparent",
+              color: COLORS.fairwayLight,
+              fontFamily: "'Bebas Neue', sans-serif",
+              fontSize: 18,
+              letterSpacing: 1,
+              cursor: "pointer",
+            }}
+          >
+            + ADD A FRIEND
+          </button>
+          <button
+            onClick={() => setSelectMode(true)}
+            disabled={friends.length < 1}
+            style={{
+              width: "100%",
+              marginTop: 10,
+              padding: "13px 0",
+              borderRadius: 12,
+              border: "none",
+              background: friends.length < 1 ? `${COLORS.flag}66` : COLORS.flag,
+              color: COLORS.cream,
+              fontFamily: "'Bebas Neue', sans-serif",
+              fontSize: 18,
+              letterSpacing: 1,
+              cursor: friends.length < 1 ? "not-allowed" : "pointer",
+            }}
+          >
+            COMPARE
+          </button>
+        </>
+      ) : (
+        <div style={{ display: "flex", gap: 8 }}>
+          <button
+            onClick={() => {
+              setSelectMode(false);
+              setSelected([]);
+            }}
+            style={{
+              flex: 1,
+              padding: "12px 0",
+              borderRadius: 10,
+              border: `1px solid ${COLORS.creamDim}55`,
+              background: "transparent",
+              color: COLORS.creamDim,
+              fontFamily: "'Bebas Neue', sans-serif",
+              fontSize: 16,
+              letterSpacing: 1,
+              cursor: "pointer",
+            }}
+          >
+            CANCEL
+          </button>
+          <button
+            onClick={() =>
+              onConfirmCompare([
+                { id: profileId, name: profileName || "You" },
+                ...selected.map((id) => {
+                  const f = friends.find((fr) => fr.friendId === id);
+                  return { id: f.friendId, name: f.friendName };
+                }),
+              ])
+            }
+            disabled={selected.length < 1}
+            style={{
+              flex: 1,
+              padding: "12px 0",
+              borderRadius: 10,
+              border: "none",
+              background: selected.length < 1 ? `${COLORS.flag}66` : COLORS.flag,
+              color: COLORS.cream,
+              fontFamily: "'Bebas Neue', sans-serif",
+              fontSize: 16,
+              letterSpacing: 1,
+              cursor: selected.length < 1 ? "not-allowed" : "pointer",
+            }}
+          >
+            COMPARE {selected.length > 0 ? `(${selected.length + 1})` : ""}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AddFriendScreen({ profileId, profileName, myFriendLinks, onBack }) {
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [sendingId, setSendingId] = useState(null);
+  const [error, setError] = useState(null);
+
+  const linkByFriendId = {};
+  for (const l of myFriendLinks || []) linkByFriendId[l.friendId] = l;
+
+  async function runSearch(text) {
+    if (!text.trim()) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const players = await searchPlayers(text, profileId);
+      setResults(players);
+    } catch (e) {
+      setError("Couldn't reach the server — check your connection and try again.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleSend(player) {
+    setSendingId(player.id);
+    setError(null);
+    try {
+      await sendFriendRequest(profileId, profileName || "Player", player.id, player.name);
+    } catch (e) {
+      setError("Couldn't send that request — try again.");
+    } finally {
+      setSendingId(null);
+    }
+  }
+
+  return (
+    <div>
+      <div style={{ marginBottom: 16 }}>
+        <SectionLabel>COMPETE · COMPARE</SectionLabel>
+        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 24, marginTop: 2 }}>Add a friend</div>
+      </div>
+
+      <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+        <input
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && runSearch(query)}
+          placeholder="Search by name or email"
+          style={{
+            flex: 1,
+            background: COLORS.turfDark,
+            border: `1px solid ${COLORS.creamDim}33`,
+            borderRadius: 8,
+            color: COLORS.cream,
+            fontFamily: "'Inter', sans-serif",
+            fontSize: 15,
+            padding: "10px 12px",
+            boxSizing: "border-box",
+          }}
+          autoFocus
+        />
+        <button
+          onClick={() => runSearch(query)}
+          style={{
+            padding: "0 16px",
+            borderRadius: 8,
+            border: "none",
+            background: COLORS.fairway,
+            color: COLORS.cream,
+            fontFamily: "'Bebas Neue', sans-serif",
+            fontSize: 14,
+            letterSpacing: 0.5,
+            cursor: "pointer",
+          }}
+        >
+          SEARCH
+        </button>
+      </div>
+
+      {error && (
+        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: COLORS.flag, marginBottom: 12 }}>{error}</div>
+      )}
+
+      {results === null && !loading && (
+        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, opacity: 0.75, lineHeight: 1.5 }}>
+          Search for a friend by name or email — unlike coaches, this doesn't browse every player
+          on the app, so you'll need at least a partial name or their email.
+        </div>
+      )}
+
+      {loading && (
+        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim }}>Searching…</div>
+      )}
+
+      {results !== null && !loading && results.length === 0 && (
+        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, opacity: 0.75 }}>
+          No players found for that search.
+        </div>
+      )}
+
+      {results !== null &&
+        !loading &&
+        results.map((player) => {
+          const link = linkByFriendId[player.id];
+          const status = link ? link.status : null;
+          return (
+            <Card key={player.id} style={{ marginBottom: 8 }}>
+              <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 18, color: COLORS.cream }}>{player.name}</div>
+              {player.email && (
+                <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
+                  {player.email}
+                </div>
+              )}
+              <div style={{ marginTop: 10 }}>
+                {status === "approved" && (
+                  <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.fairwayLight }}>
+                    Already friends
+                  </div>
+                )}
+                {status === "pending" && (
+                  <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.sand }}>
+                    {link.direction === "sent" ? "Request sent" : "They've requested you — check Requests"}
+                  </div>
+                )}
+                {(status === "declined" || !status) && (
+                  <button
+                    onClick={() => handleSend(player)}
+                    disabled={sendingId === player.id}
+                    style={{
+                      width: "100%",
+                      padding: "9px 0",
+                      borderRadius: 10,
+                      border: `1px solid ${COLORS.fairwayLight}66`,
+                      background: "transparent",
+                      color: COLORS.fairwayLight,
+                      fontFamily: "'Bebas Neue', sans-serif",
+                      fontSize: 14,
+                      letterSpacing: 0.5,
+                      cursor: sendingId === player.id ? "not-allowed" : "pointer",
+                    }}
+                  >
+                    {sendingId === player.id ? "SENDING…" : status === "declined" ? "REQUEST AGAIN" : "ADD FRIEND"}
+                  </button>
+                )}
+              </div>
+            </Card>
+          );
+        })}
+
+      <button
+        onClick={onBack}
+        style={{
+          width: "100%",
+          marginTop: 16,
+          padding: "12px 0",
+          borderRadius: 10,
+          border: `1px solid ${COLORS.creamDim}44`,
+          background: "transparent",
+          color: COLORS.creamDim,
+          fontFamily: "'Bebas Neue', sans-serif",
+          fontSize: 16,
+          letterSpacing: 1,
+          cursor: "pointer",
+        }}
+      >
+        BACK
+      </button>
+    </div>
+  );
+}
+
+function CompareTooltip({ active, payload, isPct }) {
+  if (!active || !payload || !payload.length) return null;
+  const p = payload[0];
+  return (
+    <div
+      style={{
+        background: COLORS.turfDark,
+        border: `1px solid ${COLORS.creamDim}33`,
+        borderRadius: 8,
+        padding: "6px 10px",
+        fontFamily: "'JetBrains Mono', monospace",
+        fontSize: 11,
+        color: COLORS.cream,
+      }}
+    >
+      {p.payload.fullName}: {isPct ? `${p.value}%` : formatSG(p.value)}
+    </div>
+  );
+}
+
+function CompareBarChart({ title, subtitle, data, isPct }) {
+  return (
+    <Card style={{ marginBottom: 14 }}>
+      <SectionLabel>{title}</SectionLabel>
+      <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginTop: 2 }}>{subtitle}</div>
+      <div style={{ marginTop: 10, height: 180 }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={data} margin={{ top: 18, right: 4, left: -8, bottom: 0 }}>
+            <CartesianGrid vertical={false} stroke={`${COLORS.creamDim}22`} />
+            <XAxis
+              dataKey="name"
+              tick={{ fill: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", fontSize: 10 }}
+              axisLine={{ stroke: `${COLORS.creamDim}33` }}
+              tickLine={false}
+            />
+            <YAxis
+              domain={isPct ? [0, 100] : ["dataMin - 0.05", "dataMax + 0.05"]}
+              tickFormatter={(v) => (isPct ? `${v}%` : v.toFixed(2))}
+              tick={{ fill: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", fontSize: 10 }}
+              axisLine={false}
+              tickLine={false}
+              width={44}
+            />
+            <Tooltip content={<CompareTooltip isPct={isPct} />} cursor={{ fill: `${COLORS.creamDim}11` }} />
+            <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+              <LabelList
+                dataKey="value"
+                position="top"
+                formatter={(v) => (isPct ? `${v}%` : formatSG(v))}
+                style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, fill: COLORS.cream }}
+              />
+              {data.map((d, i) => (
+                <Cell key={i} fill={d.color} />
+              ))}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    </Card>
+  );
+}
+
+// entries: [{ id, name }] — "you" first, then selected friends, in that order.
+function CompareResultsScreen({ profileName, entries, onBack }) {
+  const [baselineKey, setBaselineKey] = useState("tour");
+  const baselineOption = COMPARE_BASELINE_OPTIONS.find((b) => b.key === baselineKey) || COMPARE_BASELINE_OPTIONS[0];
+
+  const compareEntries = entries.map((entry, i) => ({
+    entry,
+    color: COMPARE_COLORS[i % COMPARE_COLORS.length],
+    stats: buildCompareSampleStats(entry.id),
+  }));
+
+  function chartDataFor(sectionKey, isPct) {
+    return compareEntries.map((e) => {
+      const s = e.stats[sectionKey];
+      const value = isPct ? s.overallHitPct : Number((s.overallAvgSG + baselineOption.offset).toFixed(2));
+      return { name: e.entry.name.split(" ")[0], fullName: e.entry.name, value, color: e.color };
+    });
+  }
+
+  return (
+    <div>
+      <div style={{ marginBottom: 16 }}>
+        <SectionLabel>COMPETE · COMPARE</SectionLabel>
+        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 24, marginTop: 2 }}>{compareEntries.length} players</div>
+      </div>
+
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginBottom: 16 }}>
+        {compareEntries.map((e) => (
+          <div key={e.entry.id} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <div style={{ width: 10, height: 10, borderRadius: 3, background: e.color, flexShrink: 0 }} />
+            <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim }}>{e.entry.name}</span>
+          </div>
+        ))}
+      </div>
+
+      <Card style={{ marginBottom: 18 }}>
+        <SectionLabel>BASELINE</SectionLabel>
+        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginTop: 2 }}>
+          Applies to everyone here — doesn't affect Tee Accuracy, which isn't strokes-gained based
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 6, marginTop: 10 }}>
+          {COMPARE_BASELINE_OPTIONS.map((b) => (
+            <button
+              key={b.key}
+              onClick={() => setBaselineKey(b.key)}
+              style={{
+                padding: "9px 2px",
+                borderRadius: 8,
+                border: baselineKey === b.key ? `2px solid ${COLORS.fairwayLight}` : `1px solid ${COLORS.creamDim}33`,
+                background: baselineKey === b.key ? COLORS.fairway : "transparent",
+                color: baselineKey === b.key ? COLORS.cream : COLORS.creamDim,
+                fontFamily: "'JetBrains Mono', monospace",
+                fontSize: 10,
+                letterSpacing: 0.3,
+                cursor: "pointer",
+              }}
+            >
+              {b.label}
+            </button>
+          ))}
+        </div>
+      </Card>
+
+      {COMPARE_SECTION_META.map((s) => (
+        <CompareBarChart
+          key={s.key}
+          title={s.label}
+          subtitle={s.metricType === "pct" ? "% fairways hit" : `Avg strokes gained vs ${baselineOption.label}`}
+          data={chartDataFor(s.key, s.metricType === "pct")}
+          isPct={s.metricType === "pct"}
+        />
+      ))}
+
+      <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginTop: 4, lineHeight: 1.5 }}>
+        Sample data for preview — live comparisons are coming once friends' stats can be shared
+        between accounts.
+      </div>
+
+      <button
+        onClick={onBack}
+        style={{
+          width: "100%",
+          marginTop: 16,
+          padding: "12px 0",
+          borderRadius: 10,
+          border: `1px solid ${COLORS.creamDim}44`,
+          background: "transparent",
+          color: COLORS.creamDim,
+          fontFamily: "'Bebas Neue', sans-serif",
+          fontSize: 16,
+          letterSpacing: 1,
+          cursor: "pointer",
+        }}
+      >
+        BACK
+      </button>
     </div>
   );
 }
@@ -20466,27 +21300,51 @@ function suggestBaselineFromHandicap(handicap) {
   return BASELINE_SKILL_ORDER[Math.max(0, idx - 1)];
 }
 
-export function ProfileSetupWizard({ onComplete }) {
-  const [step, setStep] = useState("name"); // name | handicap | device | device-method | baseline
-  const [name, setName] = useState("");
+export function ProfileSetupWizard({ onComplete, initialFirstName = "", initialSurname = "", initialEmail = "" }) {
+  // handicap | baseline | tracking | device | device-method | coach | emailopt | done
+  // Name and email are already collected at sign-up (see AuthGate.jsx) and passed in as props —
+  // asking again here would just duplicate the account-creation form, so there's no identity step.
+  const [step, setStep] = useState("handicap");
+  const [firstName] = useState(initialFirstName);
+  const [surname] = useState(initialSurname);
+  const [email] = useState(initialEmail);
   const [handicap, setHandicap] = useState("");
+  const [units, setUnits] = useState("imperial"); // imperial | metric
+  const [baseline, setBaseline] = useState("tour");
+  const [trackingMode, setTrackingMode] = useState("sg"); // sg | points (points not built yet)
   const [device, setDevice] = useState(null); // "yes" | "no"
   const [deviceMethod, setDeviceMethod] = useState(null); // "distance" | "rating"
-  const [baseline, setBaseline] = useState("tour");
+  const [hasCoach, setHasCoach] = useState(null); // "yes" | "no"
+  const [coachQuery, setCoachQuery] = useState("");
+  const [monthlyEmailOptIn, setMonthlyEmailOptIn] = useState(null); // "yes" | "no"
 
-  function handleNameNext() {
-    if (!name.trim()) return;
-    setStep("handicap");
-  }
+  const TOTAL_STEPS = 6;
+  const STEP_NUMBER = {
+    handicap: 1,
+    baseline: 2,
+    tracking: 3,
+    device: 4,
+    "device-method": 4,
+    coach: 5,
+    emailopt: 6,
+  };
 
   function handleHandicapNext() {
     setBaseline(suggestBaselineFromHandicap(handicap));
+    setStep("baseline");
+  }
+
+  function handleBaselineNext() {
+    setStep("tracking");
+  }
+
+  function handleTrackingNext() {
     setStep("device");
   }
 
   function handleDeviceYes() {
     setDevice("yes");
-    setStep("baseline");
+    setStep("coach");
   }
 
   function handleDeviceNo() {
@@ -20496,20 +21354,114 @@ export function ProfileSetupWizard({ onComplete }) {
 
   function handleDeviceMethod(method) {
     setDeviceMethod(method);
-    setStep("baseline");
+    setStep("coach");
   }
 
-  function handleBaselineConfirm() {
+  function handleCoachNo() {
+    setHasCoach("no");
+    setStep("emailopt");
+  }
+
+  function handleCoachNext() {
+    if (hasCoach === "yes" && !coachQuery.trim()) return;
+    setStep("emailopt");
+  }
+
+  function handleEmailOptNext() {
+    if (!monthlyEmailOptIn) return;
+    setStep("done");
+  }
+
+  function handleFinish() {
     const rangeTrackingMode = device === "yes" ? "distance" : deviceMethod;
     onComplete({
-      name,
+      name: `${firstName.trim()} ${surname.trim()}`.trim(),
+      firstName: firstName.trim(),
+      surname: surname.trim(),
+      email: email.trim(),
       handicap: handicap.trim() === "" ? null : handicap,
-      rangeTrackingMode,
+      units,
       baselineHandicap: baseline,
+      trackingMode,
+      rangeTrackingMode,
+      hasCoach: hasCoach === "yes",
+      // Not yet a resolved coach — just the player's own search text, carried through so the
+      // app can open AddCoachScreen pre-filled with it rather than blind-applying to a guess.
+      pendingCoachQuery: hasCoach === "yes" ? coachQuery.trim() : null,
+      monthlyEmailOptIn: monthlyEmailOptIn === "yes",
+      onboardingComplete: true,
     });
   }
 
   const cardStyle = { maxWidth: 420, margin: "0 auto" };
+  const stepLabel = STEP_NUMBER[step] ? `STEP ${STEP_NUMBER[step]} OF ${TOTAL_STEPS}` : "ALL SET";
+
+  const inputStyle = {
+    width: "100%",
+    marginTop: 10,
+    background: COLORS.turfDark,
+    border: `1px solid ${COLORS.creamDim}33`,
+    borderRadius: 8,
+    color: COLORS.cream,
+    fontFamily: "'Inter', sans-serif",
+    fontSize: 16,
+    padding: "10px 12px",
+    boxSizing: "border-box",
+  };
+
+  const primaryBtnStyle = (enabled) => ({
+    width: "100%",
+    marginTop: 14,
+    padding: "12px 0",
+    borderRadius: 10,
+    border: "none",
+    background: enabled ? COLORS.fairway : `${COLORS.fairway}66`,
+    color: COLORS.cream,
+    fontFamily: "'Bebas Neue', sans-serif",
+    fontSize: 18,
+    letterSpacing: 1,
+    cursor: enabled ? "pointer" : "not-allowed",
+  });
+
+  const confirmBtnStyle = {
+    width: "100%",
+    marginTop: 14,
+    padding: "12px 0",
+    borderRadius: 10,
+    border: "none",
+    background: COLORS.flag,
+    color: COLORS.cream,
+    fontFamily: "'Bebas Neue', sans-serif",
+    fontSize: 18,
+    letterSpacing: 1,
+    cursor: "pointer",
+  };
+
+  const outlineBtnStyle = {
+    flex: 1,
+    padding: "12px 0",
+    borderRadius: 10,
+    border: `1px solid ${COLORS.creamDim}33`,
+    background: "transparent",
+    color: COLORS.cream,
+    fontFamily: "'Bebas Neue', sans-serif",
+    fontSize: 18,
+    letterSpacing: 1,
+    cursor: "pointer",
+  };
+
+  const flagBtnStyle = {
+    flex: 1,
+    padding: "12px 0",
+    borderRadius: 10,
+    border: "none",
+    background: COLORS.flag,
+    color: COLORS.cream,
+    fontFamily: "'Bebas Neue', sans-serif",
+    fontSize: 18,
+    letterSpacing: 1,
+    cursor: "pointer",
+  };
 
   return (
     <div
@@ -20525,58 +21477,14 @@ export function ProfileSetupWizard({ onComplete }) {
       <style>{FONT_IMPORT}</style>
       <div style={cardStyle}>
         <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginBottom: 14 }}>
-          {{ name: "STEP 1 OF 4", handicap: "STEP 2 OF 4", device: "STEP 3 OF 4", "device-method": "STEP 3 OF 4", baseline: "STEP 4 OF 4" }[step]}
+          {stepLabel}
         </div>
-
-        {step === "name" && (
-          <Card>
-            <SectionLabel>What's your name?</SectionLabel>
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleNameNext()}
-              placeholder="Your name"
-              autoFocus
-              style={{
-                width: "100%",
-                marginTop: 10,
-                background: COLORS.turfDark,
-                border: `1px solid ${COLORS.creamDim}33`,
-                borderRadius: 8,
-                color: COLORS.cream,
-                fontFamily: "'Inter', sans-serif",
-                fontSize: 16,
-                padding: "10px 12px",
-                boxSizing: "border-box",
-              }}
-            />
-            <button
-              onClick={handleNameNext}
-              disabled={!name.trim()}
-              style={{
-                width: "100%",
-                marginTop: 14,
-                padding: "12px 0",
-                borderRadius: 10,
-                border: "none",
-                background: !name.trim() ? `${COLORS.fairway}66` : COLORS.fairway,
-                color: COLORS.cream,
-                fontFamily: "'Bebas Neue', sans-serif",
-                fontSize: 18,
-                letterSpacing: 1,
-                cursor: !name.trim() ? "not-allowed" : "pointer",
-              }}
-            >
-              CONTINUE
-            </button>
-          </Card>
-        )}
 
         {step === "handicap" && (
           <Card>
-            <SectionLabel>What's your handicap?</SectionLabel>
+            <SectionLabel>{firstName ? `Hi ${firstName}, let's set a few things up` : "What's your handicap?"}</SectionLabel>
             <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 4 }}>
-              Helps suggest a sensible starting point on the next screen — you can leave this blank.
+              First, what's your handicap? Helps suggest a sensible starting point on the next screen — you can leave this blank.
             </div>
             <input
               type="number"
@@ -20599,23 +21507,137 @@ export function ProfileSetupWizard({ onComplete }) {
                 boxSizing: "border-box",
               }}
             />
-            <button
-              onClick={handleHandicapNext}
-              style={{
-                width: "100%",
-                marginTop: 14,
-                padding: "12px 0",
-                borderRadius: 10,
-                border: "none",
-                background: COLORS.fairway,
-                color: COLORS.cream,
-                fontFamily: "'Bebas Neue', sans-serif",
-                fontSize: 18,
-                letterSpacing: 1,
-                cursor: "pointer",
-              }}
-            >
+            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginTop: 16 }}>
+              UNITS
+            </div>
+            <div style={{ display: "flex", marginTop: 8, borderRadius: 8, overflow: "hidden", border: `1px solid ${COLORS.creamDim}33` }}>
+              {[
+                { key: "imperial", label: "YARDS" },
+                { key: "metric", label: "METRES" },
+              ].map((u) => (
+                <div
+                  key={u.key}
+                  onClick={() => setUnits(u.key)}
+                  style={{
+                    flex: 1,
+                    textAlign: "center",
+                    padding: "9px 0",
+                    fontFamily: "'JetBrains Mono', monospace",
+                    fontSize: 11,
+                    cursor: "pointer",
+                    background: units === u.key ? COLORS.fairway : "transparent",
+                    color: units === u.key ? COLORS.cream : COLORS.creamDim,
+                  }}
+                >
+                  {u.label}
+                </div>
+              ))}
+            </div>
+            <button onClick={handleHandicapNext} style={primaryBtnStyle(true)}>
               {handicap.trim() ? "CONTINUE" : "SKIP — I DON'T TRACK ONE"}
+            </button>
+          </Card>
+        )}
+
+        {step === "baseline" && (
+          <Card>
+            <SectionLabel>Choose your strokes gained baseline</SectionLabel>
+            <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 15, color: COLORS.cream, marginTop: 8, lineHeight: 1.5 }}>
+              Every shot you log gets compared to this skill level.
+            </div>
+            <InfoToggle
+              label="What's this?"
+              text="Strokes gained measures each shot against how a player at your chosen level would be expected to do from the same spot. Pick PGA Tour to compare yourself against professionals, or a handicap level to compare against golfers closer to your own game — your numbers will look very different depending on which you pick, but neither is 'more correct,' just a different yardstick."
+            />
+            {handicap.trim() && (
+              <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.sand, marginTop: 10 }}>
+                Based on the handicap you entered, we've suggested {BASELINE_OPTIONS.find((b) => b.key === baseline)?.label} below — tap any option to change it, then confirm.
+              </div>
+            )}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 6, marginTop: 14 }}>
+              {BASELINE_OPTIONS.map((b) => (
+                <button
+                  key={b.key}
+                  onClick={() => setBaseline(b.key)}
+                  style={{
+                    padding: "9px 2px",
+                    borderRadius: 8,
+                    border: baseline === b.key ? `2px solid ${COLORS.fairwayLight}` : `1px solid ${COLORS.creamDim}33`,
+                    background: baseline === b.key ? COLORS.fairway : "transparent",
+                    color: baseline === b.key ? COLORS.cream : COLORS.creamDim,
+                    fontFamily: "'JetBrains Mono', monospace",
+                    fontSize: 10,
+                    letterSpacing: 0.3,
+                    cursor: "pointer",
+                  }}
+                >
+                  {b.label}
+                </button>
+              ))}
+            </div>
+            <button onClick={handleBaselineNext} style={confirmBtnStyle}>
+              CONTINUE — {BASELINE_OPTIONS.find((b) => b.key === baseline)?.label}
+            </button>
+          </Card>
+        )}
+
+        {step === "tracking" && (
+          <Card>
+            <SectionLabel>How do you want to track performance?</SectionLabel>
+            <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 15, color: COLORS.cream, marginTop: 8, lineHeight: 1.5 }}>
+              This decides how your stats are scored across the app.
+            </div>
+            {[
+              {
+                key: "sg",
+                title: "STROKES GAINED",
+                badge: null,
+                desc: "Every shot measured against your chosen baseline. What the app uses today.",
+              },
+              {
+                key: "points",
+                title: "POINTS",
+                badge: "COMING SOON",
+                desc: "A simpler points-based score. Choosing it now just sets your preference for when it launches — you'll use Strokes Gained until then.",
+              },
+            ].map((opt) => (
+              <div
+                key={opt.key}
+                onClick={() => setTrackingMode(opt.key)}
+                style={{
+                  border: trackingMode === opt.key ? `2px solid ${COLORS.fairwayLight}` : `1px solid ${COLORS.creamDim}33`,
+                  background: trackingMode === opt.key ? `${COLORS.fairway}59` : "transparent",
+                  borderRadius: 10,
+                  padding: 14,
+                  marginTop: 10,
+                  cursor: "pointer",
+                }}
+              >
+                <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 18, letterSpacing: 0.5, color: COLORS.cream, display: "flex", alignItems: "center", gap: 8 }}>
+                  {opt.title}
+                  {opt.badge && (
+                    <span
+                      style={{
+                        fontFamily: "'JetBrains Mono', monospace",
+                        fontSize: 9,
+                        letterSpacing: 0.5,
+                        background: COLORS.sand,
+                        color: COLORS.turfDark,
+                        padding: "2px 7px",
+                        borderRadius: 5,
+                      }}
+                    >
+                      {opt.badge}
+                    </span>
+                  )}
+                </div>
+                <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 12.5, color: COLORS.creamDim, marginTop: 4, lineHeight: 1.4 }}>
+                  {opt.desc}
+                </div>
+              </div>
+            ))}
+            <button onClick={handleTrackingNext} style={primaryBtnStyle(true)}>
+              CONTINUE
             </button>
           </Card>
         )}
@@ -20631,38 +21653,10 @@ export function ProfileSetupWizard({ onComplete }) {
               text="This can also include range tracking facilities such as TopTracer or Trackman Range."
             />
             <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
-              <button
-                onClick={handleDeviceYes}
-                style={{
-                  flex: 1,
-                  padding: "12px 0",
-                  borderRadius: 10,
-                  border: "none",
-                  background: COLORS.flag,
-                  color: COLORS.cream,
-                  fontFamily: "'Bebas Neue', sans-serif",
-                  fontSize: 18,
-                  letterSpacing: 1,
-                  cursor: "pointer",
-                }}
-              >
+              <button onClick={handleDeviceYes} style={flagBtnStyle}>
                 YES
               </button>
-              <button
-                onClick={handleDeviceNo}
-                style={{
-                  flex: 1,
-                  padding: "12px 0",
-                  borderRadius: 10,
-                  border: `1px solid ${COLORS.creamDim}33`,
-                  background: "transparent",
-                  color: COLORS.cream,
-                  fontFamily: "'Bebas Neue', sans-serif",
-                  fontSize: 18,
-                  letterSpacing: 1,
-                  cursor: "pointer",
-                }}
-              >
+              <button onClick={handleDeviceNo} style={outlineBtnStyle}>
                 NO
               </button>
             </div>
@@ -20728,59 +21722,116 @@ export function ProfileSetupWizard({ onComplete }) {
           </Card>
         )}
 
-        {step === "baseline" && (
+        {step === "coach" && (
           <Card>
-            <SectionLabel>Choose your strokes gained baseline</SectionLabel>
+            <SectionLabel>Do you have a coach you'd like to add?</SectionLabel>
             <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 15, color: COLORS.cream, marginTop: 8, lineHeight: 1.5 }}>
-              Every shot you log gets compared to this skill level.
+              They'll be able to see your logged sessions and progress.
             </div>
-            <InfoToggle
-              label="What's this?"
-              text="Strokes gained measures each shot against how a player at your chosen level would be expected to do from the same spot. Pick PGA Tour to compare yourself against professionals, or a handicap level to compare against golfers closer to your own game — your numbers will look very different depending on which you pick, but neither is 'more correct,' just a different yardstick."
-            />
-            {handicap.trim() && (
-              <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.sand, marginTop: 10 }}>
-                Based on the handicap you entered, we've suggested {BASELINE_OPTIONS.find((b) => b.key === baseline)?.label} below — tap any option to change it, then confirm.
-              </div>
+            <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
+              <button
+                onClick={() => setHasCoach("yes")}
+                style={hasCoach === "yes" ? flagBtnStyle : outlineBtnStyle}
+              >
+                YES
+              </button>
+              <button onClick={handleCoachNo} style={hasCoach === "no" ? primaryBtnStyle(true) : outlineBtnStyle}>
+                NO
+              </button>
+            </div>
+            {hasCoach === "yes" && (
+              <>
+                <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginTop: 14 }}>
+                  COACH'S EMAIL OR INVITE CODE
+                </div>
+                <input
+                  value={coachQuery}
+                  onChange={(e) => setCoachQuery(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleCoachNext()}
+                  placeholder="coach@email.com"
+                  autoFocus
+                  style={inputStyle}
+                />
+                <button onClick={handleCoachNext} disabled={!coachQuery.trim()} style={primaryBtnStyle(!!coachQuery.trim())}>
+                  CONTINUE
+                </button>
+              </>
             )}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 6, marginTop: 14 }}>
-              {BASELINE_OPTIONS.map((b) => (
-                <button
-                  key={b.key}
-                  onClick={() => setBaseline(b.key)}
+            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginTop: 12, textAlign: "center", lineHeight: 1.5 }}>
+              You can add or change this anytime in Settings → Coaches.
+            </div>
+          </Card>
+        )}
+
+        {step === "emailopt" && (
+          <Card>
+            <SectionLabel>Want a monthly performance email?</SectionLabel>
+            <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 15, color: COLORS.cream, marginTop: 8, lineHeight: 1.5 }}>
+              Once a month we'll send a short recap of your Range, Short Game and Putting — strengths, trends, and what's worth focusing on.
+            </div>
+            <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
+              <button
+                onClick={() => setMonthlyEmailOptIn("yes")}
+                style={monthlyEmailOptIn === "yes" ? flagBtnStyle : outlineBtnStyle}
+              >
+                YES, SEND IT
+              </button>
+              <button
+                onClick={() => setMonthlyEmailOptIn("no")}
+                style={monthlyEmailOptIn === "no" ? primaryBtnStyle(true) : outlineBtnStyle}
+              >
+                NO THANKS
+              </button>
+            </div>
+            {monthlyEmailOptIn && (
+              <button onClick={handleEmailOptNext} style={primaryBtnStyle(true)}>
+                CONTINUE
+              </button>
+            )}
+          </Card>
+        )}
+
+        {step === "done" && (
+          <Card>
+            <SectionLabel style={{ textAlign: "center" }}>
+              {`YOU'RE ALL SET, ${firstName.trim() ? firstName.trim().toUpperCase() : "PLAYER"}`}
+            </SectionLabel>
+            <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 15, color: COLORS.cream, marginTop: 8, lineHeight: 1.5, textAlign: "center" }}>
+              Here's what we've set up:
+            </div>
+            <div style={{ marginTop: 12 }}>
+              {[
+                ["NAME", `${firstName} ${surname}`.trim()],
+                ["EMAIL", email],
+                ["HANDICAP", handicap.trim() || "Not tracked"],
+                ["SG BASELINE", BASELINE_OPTIONS.find((b) => b.key === baseline)?.label],
+                ["UNITS", units === "imperial" ? "Yards" : "Metres"],
+                ["TRACKING", trackingMode === "sg" ? "Strokes Gained" : "Points (soon)"],
+                ["LAUNCH MONITOR", device === "yes" ? "Yes" : deviceMethod === "distance" ? "No — entering distances" : "No — rating shots out of 5"],
+                ["COACH", hasCoach === "yes" ? coachQuery : "Skipped"],
+                ["MONTHLY EMAIL", monthlyEmailOptIn === "yes" ? "Subscribed" : "Off"],
+              ].map(([k, v]) => (
+                <div
+                  key={k}
                   style={{
-                    padding: "9px 2px",
-                    borderRadius: 8,
-                    border: baseline === b.key ? `2px solid ${COLORS.fairwayLight}` : `1px solid ${COLORS.creamDim}33`,
-                    background: baseline === b.key ? COLORS.fairway : "transparent",
-                    color: baseline === b.key ? COLORS.cream : COLORS.creamDim,
-                    fontFamily: "'JetBrains Mono', monospace",
-                    fontSize: 10,
-                    letterSpacing: 0.3,
-                    cursor: "pointer",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    padding: "9px 0",
+                    borderBottom: `1px solid ${COLORS.creamDim}1f`,
+                    fontSize: 13,
                   }}
                 >
-                  {b.label}
-                </button>
+                  <span style={{ fontFamily: "'JetBrains Mono', monospace", color: COLORS.creamDim, fontSize: 11, letterSpacing: 0.3 }}>
+                    {k}
+                  </span>
+                  <span style={{ fontFamily: "'Inter', sans-serif", color: COLORS.cream, fontWeight: 600, textAlign: "right" }}>
+                    {v}
+                  </span>
+                </div>
               ))}
             </div>
-            <button
-              onClick={handleBaselineConfirm}
-              style={{
-                width: "100%",
-                marginTop: 14,
-                padding: "12px 0",
-                borderRadius: 10,
-                border: "none",
-                background: COLORS.flag,
-                color: COLORS.cream,
-                fontFamily: "'Bebas Neue', sans-serif",
-                fontSize: 18,
-                letterSpacing: 1,
-                cursor: "pointer",
-              }}
-            >
-              CONFIRM — {BASELINE_OPTIONS.find((b) => b.key === baseline)?.label}
+            <button onClick={handleFinish} style={primaryBtnStyle(true)}>
+              ENTER THE PRACTICE APP
             </button>
           </Card>
         )}
