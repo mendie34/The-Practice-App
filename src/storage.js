@@ -59,6 +59,8 @@ export const APP_DATA_KEYS = [
   "putting:activeSession",
   "putting:activeRound",
   "putting:clockSessions",
+  "putting:paceSessions",
+  "putting:startLineSessions",
   "tee:sessions",
   "wedgematrix:active",
   "wedgematrix:completed",
@@ -213,6 +215,16 @@ export async function getUserProfile(uid) {
 
 export async function saveUserProfile(uid, profile) {
   await setDoc(doc(db, "users", uid), profile, { merge: true });
+  // Keep a minimal, publicly-searchable mirror in sync — see playerDirectory further down
+  // (Add Friend section) for why this exists as a separate collection instead of just opening
+  // up reads on `users` itself. Only writes fields actually passed in, so a merge-only update
+  // elsewhere (e.g. saving just handicap) doesn't blow away an existing entry with undefined.
+  if (profile.name !== undefined || profile.email !== undefined) {
+    const dirUpdate = {};
+    if (profile.name !== undefined) dirUpdate.name = profile.name;
+    if (profile.email !== undefined) dirUpdate.email = profile.email;
+    await setDoc(doc(db, "playerDirectory", uid), dirUpdate, { merge: true });
+  }
 }
 
 // ===== Add Coach — search coaches, send/withdraw a connection request =====
@@ -315,14 +327,20 @@ function friendLinkDocRef(uidA, uidB) {
   return doc(db, "friendLinks", friendLinkId(uidA, uidB));
 }
 
-// Other players' profiles live in the same `users` collection this file already reads for
-// getUserProfile/saveUserProfile. Unlike searchCoaches, this deliberately does NOT support a
-// blank query returning everyone — coaches are a small, discoverable directory; players are not,
-// so this behaves like a lookup (name or email match) rather than a browsable list of every user.
+// Other players are found via playerDirectory — a deliberately minimal mirror of users/{uid}
+// (just name + email, kept in sync by saveUserProfile above), NOT the users collection itself.
+// users/{uid}'s Firestore rule only permits reading your OWN doc (request.auth.uid == uid), so
+// an unfiltered scan of the whole users collection is rejected outright — Firestore doesn't
+// partially satisfy a list query, it denies the entire thing if the rule can't guarantee every
+// possible result passes. playerDirectory exists specifically so this can stay a real
+// collection-wide search without needing to loosen users' privacy. Unlike searchCoaches, this
+// deliberately does NOT support a blank query returning everyone — coaches are a small,
+// discoverable directory; players are not, so this behaves like a lookup (name or email match)
+// rather than a browsable list of every user.
 export async function searchPlayers(queryText, excludeUid) {
   const q = (queryText || "").trim().toLowerCase();
   if (!q) return [];
-  const snap = await getDocs(collection(db, "users"));
+  const snap = await getDocs(collection(db, "playerDirectory"));
   const results = [];
   snap.forEach((d) => {
     if (d.id === excludeUid) return;
@@ -417,4 +435,41 @@ export async function withdrawFriendRequest(linkId) {
 // called by either player or coach — deletes the doc, nothing else to leave behind.
 export async function removeFriend(linkId) {
   await deleteDoc(doc(db, "friendLinks", linkId));
+}
+
+// ===== Real per-section stats for Compare =====
+//
+// Reads another player's raw session arrays for the four keys Compare/Coach Summary actually
+// use (golf:sessions, tee:sessions, shortgame:sessions, putting:sessions — Clock/Start Line/
+// Pace Control live under separate keys and were never part of the 5-section model either
+// screen uses). Works for self, an approved coach, or an approved friend — whichever the caller
+// has, since all three read through the same appData/{key} rule.
+//
+// ACCESS LEVEL, WORTH KNOWING: this reads full raw session detail (every shot, every session) —
+// the exact same access an approved coach already has, not a separate, smaller "aggregates
+// only" grant. If friend access is ever meant to be more limited than coach access, that needs
+// a different architecture (a separate small summary doc + its own narrower rules), not this
+// function.
+const COMPARE_ANALYSIS_KEYS = ["golf:sessions", "tee:sessions", "shortgame:sessions", "putting:sessions"];
+
+export async function getPlayerSectionHistories(uid) {
+  const raw = {};
+  await Promise.all(
+    COMPARE_ANALYSIS_KEYS.map(async (key) => {
+      try {
+        const snap = await getDoc(doc(db, "users", uid, "appData", key));
+        raw[key] = snap.exists() ? JSON.parse(snap.data().value || "[]") : [];
+      } catch (e) {
+        // Permission denied (not actually an approved friend/coach after all) or malformed
+        // JSON — treat as no data for this one key rather than failing the whole fetch.
+        raw[key] = [];
+      }
+    })
+  );
+  return {
+    range: raw["golf:sessions"] || [],
+    tee: raw["tee:sessions"] || [],
+    shortGame: raw["shortgame:sessions"] || [],
+    putting: raw["putting:sessions"] || [],
+  };
 }
