@@ -3380,6 +3380,15 @@ export default function GolfPracticeApp({ onSwitchProfile, onCreateProfile, prof
     }
   }
 
+  // Replaces a whole hole in one go (the hole editor needs to set putts AND noPutt together — two
+  // updateOnCourseHole calls in a row would each start from the same stale array and the second
+  // would overwrite the first).
+  function setOnCourseHole(index, hole) {
+    const next = onCourseHoles.map((h, i) => (i === index ? hole : h));
+    setOnCourseHoles(next);
+    persistOnCourseHoles(next);
+  }
+
   function updateOnCourseHole(index, field, value) {
     const next = onCourseHoles.map((h, i) => (i === index ? { ...h, [field]: value } : h));
     setOnCourseHoles(next);
@@ -3399,10 +3408,16 @@ export default function GolfPracticeApp({ onSwitchProfile, onCreateProfile, prof
   async function finishOnCourseRound() {
     const completed = onCourseHoles.filter(isHoleComplete);
     if (completed.length === 0) return;
-    const puttedHoles = completed.filter((h) => !h.noPutt);
-    const chipIns = completed.filter((h) => h.noPutt).length;
+    // Keep each hole's REAL number (index + 1) — without it, a hole that was skipped or chipped in
+    // is indistinguishable from one that was never played, and the saved round can't be checked
+    // hole by hole afterwards.
+    const numbered = onCourseHoles.map((h, i) => ({ h, hole: i + 1 })).filter(({ h }) => isHoleComplete(h));
+    const puttedHoles = numbered.filter(({ h }) => !h.noPutt);
+    const chipInHoles = numbered.filter(({ h }) => h.noPutt).map(({ hole }) => hole);
+    const chipIns = chipInHoles.length;
     if (puttedHoles.length === 0) return; // every completed hole was a chip-in — nothing to compute putting stats from
-    const finalPutts = puttedHoles.map((h) => ({
+    const finalPutts = puttedHoles.map(({ h, hole }) => ({
+      hole,
       targetFt: h.putts[0].distanceFt,
       strokes: h.putts.length,
       holedFromFt: h.putts[h.putts.length - 1].distanceFt,
@@ -3418,6 +3433,7 @@ export default function GolfPracticeApp({ onSwitchProfile, onCreateProfile, prof
       totalStrokes: finalPutts.reduce((a, p) => a + p.strokes, 0),
       avgStrokes: avg(finalPutts.map((p) => p.strokes)),
       chipIns, // holes chipped in from off the green — tracked separately, not part of putt stats
+      chipInHoles, // which holes those were, so the round can be reviewed hole by hole later
       holesPlayed: completed.length, // puttedHoles + chipIns, for context
     };
     const newHistory = [session, ...puttHistory];
@@ -3492,6 +3508,23 @@ export default function GolfPracticeApp({ onSwitchProfile, onCreateProfile, prof
     } catch (e) {
       setPuttStorageError(true);
     }
+  }
+
+  // Adds / corrects / removes one hole on an already-saved ON-COURSE round (see
+  // applyCourseHoleChange for the rules). Resolves true if it applied, false if it was refused.
+  async function editCourseRoundHole(sessionId, action) {
+    const target = puttHistory.find((s) => s.id === sessionId);
+    if (!target) return false;
+    const updated = applyCourseHoleChange(target, action.hole, action);
+    if (!updated) return false;
+    const newHistory = puttHistory.map((s) => (s.id === sessionId ? updated : s));
+    setPuttHistory(newHistory);
+    try {
+      await window.storage.set("putting:sessions", JSON.stringify(newHistory), false);
+    } catch (e) {
+      setPuttStorageError(true);
+    }
+    return true;
   }
 
   // ===== Putting — "Around the Clock" handlers =====
@@ -5242,6 +5275,7 @@ export default function GolfPracticeApp({ onSwitchProfile, onCreateProfile, prof
             puttingLoaded={puttLoaded}
             onDeletePuttingSession={deletePuttingSession}
             onEditPuttingSessionShot={editPuttingSessionPutt}
+            onEditCourseHole={editCourseRoundHole}
             clockHistory={clockHistory}
             clockLoaded={clockLoaded}
             onDeleteClockSession={deleteClockSession}
@@ -5816,6 +5850,7 @@ export default function GolfPracticeApp({ onSwitchProfile, onCreateProfile, prof
           <PuttingCourseSetupScreen
             onCourseHoles={onCourseHoles}
             onUpdateCourseHole={updateOnCourseHole}
+            onSetCourseHole={setOnCourseHole}
             onFinishOnCourse={finishOnCourseRound}
             onClearOnCourse={clearOnCourseRound}
             onLoadTestCourseData={loadTestCourseRounds}
@@ -8098,6 +8133,7 @@ function AnalysisScreen({
   puttingLoaded,
   onDeletePuttingSession,
   onEditPuttingSessionShot,
+  onEditCourseHole,
   clockHistory,
   clockLoaded,
   onDeleteClockSession,
@@ -8205,6 +8241,7 @@ function AnalysisScreen({
           loaded={puttingLoaded}
           onDeleteSession={onDeletePuttingSession}
           onEditSessionShot={onEditPuttingSessionShot}
+          onEditCourseHole={onEditCourseHole}
           clockHistory={clockHistory}
           clockLoaded={clockLoaded}
           onDeleteClockSession={onDeleteClockSession}
@@ -10574,19 +10611,36 @@ function PuttingCompeteHoleEditModal({ hole, players, units, onSave, onCancel })
 }
 
 // Full detail view for a single on-course round, opened by tapping it in "All rounds" — same
-// stat layout as the post-round Summary screen, plus the full hole-by-hole log.
-function RoundSummaryModal({ session, units, onEditShot, onClose }) {
-  const [editingShotIndex, setEditingShotIndex] = useState(null);
+// stat layout as the post-round Summary screen, plus a check-every-hole grid: all 18 holes at a
+// glance, any of them tappable to fix, and any hole that was never logged can be added.
+function RoundSummaryModal({ session, units, onEditHole, onClose }) {
+  const [editingHole, setEditingHole] = useState(null); // hole number being edited, or null
+  const [addingMissing, setAddingMissing] = useState(false);
   const stats = courseRoundStats(session);
+  const view = courseSessionHoleView(session);
   const onePutts = session.putts.filter((p) => p.strokes <= 1).length;
   const onePuttPct = (onePutts / session.putts.length) * 100;
   const threePutts = session.putts.filter((p) => p.strokes >= 3).length;
   const avgStrokes = avg(session.putts.map((p) => p.strokes));
+  const notLogged = view.holes.filter((c) => c.status === "empty").map((c) => c.hole);
+  const editingCell = editingHole !== null ? view.holes[editingHole - 1] : null;
 
-  function handleSave(updatedHole) {
-    onEditShot(editingShotIndex, updatedHole);
-    setEditingShotIndex(null);
+  function initialForCell(c) {
+    if (!c || c.status === "empty") return { noPutt: false, strokes: 1, firstFt: null, lastFt: null };
+    if (c.status === "chip") return { noPutt: true, strokes: 1, firstFt: null, lastFt: null };
+    return {
+      noPutt: false,
+      strokes: c.entry.strokes,
+      firstFt: c.entry.targetFt,
+      lastFt: c.entry.strokes > 1 ? c.entry.holedFromFt ?? null : null,
+    };
   }
+
+  // Add-missing-hole picker: a numbered round can only add to holes that are still empty; a legacy
+  // round (no hole numbers stored) can slot the new hole in at any number, and the holes after it
+  // move up by one.
+  const pickerOptions = view.legacy ? Array.from({ length: 18 }, (_, i) => i + 1) : notLogged;
+  const pickerDefault = view.legacy ? (notLogged.length ? notLogged[0] : 18) : notLogged[0];
 
   return (
     <div
@@ -10645,11 +10699,68 @@ function RoundSummaryModal({ session, units, onEditShot, onClose }) {
         )}
 
         <div style={{ marginTop: 16 }}>
+          <SectionLabel>Check every hole</SectionLabel>
+          <div style={{ marginTop: 8 }}>
+            <CourseHoleGrid cells={view.holes} onTapHole={setEditingHole} />
+          </div>
+          {notLogged.length > 0 && (
+            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.sand, marginTop: 8 }}>
+              Not logged: {formatHoleRanges(notLogged)}
+            </div>
+          )}
+          {view.legacy && (
+            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginTop: 6, lineHeight: 1.5 }}>
+              This round was saved before hole numbers were recorded, so its holes are numbered in the order they were putted. If one is
+              missing, use ADD MISSING HOLE and pick its number — the holes after it move up by one.
+              {session.chipIns > 0 ? " Its chip-ins can't be placed on a hole number." : ""}
+            </div>
+          )}
+          {pickerOptions.length > 0 && (
+            <button
+              onClick={() => setAddingMissing(true)}
+              style={{
+                width: "100%",
+                marginTop: 10,
+                padding: "10px 0",
+                borderRadius: 10,
+                border: `1px solid ${COLORS.fairwayLight}`,
+                background: "transparent",
+                color: COLORS.fairwayLight,
+                fontFamily: "'Bebas Neue', sans-serif",
+                fontSize: 15,
+                letterSpacing: 1,
+                cursor: "pointer",
+              }}
+            >
+              + ADD MISSING HOLE
+            </button>
+          )}
+        </div>
+
+        <div style={{ marginTop: 16 }}>
           <SectionLabel>Hole by hole — tap a hole to amend</SectionLabel>
           <div style={{ marginTop: 6 }}>
-            <PuttLog putts={session.putts} units={units} onEditShot={setEditingShotIndex} />
+            <CourseHoleTable view={view} units={units} onTapHole={setEditingHole} />
           </div>
         </div>
+
+        <ShareResultButton
+          badge="PUTTING SESSION"
+          hero={`${onePuttPct.toFixed(0)}%`}
+          heroLabel="ONE-PUTT PERCENTAGE"
+          heroGood={onePuttPct >= 50}
+          stats={[
+            ["PUTTS", String(stats.totalPutts)],
+            ["AVG SG/PUTT", formatSG(stats.avgSG)],
+            ["3+ PUTTS", String(threePutts)],
+          ]}
+          caption={
+            onePuttPct >= 50
+              ? `${onePuttPct.toFixed(0)}% one-putts today out on the course. Putting is finally starting to click. @The_golfpracticeapp`
+              : `Rough day on the greens today. Logging it anyway — the only way through is more reps. @The_golfpracticeapp`
+          }
+          hashtags={["#golf", "#putting", "#golfpractice", "#strokesgained", "#golftips", "#ThePracticeApp"]}
+        />
 
         <button
           onClick={onClose}
@@ -10670,13 +10781,53 @@ function RoundSummaryModal({ session, units, onEditShot, onClose }) {
         </button>
       </div>
 
-      {editingShotIndex !== null && (
+      {editingHole !== null && (
         <div onClick={(e) => e.stopPropagation()}>
-          <PuttShotEditModal
-            shot={session.putts[editingShotIndex]}
+          <CourseHoleEditModal
+            key={`edit-${editingHole}`}
+            holeNumber={editingHole}
+            initial={initialForCell(editingCell)}
             units={units}
-            onSave={handleSave}
-            onCancel={() => setEditingShotIndex(null)}
+            onSave={async (r) => {
+              const ok = await onEditHole({ type: "save", hole: editingHole, noPutt: r.noPutt, distancesFt: r.distancesFt });
+              if (ok) setEditingHole(null);
+              return ok;
+            }}
+            onRemove={
+              editingCell && editingCell.status !== "empty"
+                ? async () => {
+                    const ok = await onEditHole({ type: "remove", hole: editingHole });
+                    if (ok) setEditingHole(null);
+                    return ok;
+                  }
+                : null
+            }
+            removeLabel="REMOVE THIS HOLE FROM THE ROUND"
+            onCancel={() => setEditingHole(null)}
+          />
+        </div>
+      )}
+
+      {addingMissing && (
+        <div onClick={(e) => e.stopPropagation()}>
+          <CourseHoleEditModal
+            key="add-missing"
+            holeNumber={pickerDefault}
+            initial={null}
+            units={units}
+            holeChoices={{ options: pickerOptions, defaultHole: pickerDefault }}
+            onSave={async (r) => {
+              const ok = await onEditHole({
+                type: "save",
+                hole: r.hole,
+                noPutt: r.noPutt,
+                distancesFt: r.distancesFt,
+                insert: view.legacy,
+              });
+              if (ok) setAddingMissing(false);
+              return ok;
+            }}
+            onCancel={() => setAddingMissing(false)}
           />
         </div>
       )}
@@ -17146,6 +17297,7 @@ function PuttingRandomSetupScreen({
 function PuttingCourseSetupScreen({
   onCourseHoles,
   onUpdateCourseHole,
+  onSetCourseHole,
   onFinishOnCourse,
   onClearOnCourse,
   onLoadTestCourseData,
@@ -17168,6 +17320,42 @@ function PuttingCourseSetupScreen({
   const courseCurrentIndex = onCourseHoles.findIndex((h) => !isHoleComplete(h));
   const lastTouchedIndex = onCourseHoles.reduce((acc, h, i) => (h.putts.length > 0 || h.noPutt ? i : acc), -1);
   const unitLabel = shortUnitLabel(units);
+
+  // ----- Hole-by-hole check: all 18 holes at a glance, any of them tappable to fix or fill in -----
+  const [editingHoleIndex, setEditingHoleIndex] = useState(null);
+  const [showGapWarning, setShowGapWarning] = useState(false);
+  const liveCells = onCourseHoles.map((h, i) => {
+    let status = "empty";
+    if (h.noPutt) status = "chip";
+    else if (isHoleComplete(h)) status = "putted";
+    else if (h.putts.length > 0) status = "partial";
+    return { hole: i + 1, status, strokes: h.putts.length, current: i === courseCurrentIndex };
+  });
+  const lastCompletedIdx = onCourseHoles.reduce((acc, h, i) => (isHoleComplete(h) ? i : acc), -1);
+  // A hole is a "problem" if it's unfinished, or not logged but sits BEFORE a hole that was logged
+  // (a gap in the middle of the round). Holes after the last logged one are just "not played yet".
+  const problemHoles = liveCells
+    .filter((c) => c.status === "partial" || (c.status === "empty" && c.hole - 1 < lastCompletedIdx))
+    .map((c) => c.hole);
+
+  function handleFinishClick() {
+    if (problemHoles.length > 0 && !showGapWarning) {
+      setShowGapWarning(true);
+      return;
+    }
+    onFinishOnCourse();
+  }
+
+  function liveHoleInitial(h) {
+    if (h.noPutt) return { noPutt: true, strokes: 1, firstFt: null, lastFt: null };
+    if (h.putts.length === 0) return { noPutt: false, strokes: 1, firstFt: null, lastFt: null };
+    return {
+      noPutt: false,
+      strokes: h.putts.length,
+      firstFt: h.putts[0].distanceFt,
+      lastFt: h.putts.length > 1 ? h.putts[h.putts.length - 1].distanceFt : null,
+    };
+  }
 
   function recordPutt(made) {
     const val = unitToFt(parseFloat(courseDistanceInput), units);
@@ -17372,8 +17560,59 @@ function PuttingCourseSetupScreen({
         </Card>
       )}
 
+      <Card style={{ marginTop: 10 }}>
+        <SectionLabel>Check every hole</SectionLabel>
+        <div style={{ marginTop: 8 }}>
+          <CourseHoleGrid cells={liveCells} onTapHole={(n) => setEditingHoleIndex(n - 1)} />
+        </div>
+      </Card>
+
+      {showGapWarning && problemHoles.length > 0 && (
+        <Card style={{ marginTop: 10, border: `1px solid ${COLORS.sand}` }}>
+          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.sand, lineHeight: 1.5 }}>
+            {problemHoles.length === 1 ? "Hole" : "Holes"} {formatHoleRanges(problemHoles)}{" "}
+            {problemHoles.length === 1 ? "isn't" : "aren't"} logged or finished. Finishing now saves the round without{" "}
+            {problemHoles.length === 1 ? "it" : "them"}.
+          </div>
+          <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+            <button
+              onClick={() => setEditingHoleIndex(problemHoles[0] - 1)}
+              style={{
+                flex: 1,
+                padding: "10px 0",
+                borderRadius: 10,
+                border: "none",
+                background: COLORS.fairway,
+                color: COLORS.cream,
+                fontFamily: "'Bebas Neue', sans-serif",
+                fontSize: 15,
+                cursor: "pointer",
+              }}
+            >
+              FIX HOLE {problemHoles[0]}
+            </button>
+            <button
+              onClick={onFinishOnCourse}
+              style={{
+                flex: 1,
+                padding: "10px 0",
+                borderRadius: 10,
+                border: `1px solid ${COLORS.creamDim}33`,
+                background: "transparent",
+                color: COLORS.creamDim,
+                fontFamily: "'Bebas Neue', sans-serif",
+                fontSize: 15,
+                cursor: "pointer",
+              }}
+            >
+              FINISH ANYWAY
+            </button>
+          </div>
+        </Card>
+      )}
+
       <button
-        onClick={onFinishOnCourse}
+        onClick={handleFinishClick}
         disabled={courseCompleted.length === 0}
         style={{
           width: "100%",
@@ -17416,7 +17655,9 @@ function PuttingCourseSetupScreen({
                 return (
                   <div
                     key={h.hole}
+                    onClick={() => setEditingHoleIndex(h.hole - 1)}
                     style={{
+                      cursor: "pointer",
                       display: "flex",
                       padding: "7px 12px",
                       borderTop: i > 0 ? `1px solid ${COLORS.creamDim}11` : "none",
@@ -17434,7 +17675,9 @@ function PuttingCourseSetupScreen({
               return (
                 <div
                   key={h.hole}
+                  onClick={() => setEditingHoleIndex(h.hole - 1)}
                   style={{
+                    cursor: "pointer",
                     display: "flex",
                     padding: "7px 12px",
                     borderTop: i > 0 ? `1px solid ${COLORS.creamDim}11` : "none",
@@ -17472,6 +17715,43 @@ function PuttingCourseSetupScreen({
       >
         View putting analysis
       </div>
+
+      {editingHoleIndex !== null && (
+        <CourseHoleEditModal
+          key={editingHoleIndex}
+          holeNumber={editingHoleIndex + 1}
+          initial={liveHoleInitial(onCourseHoles[editingHoleIndex])}
+          units={units}
+          note={
+            liveCells[editingHoleIndex].status === "partial"
+              ? "This hole is unfinished — saving marks the last putt as the one that went in."
+              : null
+          }
+          onSave={(r) => {
+            if (r.noPutt) {
+              onSetCourseHole(editingHoleIndex, { putts: [], noPutt: true });
+            } else {
+              const n = r.distancesFt.length;
+              onSetCourseHole(editingHoleIndex, {
+                putts: r.distancesFt.map((d, k) => ({ distanceFt: d, made: k === n - 1 })),
+              });
+            }
+            setEditingHoleIndex(null);
+            return true;
+          }}
+          onRemove={
+            liveCells[editingHoleIndex].status === "empty"
+              ? null
+              : () => {
+                  onSetCourseHole(editingHoleIndex, { putts: [] });
+                  setEditingHoleIndex(null);
+                  return true;
+                }
+          }
+          removeLabel="CLEAR HOLE"
+          onCancel={() => setEditingHoleIndex(null)}
+        />
+      )}
     </div>
   );
 }
@@ -18468,6 +18748,473 @@ function PuttingPaceSummaryScreen({ session, onPlayAgain, onExit, storageError, 
   );
 }
 
+// ===== On-course hole-by-hole review (grid, editor, and the pure helpers behind them) =====
+//
+// A saved on-course round stores one `putts` entry per hole PUTTED ({hole, targetFt, strokes,
+// holedFromFt}) plus `chipInHoles` (hole numbers chipped in, no putt). Rounds saved before this
+// existed have no `hole` on their entries and no `chipInHoles` — those are "legacy": their entries
+// are simply numbered in the order they appear (1, 2, 3 ...), since the original hole numbers were
+// never stored.
+function isLegacyCourseSession(session) {
+  return session.putts.some((p) => p.hole == null);
+}
+
+// Turns a saved round into an 18-slot view: which holes are putted, chipped in, or not logged.
+function courseSessionHoleView(session) {
+  const legacy = isLegacyCourseSession(session);
+  const byHole = {};
+  session.putts.forEach((p, i) => {
+    const n = legacy ? i + 1 : p.hole;
+    byHole[n] = { ...p, hole: n };
+  });
+  const chipSet = new Set(legacy ? [] : session.chipInHoles || []);
+  const holes = Array.from({ length: 18 }, (_, i) => {
+    const n = i + 1;
+    if (byHole[n]) return { hole: n, status: "putted", strokes: byHole[n].strokes, entry: byHole[n] };
+    if (chipSet.has(n)) return { hole: n, status: "chip" };
+    return { hole: n, status: "empty" };
+  });
+  return { holes, legacy };
+}
+
+// Applies ONE hole change to a saved on-course round and rebuilds every cached field on it
+// (puttCount, min/max, totalStrokes, avgStrokes, chipIns, holesPlayed) — same "don't let cached
+// fields go stale after an edit" rule as every other historical-edit handler in this file.
+//   change = { type: "save", noPutt, distancesFt, insert }  |  { type: "remove" }
+// `insert` only matters for a legacy round: the new hole is slotted in at that number and every
+// existing hole from there on moves up by one (which is exactly right for "I'm missing hole 12").
+// Returns null if the change isn't allowed (no putted holes left, or a hole would pass 18).
+function applyCourseHoleChange(session, holeNumber, change) {
+  const legacy = isLegacyCourseSession(session);
+  let entries = session.putts.map((p, i) => ({ ...p, hole: legacy ? i + 1 : p.hole }));
+  let chipHoles = legacy ? [] : [...(session.chipInHoles || [])];
+  // Chip-ins from a legacy round have no known hole number — keep their COUNT so it isn't lost.
+  const unplaced = legacy ? session.chipIns || 0 : session.unplacedChipIns || 0;
+  if (legacy && change.type === "save" && change.insert) {
+    entries = entries.map((e) => (e.hole >= holeNumber ? { ...e, hole: e.hole + 1 } : e));
+  }
+  entries = entries.filter((e) => e.hole !== holeNumber);
+  chipHoles = chipHoles.filter((h) => h !== holeNumber);
+  if (change.type === "save") {
+    if (change.noPutt) {
+      chipHoles.push(holeNumber);
+    } else {
+      const d = change.distancesFt;
+      entries.push({ hole: holeNumber, targetFt: d[0], strokes: d.length, holedFromFt: d[d.length - 1] });
+    }
+  }
+  if (entries.length === 0) return null;
+  if (entries.some((e) => e.hole > 18 || e.hole < 1)) return null;
+  entries.sort((a, b) => a.hole - b.hole);
+  chipHoles.sort((a, b) => a - b);
+  return {
+    ...session,
+    putts: entries,
+    chipInHoles: chipHoles,
+    unplacedChipIns: unplaced,
+    chipIns: chipHoles.length + unplaced,
+    holesPlayed: entries.length + chipHoles.length + unplaced,
+    puttCount: entries.length,
+    puttMinFt: Math.min(...entries.map((e) => e.targetFt)),
+    puttMaxFt: Math.max(...entries.map((e) => e.targetFt)),
+    totalStrokes: entries.reduce((a, e) => a + e.strokes, 0),
+    avgStrokes: avg(entries.map((e) => e.strokes)),
+  };
+}
+
+// [12, 13, 14, 18] -> "12–14, 18"
+function formatHoleRanges(nums) {
+  const out = [];
+  let start = null;
+  let prev = null;
+  const flush = () => out.push(start === prev ? `${start}` : `${start}–${prev}`);
+  nums.forEach((n) => {
+    if (start === null) {
+      start = prev = n;
+    } else if (n === prev + 1) {
+      prev = n;
+    } else {
+      flush();
+      start = prev = n;
+    }
+  });
+  if (start !== null) flush();
+  return out.join(", ");
+}
+
+// 6-across grid of all 18 holes. cells: [{ hole, status: "putted"|"chip"|"partial"|"empty", strokes, current }]
+function CourseHoleGrid({ cells, onTapHole }) {
+  return (
+    <div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 6 }}>
+        {cells.map((c) => {
+          let border = `1px dashed ${COLORS.creamDim}55`;
+          let bg = "transparent";
+          let label = "–";
+          let labelColor = COLORS.creamDim;
+          if (c.status === "putted") {
+            const col = ragColor(ragStatusForPutts(c.strokes));
+            border = `1px solid ${col}`;
+            bg = `${col}22`;
+            label = String(c.strokes);
+            labelColor = col;
+          } else if (c.status === "chip") {
+            border = `1px solid ${COLORS.sand}`;
+            bg = `${COLORS.sand}22`;
+            label = "CI";
+            labelColor = COLORS.sand;
+          } else if (c.status === "partial") {
+            border = `1px dashed ${COLORS.sand}`;
+            label = String(c.strokes);
+            labelColor = COLORS.sand;
+          }
+          if (c.current) border = `2px solid ${COLORS.fairwayLight}`;
+          return (
+            <button
+              key={c.hole}
+              onClick={() => onTapHole(c.hole)}
+              style={{
+                position: "relative",
+                height: 48,
+                padding: 0,
+                borderRadius: 8,
+                border,
+                background: bg,
+                cursor: "pointer",
+              }}
+            >
+              <span
+                style={{
+                  position: "absolute",
+                  top: 3,
+                  left: 5,
+                  fontFamily: "'JetBrains Mono', monospace",
+                  fontSize: 9,
+                  color: COLORS.creamDim,
+                }}
+              >
+                {c.hole}
+              </span>
+              <span style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 20, color: labelColor, lineHeight: "54px" }}>
+                {label}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: COLORS.creamDim, marginTop: 8, lineHeight: 1.5 }}>
+        Tap any hole to check or fix it. Number = putts taken · CI = chipped in · dashed = not logged.
+      </div>
+    </div>
+  );
+}
+
+// Add / correct one on-course hole. Used live (On Course screen) and on saved rounds. Only the
+// FIRST putt's distance and the distance the ball was HOLED from are ever stored/used, so those
+// are the only two distances asked for. `holeChoices` ({ options, defaultHole }) turns the header
+// into a hole-number picker (for "Add missing hole"). onSave/onRemove may be async; returning
+// false shows an error and keeps the modal open.
+// initial = { noPutt, strokes, firstFt, lastFt }
+function CourseHoleEditModal({ holeNumber, initial, units, holeChoices, note, onSave, onRemove, removeLabel, onCancel }) {
+  const unitLabel = shortUnitLabel(units);
+  const init = initial || { noPutt: false, strokes: 1, firstFt: null, lastFt: null };
+  const [hole, setHole] = useState(holeChoices ? holeChoices.defaultHole : holeNumber);
+  const [chip, setChip] = useState(!!init.noPutt);
+  const [strokes, setStrokes] = useState(Math.min(Math.max(init.strokes || 1, 1), 6));
+  const [firstInput, setFirstInput] = useState(init.firstFt != null ? String(fmt1(ftToUnit(init.firstFt, units))) : "");
+  const [lastInput, setLastInput] = useState(init.lastFt != null ? String(fmt1(ftToUnit(init.lastFt, units))) : "");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const labelStyle = { fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginBottom: 6 };
+  const inputStyle = {
+    width: "100%",
+    background: COLORS.turfDark,
+    border: `1px solid ${COLORS.creamDim}33`,
+    borderRadius: 8,
+    color: COLORS.cream,
+    fontFamily: "'Bebas Neue', sans-serif",
+    fontSize: 20,
+    padding: "8px 12px",
+    boxSizing: "border-box",
+  };
+
+  async function handleSave() {
+    setError("");
+    let result;
+    if (chip) {
+      result = { hole, noPutt: true };
+    } else {
+      const first = parseFloat(firstInput);
+      const last = strokes > 1 ? parseFloat(lastInput) : first;
+      if (isNaN(first) || first < 0 || isNaN(last) || last < 0) {
+        setError(strokes > 1 ? "Enter the first putt's distance and the distance of the putt that went in." : "Enter the putt distance.");
+        return;
+      }
+      const firstFt = unitToFt(first, units);
+      const lastFt = unitToFt(last, units);
+      const distancesFt = [firstFt];
+      for (let i = 1; i < strokes; i++) distancesFt.push(lastFt);
+      result = { hole, noPutt: false, distancesFt };
+    }
+    setBusy(true);
+    const ok = await onSave(result);
+    setBusy(false);
+    if (ok === false) setError("Couldn't save that — a round needs at least one putted hole, and holes can't go past 18.");
+  }
+
+  async function handleRemove() {
+    setError("");
+    setBusy(true);
+    const ok = await onRemove(hole);
+    setBusy(false);
+    if (ok === false) setError("Couldn't remove that — a round needs at least one putted hole.");
+  }
+
+  return (
+    <div
+      onClick={onCancel}
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(10,22,15,0.75)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 24,
+        zIndex: 60,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: COLORS.turf,
+          border: `1px solid ${COLORS.creamDim}33`,
+          borderRadius: 14,
+          padding: 20,
+          maxWidth: 360,
+          width: "100%",
+          maxHeight: "85vh",
+          overflowY: "auto",
+        }}
+      >
+        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 20, letterSpacing: 1, color: COLORS.cream }}>
+          {holeChoices ? "ADD MISSING HOLE" : `HOLE ${holeNumber}`}
+        </div>
+
+        {note && (
+          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.sand, marginTop: 6, lineHeight: 1.5 }}>{note}</div>
+        )}
+
+        {holeChoices && (
+          <div style={{ marginTop: 14 }}>
+            <div style={labelStyle}>WHICH HOLE?</div>
+            <select
+              value={hole}
+              onChange={(e) => setHole(parseInt(e.target.value, 10))}
+              style={{ ...inputStyle, appearance: "auto" }}
+            >
+              {holeChoices.options.map((n) => (
+                <option key={n} value={n}>
+                  Hole {n}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        <div style={{ marginTop: 14 }}>
+          <div style={labelStyle}>PUTTS TAKEN</div>
+          <div style={{ display: "flex", gap: 6 }}>
+            {[1, 2, 3, 4, 5, 6].map((n) => (
+              <button
+                key={n}
+                onClick={() => {
+                  setChip(false);
+                  setStrokes(n);
+                }}
+                style={{
+                  flex: 1,
+                  padding: "10px 0",
+                  borderRadius: 8,
+                  border: !chip && strokes === n ? `2px solid ${COLORS.fairwayLight}` : `1px solid ${COLORS.creamDim}33`,
+                  background: !chip && strokes === n ? COLORS.fairway : "transparent",
+                  color: COLORS.cream,
+                  fontFamily: "'Bebas Neue', sans-serif",
+                  fontSize: 16,
+                  cursor: "pointer",
+                }}
+              >
+                {n}
+              </button>
+            ))}
+          </div>
+          <button
+            onClick={() => setChip(!chip)}
+            style={{
+              width: "100%",
+              marginTop: 6,
+              padding: "9px 0",
+              borderRadius: 8,
+              border: chip ? `2px solid ${COLORS.sand}` : `1px solid ${COLORS.creamDim}33`,
+              background: chip ? `${COLORS.sand}22` : "transparent",
+              color: chip ? COLORS.sand : COLORS.creamDim,
+              fontFamily: "'JetBrains Mono', monospace",
+              fontSize: 11,
+              cursor: "pointer",
+            }}
+          >
+            CHIPPED IN — NO PUTT TAKEN
+          </button>
+        </div>
+
+        {!chip && (
+          <>
+            <div style={{ marginTop: 14 }}>
+              <div style={labelStyle}>
+                {strokes > 1 ? "FIRST PUTT DISTANCE" : "PUTT DISTANCE"} ({unitLabel.toUpperCase()})
+              </div>
+              <input
+                type="number"
+                inputMode="decimal"
+                value={firstInput}
+                onChange={(e) => setFirstInput(e.target.value)}
+                placeholder="0"
+                style={inputStyle}
+              />
+            </div>
+            {strokes > 1 && (
+              <div style={{ marginTop: 14 }}>
+                <div style={labelStyle}>DISTANCE OF THE PUTT THAT WENT IN ({unitLabel.toUpperCase()})</div>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  value={lastInput}
+                  onChange={(e) => setLastInput(e.target.value)}
+                  placeholder="0"
+                  style={inputStyle}
+                />
+              </div>
+            )}
+          </>
+        )}
+
+        {error && (
+          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.flag, marginTop: 12 }}>{error}</div>
+        )}
+
+        <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
+          <button
+            onClick={onCancel}
+            style={{
+              flex: 1,
+              padding: "11px 0",
+              borderRadius: 10,
+              border: `1px solid ${COLORS.creamDim}33`,
+              background: "transparent",
+              color: COLORS.creamDim,
+              fontFamily: "'Bebas Neue', sans-serif",
+              fontSize: 15,
+              cursor: "pointer",
+            }}
+          >
+            CANCEL
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={busy}
+            style={{
+              flex: 1,
+              padding: "11px 0",
+              borderRadius: 10,
+              border: "none",
+              background: COLORS.fairway,
+              color: COLORS.cream,
+              fontFamily: "'Bebas Neue', sans-serif",
+              fontSize: 15,
+              cursor: busy ? "not-allowed" : "pointer",
+              opacity: busy ? 0.6 : 1,
+            }}
+          >
+            SAVE
+          </button>
+        </div>
+        {onRemove && (
+          <div
+            onClick={busy ? undefined : handleRemove}
+            style={{
+              textAlign: "center",
+              marginTop: 12,
+              fontFamily: "'JetBrains Mono', monospace",
+              fontSize: 10,
+              color: COLORS.flag,
+              cursor: "pointer",
+              textDecoration: "underline",
+              textUnderlineOffset: 3,
+            }}
+          >
+            {removeLabel || "REMOVE HOLE"}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Hole-numbered detail table for a SAVED on-course round (rows = holes that were logged).
+function CourseHoleTable({ view, units, onTapHole }) {
+  const unitLabel = shortUnitLabel(units);
+  const rows = view.holes.filter((c) => c.status !== "empty");
+  return (
+    <div
+      style={{
+        border: `1px solid ${COLORS.creamDim}22`,
+        borderRadius: 10,
+        overflow: "hidden",
+        fontFamily: "'JetBrains Mono', monospace",
+        fontSize: 12,
+      }}
+    >
+      <div style={{ display: "flex", padding: "8px 12px", background: `${COLORS.turf}aa`, color: COLORS.creamDim }}>
+        <div style={{ width: 40 }}>HOLE</div>
+        <div style={{ flex: 1 }}>DIST</div>
+        <div style={{ width: 55, textAlign: "right" }}>PUTTS</div>
+        <div style={{ width: 55, textAlign: "right" }}>SG</div>
+      </div>
+      {rows.map((c, i) => {
+        const rowStyle = {
+          display: "flex",
+          padding: "7px 12px",
+          borderTop: i > 0 ? `1px solid ${COLORS.creamDim}11` : "none",
+          cursor: "pointer",
+        };
+        if (c.status === "chip") {
+          return (
+            <div key={c.hole} onClick={() => onTapHole(c.hole)} style={{ ...rowStyle, color: COLORS.creamDim }}>
+              <div style={{ width: 40 }}>{c.hole}</div>
+              <div style={{ flex: 1, fontStyle: "italic" }}>Chipped in</div>
+              <div style={{ width: 55, textAlign: "right" }}>—</div>
+              <div style={{ width: 55, textAlign: "right" }}>—</div>
+            </div>
+          );
+        }
+        const sg = sgForPutt(c.entry.targetFt, c.entry.strokes);
+        return (
+          <div key={c.hole} onClick={() => onTapHole(c.hole)} style={{ ...rowStyle, color: COLORS.cream }}>
+            <div style={{ width: 40, color: COLORS.creamDim }}>{c.hole}</div>
+            <div style={{ flex: 1 }}>
+              {fmt1(ftToUnit(c.entry.targetFt, units))}
+              {unitLabel}
+            </div>
+            <div style={{ width: 55, textAlign: "right", color: ragColor(ragStatusForPutts(c.entry.strokes)) }}>{c.entry.strokes}</div>
+            <div style={{ width: 55, textAlign: "right", color: sgRagColor(sg) }}>{formatSG(sg)}</div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function PuttLog({ putts, units, onEditShot }) {
   const unitLabel = shortUnitLabel(units);
   return (
@@ -18945,6 +19692,11 @@ function PuttingSummaryScreen({ putts, onNewSession, storageError, units, feedba
   const distMin = Math.min(...putts.map((p) => p.targetFt));
   const distMax = Math.max(...putts.map((p) => p.targetFt));
   const unitLabel = shortUnitLabel(units);
+  // For an on-course round, `putts` has one entry PER HOLE (strokes = putts taken on that hole), so
+  // putts.length is holes putted, not putts. The real putt count is the sum of strokes. For practice
+  // sessions each entry is a single putt attempt, so the entry count is what's always been shown.
+  const totalPutts = putts.reduce((a, p) => a + p.strokes, 0);
+  const puttsDisplayed = isOnCourse ? totalPutts : putts.length;
 
   return (
     <div>
@@ -18952,7 +19704,8 @@ function PuttingSummaryScreen({ putts, onNewSession, storageError, units, feedba
       <Card>
         <div style={{ textAlign: "center", marginBottom: 4 }}>
           <div style={{ fontSize: 11, color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", letterSpacing: 2 }}>
-            {isOnCourse ? "ROUND COMPLETE" : "SESSION COMPLETE"} — {putts.length} PUTTS · {ftToUnitRound(distMin, units)}-{ftToUnitRound(distMax, units)}
+            {isOnCourse ? "ROUND COMPLETE" : "SESSION COMPLETE"} — {puttsDisplayed} PUTTS
+            {isOnCourse ? ` · ${putts.length} HOLES` : ""} · {ftToUnitRound(distMin, units)}-{ftToUnitRound(distMax, units)}
             {unitLabel.toUpperCase()}
           </div>
         </div>
@@ -18964,7 +19717,7 @@ function PuttingSummaryScreen({ putts, onNewSession, storageError, units, feedba
           <>
             <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
               <StatBox label="AVG PUTTS" value={avgStrokes.toFixed(2)} />
-              <StatBox label="TOTAL PUTTS" value={putts.reduce((a, p) => a + p.strokes, 0)} />
+              <StatBox label="TOTAL PUTTS" value={totalPutts} />
             </div>
             <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
               <StatBox label="1-PUTTS" value={`${onePutts} (${onePuttPct.toFixed(0)}%)`} valueColor={COLORS.fairwayLight} />
@@ -19014,7 +19767,7 @@ function PuttingSummaryScreen({ putts, onNewSession, storageError, units, feedba
         stats={
           isOnCourse
             ? [
-                ["PUTTS", String(putts.length)],
+                ["PUTTS", String(totalPutts)],
                 ["AVG SG/PUTT", formatSG(avgSG)],
                 ["3+ PUTTS", String(threePutts)],
               ]
@@ -19026,7 +19779,7 @@ function PuttingSummaryScreen({ putts, onNewSession, storageError, units, feedba
         }
         caption={
           onePuttPct >= 50
-            ? `${onePuttPct.toFixed(0)}% one-putts today on the practice green. Putting is finally starting to click. @The_golfpracticeapp`
+            ? `${onePuttPct.toFixed(0)}% one-putts today ${isOnCourse ? "out on the course" : "on the practice green"}. Putting is finally starting to click. @The_golfpracticeapp`
             : `Rough day on the greens today. Logging it anyway — the only way through is more reps. @The_golfpracticeapp`
         }
         hashtags={["#golf", "#putting", "#golfpractice", "#strokesgained", "#golftips", "#ThePracticeApp"]}
@@ -19771,6 +20524,7 @@ function PuttingAnalysisHub({
   loaded,
   onDeleteSession,
   onEditSessionShot,
+  onEditCourseHole,
   clockHistory,
   clockLoaded,
   onDeleteClockSession,
@@ -19870,7 +20624,7 @@ function PuttingAnalysisHub({
           history={courseHistory}
           loaded={loaded}
           onDeleteSession={onDeleteSession}
-          onEditSessionShot={onEditSessionShot}
+          onEditCourseHole={onEditCourseHole}
           units={units}
         />
       )}
@@ -20746,7 +21500,7 @@ function PuttingPaceAnalysisBody({ history, loaded, onDeleteSession, onEditPutt,
   );
 }
 
-function OnCourseAnalysisBody({ history, loaded, onDeleteSession, onEditSessionShot, units }) {
+function OnCourseAnalysisBody({ history, loaded, onDeleteSession, onEditCourseHole, units }) {
   const [timescale, setTimescale] = useState("all");
   const [printMode, triggerPrint] = usePrintMode();
   const [selectedRoundId, setSelectedRoundId] = useState(null);
@@ -20946,7 +21700,7 @@ function OnCourseAnalysisBody({ history, loaded, onDeleteSession, onEditSessionS
         <RoundSummaryModal
           session={selectedRound}
           units={units}
-          onEditShot={(holeIndex, updatedHole) => onEditSessionShot(selectedRound.id, holeIndex, updatedHole)}
+          onEditHole={(action) => onEditCourseHole(selectedRound.id, action)}
           onClose={() => setSelectedRoundId(null)}
         />
       )}
