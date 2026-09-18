@@ -2152,6 +2152,13 @@ function sgRagColor(avgSG) {
   return COLORS.flag;
 }
 
+// Strokes-gained BAR charts use a plain two-colour rule instead of the three-band sgRagColor above:
+// positive (0 or better) = green, negative = red. Bars are compared side by side, so the sign is the
+// thing that has to read at a glance — there is no amber "in between" bar.
+function sgBarColor(sg) {
+  return sg >= 0 ? COLORS.fairwayLight : COLORS.flag;
+}
+
 // A hole is complete once its most recent putt attempt actually went in — everything before
 // that in the array was a miss that needed a follow-up putt. A hole explicitly marked "no putt"
 // (chipped in from off the green) is also complete, with no putt data attached at all.
@@ -9159,7 +9166,7 @@ function ShortGameAnalysisBody({ history, loaded, onDeleteSession, onEditSession
                     <Tooltip content={<ChartTooltip suffix=" SG" />} />
                     <Bar dataKey="avgSG" radius={[4, 4, 0, 0]}>
                       {lieStats.map((l, i) => (
-                        <Cell key={i} fill={sgRagColor(l.avgSG)} />
+                        <Cell key={i} fill={sgBarColor(l.avgSG)} />
                       ))}
                     </Bar>
                   </BarChart>
@@ -9728,7 +9735,7 @@ function RangeAnalysisBody({ history, loaded, onDeleteSession, onEditSessionShot
                       <Tooltip content={<ChartTooltip suffix=" SG" />} />
                       <Bar dataKey="avgSG" radius={[4, 4, 0, 0]}>
                         {graphBuckets.map((b, i) => (
-                          <Cell key={i} fill={sgRagColor(b.avgSG)} />
+                          <Cell key={i} fill={sgBarColor(b.avgSG)} />
                         ))}
                       </Bar>
                     </BarChart>
@@ -9745,13 +9752,10 @@ function RangeAnalysisBody({ history, loaded, onDeleteSession, onEditSessionShot
                   }}
                 >
                   <span>
-                    <span style={{ color: COLORS.fairwayLight }}>●</span> ≥0 (tour avg or better)
+                    <span style={{ color: COLORS.fairwayLight }}>●</span> positive (at or above baseline)
                   </span>
                   <span>
-                    <span style={{ color: COLORS.sand }}>●</span> ≥-0.15
-                  </span>
-                  <span>
-                    <span style={{ color: COLORS.flag }}>●</span> &lt;-0.15
+                    <span style={{ color: COLORS.flag }}>●</span> negative (below baseline)
                   </span>
                 </div>
               </Card>
@@ -15106,6 +15110,20 @@ function CompareTooltip({ active, payload, isPct }) {
 }
 
 function CompareBarChart({ title, subtitle, data, isPct }) {
+  // Strokes gained is signed, so its axis must ALWAYS include 0 (bars grow up from it when positive,
+  // down from it when negative) — a padded min/max axis can cut zero out and make a negative
+  // player's bar look like a positive one. Hit % keeps its fixed 0-100 axis.
+  const vals = data.map((d) => d.value);
+  // Axis: always spans 0, padded a little so bar labels have room, rounded to a clean step, and the
+  // ticks are generated explicitly so 0 is always one of them (auto ticks can straddle it).
+  const rawLo = Math.min(0, Math.min(...vals) - 0.08);
+  const rawHi = Math.max(0, Math.max(...vals) + 0.08);
+  const step = [0.05, 0.1, 0.2, 0.25, 0.5, 1, 2].find((st) => (rawHi - rawLo) / st <= 6) || 5;
+  const lo = Math.floor(rawLo / step + 1e-9) * step;
+  const hi = Math.ceil(rawHi / step - 1e-9) * step;
+  const sgDomain = [Number(lo.toFixed(2)), Number(hi.toFixed(2))];
+  const sgTicks = [];
+  for (let v = lo; v <= hi + 1e-9; v += step) sgTicks.push(Number(v.toFixed(2)));
   return (
     <Card style={{ marginBottom: 14 }}>
       <SectionLabel>{title}</SectionLabel>
@@ -15121,13 +15139,15 @@ function CompareBarChart({ title, subtitle, data, isPct }) {
               tickLine={false}
             />
             <YAxis
-              domain={isPct ? [0, 100] : ["dataMin - 0.05", "dataMax + 0.05"]}
+              domain={isPct ? [0, 100] : sgDomain}
+              ticks={isPct ? undefined : sgTicks}
               tickFormatter={(v) => (isPct ? `${v}%` : v.toFixed(2))}
               tick={{ fill: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", fontSize: 10 }}
               axisLine={false}
               tickLine={false}
               width={44}
             />
+            {!isPct && <ReferenceLine y={0} stroke={COLORS.creamDim} strokeOpacity={0.6} />}
             <Tooltip content={<CompareTooltip isPct={isPct} />} cursor={{ fill: `${COLORS.creamDim}11` }} />
             <Bar dataKey="value" radius={[4, 4, 0, 0]}>
               <LabelList
@@ -15136,9 +15156,12 @@ function CompareBarChart({ title, subtitle, data, isPct }) {
                 formatter={(v) => (isPct ? `${v}%` : formatSG(v))}
                 style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, fill: COLORS.cream }}
               />
-              {data.map((d, i) => (
-                <Cell key={i} fill={d.color} />
-              ))}
+              {data.map((d, i) =>
+                // SG: green if positive, red if negative — deliberately NOT the player's own colour (two of
+                // the player colours are themselves red/green, which would read as a wrong sign). Players are
+                // named under each bar. Hit %: unchanged, filled in the player's colour.
+                <Cell key={i} fill={isPct ? d.color : sgBarColor(d.value)} />
+              )}
             </Bar>
           </BarChart>
         </ResponsiveContainer>
@@ -15252,7 +15275,8 @@ function CompareResultsScreen({ profileId, profileName, entries, myHistories, on
         <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 12.5, color: COLORS.creamDim, marginTop: 6, lineHeight: 1.5 }}>
           Each person's strokes gained reflects whichever baseline they had set when they logged
           each session — these are everyone's real numbers as originally recorded, not
-          recalculated against a single shared baseline.
+          recalculated against a single shared baseline. On strokes-gained charts a bar is green when
+          it's positive and red when it's negative, with each player named under their bar.
         </div>
       </Card>
 
@@ -15264,7 +15288,7 @@ function CompareResultsScreen({ profileId, profileName, entries, myHistories, on
             {data.length > 0 ? (
               <CompareBarChart
                 title={s.label}
-                subtitle={s.metricType === "pct" ? "% fairways hit" : "Avg strokes gained per shot"}
+                subtitle={s.metricType === "pct" ? "% fairways hit" : "Avg strokes gained per shot · green = positive, red = negative"}
                 data={data}
                 isPct={s.metricType === "pct"}
               />
@@ -22144,7 +22168,7 @@ function PuttingAnalysisBody({ history, loaded, onDeleteSession, onEditSessionSh
                       <Tooltip content={<ChartTooltip suffix=" SG" />} />
                       <Bar dataKey="avgSG" radius={[4, 4, 0, 0]}>
                         {graphBuckets.map((b, i) => (
-                          <Cell key={i} fill={sgRagColor(b.avgSG)} />
+                          <Cell key={i} fill={sgBarColor(b.avgSG)} />
                         ))}
                       </Bar>
                     </BarChart>
@@ -22161,13 +22185,10 @@ function PuttingAnalysisBody({ history, loaded, onDeleteSession, onEditSessionSh
                   }}
                 >
                   <span>
-                    <span style={{ color: COLORS.fairwayLight }}>●</span> ≥0 (tour avg or better)
+                    <span style={{ color: COLORS.fairwayLight }}>●</span> positive (at or above baseline)
                   </span>
                   <span>
-                    <span style={{ color: COLORS.sand }}>●</span> ≥-0.15
-                  </span>
-                  <span>
-                    <span style={{ color: COLORS.flag }}>●</span> &lt;-0.15
+                    <span style={{ color: COLORS.flag }}>●</span> negative (below baseline)
                   </span>
                 </div>
               </Card>
