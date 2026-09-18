@@ -215,16 +215,6 @@ export async function getUserProfile(uid) {
 
 export async function saveUserProfile(uid, profile) {
   await setDoc(doc(db, "users", uid), profile, { merge: true });
-  // Keep a minimal, publicly-searchable mirror in sync — see playerDirectory further down
-  // (Add Friend section) for why this exists as a separate collection instead of just opening
-  // up reads on `users` itself. Only writes fields actually passed in, so a merge-only update
-  // elsewhere (e.g. saving just handicap) doesn't blow away an existing entry with undefined.
-  if (profile.name !== undefined || profile.email !== undefined) {
-    const dirUpdate = {};
-    if (profile.name !== undefined) dirUpdate.name = profile.name;
-    if (profile.email !== undefined) dirUpdate.email = profile.email;
-    await setDoc(doc(db, "playerDirectory", uid), dirUpdate, { merge: true });
-  }
 }
 
 // ===== Add Coach — search coaches, send/withdraw a connection request =====
@@ -327,20 +317,17 @@ function friendLinkDocRef(uidA, uidB) {
   return doc(db, "friendLinks", friendLinkId(uidA, uidB));
 }
 
-// Other players are found via playerDirectory — a deliberately minimal mirror of users/{uid}
-// (just name + email, kept in sync by saveUserProfile above), NOT the users collection itself.
-// users/{uid}'s Firestore rule only permits reading your OWN doc (request.auth.uid == uid), so
-// an unfiltered scan of the whole users collection is rejected outright — Firestore doesn't
-// partially satisfy a list query, it denies the entire thing if the rule can't guarantee every
-// possible result passes. playerDirectory exists specifically so this can stay a real
-// collection-wide search without needing to loosen users' privacy. Unlike searchCoaches, this
-// deliberately does NOT support a blank query returning everyone — coaches are a small,
-// discoverable directory; players are not, so this behaves like a lookup (name or email match)
-// rather than a browsable list of every user.
+// Players are searched the same way coaches are — users/{uid} is now openly readable by any
+// signed-in player (see firestore.rules), so this queries it directly, same pattern as
+// searchCoaches above. No separate directory collection to keep in sync anymore; simpler, and
+// removes an entire class of bug where the mirror could silently drift from the real profile.
+// Unlike searchCoaches, this deliberately does NOT support a blank query returning everyone —
+// coaches are a small, discoverable directory; players are not, so this behaves like a lookup
+// (name or email match) rather than a browsable list of every user.
 export async function searchPlayers(queryText, excludeUid) {
   const q = (queryText || "").trim().toLowerCase();
   if (!q) return [];
-  const snap = await getDocs(collection(db, "playerDirectory"));
+  const snap = await getDocs(collection(db, "users"));
   const results = [];
   snap.forEach((d) => {
     if (d.id === excludeUid) return;
