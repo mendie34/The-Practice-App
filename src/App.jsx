@@ -136,7 +136,8 @@ function shareWrapCenteredText(ctx, text, cx, y, maxWidth, lineHeight) {
 }
 
 // stats: up to 3 [label, value] pairs shown in the row below the hero number.
-function drawShareCard(canvas, { badge, hero, heroLabel, heroGood, stats }) {
+// best: optional string (e.g. "FT MADE") — when set, a gold "PERSONAL BEST" pill is drawn under the hero.
+function drawShareCard(canvas, { badge, hero, heroLabel, heroGood, stats, best }) {
   const ctx = canvas.getContext("2d");
   const W = canvas.width;
   const H = canvas.height;
@@ -186,6 +187,22 @@ function drawShareCard(canvas, { badge, hero, heroLabel, heroGood, stats }) {
   ctx.fillStyle = COLORS.creamDim;
   ctx.font = "600 30px 'JetBrains Mono', monospace";
   ctx.fillText(heroLabel, W / 2, 710);
+
+  if (best) {
+    const text = `★ PERSONAL BEST · ${best}`;
+    let fs = 28;
+    ctx.font = `700 ${fs}px 'JetBrains Mono', monospace`;
+    while (ctx.measureText(text).width + 60 > W - 120 && fs > 16) {
+      fs -= 2;
+      ctx.font = `700 ${fs}px 'JetBrains Mono', monospace`;
+    }
+    const pillW = ctx.measureText(text).width + 60;
+    ctx.fillStyle = COLORS.sand;
+    shareRoundRectPath(ctx, W / 2 - pillW / 2, 728, pillW, 46, 23);
+    ctx.fill();
+    ctx.fillStyle = COLORS.turfDark;
+    ctx.fillText(text, W / 2, 728 + 32);
+  }
 
   ctx.strokeStyle = `${COLORS.creamDim}33`;
   ctx.lineWidth = 2;
@@ -240,7 +257,9 @@ function generateShareCardBlob(cardData) {
 // ShareResultButton — the caller (each Summary screen) computes its own hero stat, mood, caption
 // and hashtags from its own local session data, same as it already computes its own StatBoxes.
 // This component only knows how to render the card and run the share/fallback flow.
-function ShareResultButton({ badge, hero, heroLabel, heroGood, stats, caption, hashtags }) {
+// bestLabels: names of the stats that are a genuine new personal best (see personalBestLabels) — empty/omitted
+// means no callout. It's drawn on the card AND opens the caption, so the post says it too.
+function ShareResultButton({ badge, hero, heroLabel, heroGood, stats, caption, hashtags, bestLabels }) {
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -248,9 +267,10 @@ function ShareResultButton({ badge, hero, heroLabel, heroGood, stats, caption, h
     setBusy(true);
     setStatus("");
     try {
-      const blob = await generateShareCardBlob({ badge, hero, heroLabel, heroGood, stats });
+      const best = bestLabels && bestLabels.length ? bestLabels.join(" + ") : null;
+      const blob = await generateShareCardBlob({ badge, hero, heroLabel, heroGood, stats, best });
       const file = new File([blob], "practice-app-result.png", { type: "image/png" });
-      const fullCaption = `${caption}\n\n${hashtags.join(" ")}`;
+      const fullCaption = `${best ? `★ New personal best — ${best}! ` : ""}${caption}\n\n${hashtags.join(" ")}`;
 
       if (navigator.canShare && navigator.canShare({ files: [file] })) {
         try {
@@ -2501,6 +2521,113 @@ function RatingInsightCard({ title, subtitle, items, emptyText }) {
       </div>
     </Card>
   );
+}
+
+// ===== Personal bests for the share cards =====
+// A card only calls something a personal best when it is a STRICT improvement over EVERY earlier
+// session it can fairly be compared with. Ties don't count, a first-ever session has nothing to beat,
+// and "fairly" is decided per stat (e.g. a 9-hole round is never compared with 18-hole rounds on
+// total feet made) — so the callout can be trusted, not just handed out.
+// metrics: [{ label, fn(session) -> number, comparable?(otherSession, session) -> bool }]
+function personalBestLabels(session, sessions, metrics) {
+  if (!session || !sessions) return [];
+  const t = new Date(session.date).getTime();
+  const earlier = sessions.filter((s) => s.id !== session.id && new Date(s.date).getTime() < t);
+  const labels = [];
+  metrics.forEach(({ label, fn, comparable }) => {
+    const cur = fn(session);
+    if (typeof cur !== "number" || !isFinite(cur)) return;
+    const prior = earlier.filter((s) => !comparable || comparable(s, session));
+    const vals = prior.map(fn).filter((v) => typeof v === "number" && isFinite(v));
+    if (vals.length === 0) return;
+    if (cur > Math.max(...vals) + 1e-9) labels.push(label);
+  });
+  return labels;
+}
+
+// Feet of putts actually holed: the exact holing distance where it was recorded, otherwise the
+// old approximation (only holes/putts that went in first time count) — same rule as FT MADE elsewhere.
+function puttsFtMade(putts) {
+  return putts.reduce((a, p) => a + (p.holedFromFt != null ? p.holedFromFt : p.strokes === 1 ? p.targetFt : 0), 0);
+}
+function puttsAvgSG(putts) {
+  return avg(putts.map((p) => sgForPutt(p.targetFt, p.strokes)));
+}
+// Big share-card number for feet/metres made: one decimal under 100, whole number above.
+function shareFtHero(v) {
+  const r = Math.round(v * 10) / 10;
+  return r >= 100 ? String(Math.round(v)) : r.toFixed(1);
+}
+// 9-hole-ish rounds vs 18-hole-ish rounds — only like is compared with like for total feet made.
+function courseRoundBucket(s) {
+  return s.putts.length + (s.chipIns || 0) <= 10 ? 9 : 18;
+}
+
+function rangeBestLabels(session, sessions) {
+  const isRating = session.mode === "rating";
+  return personalBestLabels(session, sessions, [
+    isRating
+      ? { label: "AVG RATING", fn: (s) => avg(s.shots.map((sh) => sh.rating)), comparable: (s) => s.mode === "rating" }
+      : {
+          label: "AVG SG",
+          fn: (s) => avg(s.shots.map((sh) => sgForApproachShot(sh.target, sh.actual))),
+          comparable: (s) => s.mode !== "rating",
+        },
+  ]);
+}
+function teeBestLabels(session, sessions) {
+  // Hit % only means the same thing at the same fairway width.
+  return personalBestLabels(session, sessions, [
+    { label: "FAIRWAYS HIT", fn: (s) => s.hitPct, comparable: (s, cur) => s.fairwayWidth === cur.fairwayWidth },
+  ]);
+}
+function shortGameBestLabels(session, sessions) {
+  return personalBestLabels(session, sessions, [
+    { label: "AVG SG", fn: (s) => avg(s.shots.map((sh) => sgForShortGameShot(sh.lie, sh.target, sh.resultFt))) },
+  ]);
+}
+// Random Practice + On Course share puttHistory, told apart by session.type.
+function puttingBestLabels(session, sessions, units) {
+  const madeLabel = `${shortUnitLabel(units).toUpperCase()} MADE`;
+  if (session.type === "course") {
+    return personalBestLabels(session, sessions, [
+      {
+        label: madeLabel,
+        fn: (s) => puttsFtMade(s.putts),
+        comparable: (s, cur) => s.type === "course" && courseRoundBucket(s) === courseRoundBucket(cur),
+      },
+      { label: "AVG SG/PUTT", fn: (s) => courseRoundStats(s).avgSG, comparable: (s) => s.type === "course" },
+    ]);
+  }
+  return personalBestLabels(session, sessions, [
+    {
+      label: madeLabel,
+      fn: (s) => puttsFtMade(s.putts),
+      // Feet made depends on how many putts, from how far — compare the same setup only.
+      comparable: (s, cur) =>
+        s.type !== "course" && s.puttCount === cur.puttCount && s.puttMinFt === cur.puttMinFt && s.puttMaxFt === cur.puttMaxFt,
+    },
+    { label: "AVG SG/PUTT", fn: (s) => puttsAvgSG(s.putts), comparable: (s) => s.type !== "course" },
+  ]);
+}
+function clockBestLabels(session, sessions, units) {
+  return personalBestLabels(session, sessions, [
+    { label: `${shortUnitLabel(units).toUpperCase()} MADE`, fn: (s) => puttsFtMade(s.putts) },
+    { label: "AVG SG/PUTT", fn: (s) => puttsAvgSG(s.putts) },
+  ]);
+}
+function startLineBestLabels(session, sessions) {
+  return personalBestLabels(session, sessions, [{ label: "THROUGH THE GATE", fn: (s) => s.made }]);
+}
+function paceBestLabels(session, sessions) {
+  // Same distances and same putts-per-distance, or the % of max points isn't like-for-like.
+  return personalBestLabels(session, sessions, [
+    {
+      label: "PACE POINTS",
+      fn: (s) => (s.maxPoints ? s.totalPoints / s.maxPoints : NaN),
+      comparable: (s, cur) => s.puttsPerDistance === cur.puttsPerDistance && JSON.stringify(s.distances) === JSON.stringify(cur.distances),
+    },
+  ]);
 }
 
 // ===== Post-session feedback ("that was your 2nd best session ever") =====
@@ -5258,6 +5385,7 @@ export default function GolfPracticeApp({ onSwitchProfile, onCreateProfile, prof
             storageError={storageError}
             units={units}
             feedback={rangeSessionFeedback}
+            history={history}
           />
         )}
 
@@ -5460,6 +5588,7 @@ export default function GolfPracticeApp({ onSwitchProfile, onCreateProfile, prof
             shots={teeShots}
             fairwayWidth={teeFairwayWidth}
             onNewSession={resetTeeToSetup}
+            history={teeHistory}
             storageError={teeStorageError}
             units={units}
           />
@@ -5818,6 +5947,7 @@ export default function GolfPracticeApp({ onSwitchProfile, onCreateProfile, prof
             storageError={shortStorageError}
             units={units}
             feedback={shortSessionFeedback}
+            history={shortHistory}
           />
         )}
 
@@ -5880,6 +6010,7 @@ export default function GolfPracticeApp({ onSwitchProfile, onCreateProfile, prof
         {screen === "puttingClockSummary" && clockHistory.length > 0 && (
           <PuttingClockSummaryScreen
             session={clockHistory[0]}
+            history={clockHistory}
             onPlayAgain={startClockRound}
             onExit={() => setScreen("puttingChoose")}
             storageError={clockStorageError}
@@ -5903,6 +6034,7 @@ export default function GolfPracticeApp({ onSwitchProfile, onCreateProfile, prof
         {screen === "puttingStartLineSummary" && startLineHistory.length > 0 && (
           <PuttingStartLineSummaryScreen
             session={startLineHistory[0]}
+            history={startLineHistory}
             onPlayAgain={startStartLineDrill}
             onExit={() => setScreen("puttingChoose")}
             storageError={startLineStorageError}
@@ -5937,6 +6069,7 @@ export default function GolfPracticeApp({ onSwitchProfile, onCreateProfile, prof
         {screen === "puttingPaceSummary" && paceHistory.length > 0 && (
           <PuttingPaceSummaryScreen
             session={paceHistory[0]}
+            history={paceHistory}
             onPlayAgain={() => setScreen("puttingPaceSetup")}
             onExit={() => setScreen("puttingChoose")}
             storageError={paceStorageError}
@@ -5974,6 +6107,7 @@ export default function GolfPracticeApp({ onSwitchProfile, onCreateProfile, prof
             feedback={puttSessionFeedback}
             isOnCourse={puttSummaryIsOnCourse}
             chipIns={puttSummaryChipIns}
+            history={puttHistory}
           />
         )}
       </div>
@@ -6797,7 +6931,8 @@ function RatingLog({ shots, units, onEditShot }) {
   );
 }
 
-function SummaryScreen({ shots, minDist, maxDist, onNewSession, storageError, units, feedback }) {
+function SummaryScreen({ shots, minDist, maxDist, onNewSession, storageError, units, feedback, history }) {
+  const bestLabels = history && history[0] ? rangeBestLabels(history[0], history) : [];
   const isRating = shots.length > 0 && shots[0].rating !== undefined;
   const unitLabel = longUnitLabel(units);
   const [showScoreInfo, setShowScoreInfo] = useState(false);
@@ -6842,6 +6977,7 @@ function SummaryScreen({ shots, minDist, maxDist, onNewSession, storageError, un
 
         <ShareResultButton
           badge="RANGE SESSION"
+          bestLabels={bestLabels}
           hero={`${avgRating.toFixed(1)}/5`}
           heroLabel="AVG RATING"
           heroGood={avgRating >= 3}
@@ -6955,6 +7091,7 @@ function SummaryScreen({ shots, minDist, maxDist, onNewSession, storageError, un
 
       <ShareResultButton
         badge="RANGE SESSION"
+        bestLabels={bestLabels}
         hero={formatSG(avgSG)}
         heroLabel="AVG STROKES GAINED / SHOT"
         heroGood={avgSG >= 0}
@@ -10613,7 +10750,7 @@ function PuttingCompeteHoleEditModal({ hole, players, units, onSave, onCancel })
 // Full detail view for a single on-course round, opened by tapping it in "All rounds" — same
 // stat layout as the post-round Summary screen, plus a check-every-hole grid: all 18 holes at a
 // glance, any of them tappable to fix, and any hole that was never logged can be added.
-function RoundSummaryModal({ session, units, onEditHole, onClose }) {
+function RoundSummaryModal({ session, units, allRounds, onEditHole, onClose }) {
   const [editingHole, setEditingHole] = useState(null); // hole number being edited, or null
   const [addingMissing, setAddingMissing] = useState(false);
   const stats = courseRoundStats(session);
@@ -10746,18 +10883,19 @@ function RoundSummaryModal({ session, units, onEditHole, onClose }) {
 
         <ShareResultButton
           badge="PUTTING SESSION"
-          hero={`${onePuttPct.toFixed(0)}%`}
-          heroLabel="ONE-PUTT PERCENTAGE"
-          heroGood={onePuttPct >= 50}
+          bestLabels={puttingBestLabels(session, allRounds || [], units)}
+          hero={shareFtHero(ftToUnit(stats.ftMade, units))}
+          heroLabel={`${shortUnitLabel(units).toUpperCase()} MADE`}
+          heroGood
           stats={[
             ["PUTTS", String(stats.totalPutts)],
             ["AVG SG/PUTT", formatSG(stats.avgSG)],
             ["3+ PUTTS", String(threePutts)],
           ]}
           caption={
-            onePuttPct >= 50
-              ? `${onePuttPct.toFixed(0)}% one-putts today out on the course. Putting is finally starting to click. @The_golfpracticeapp`
-              : `Rough day on the greens today. Logging it anyway — the only way through is more reps. @The_golfpracticeapp`
+            stats.avgSG >= 0
+              ? `Holed ${shareFtHero(ftToUnit(stats.ftMade, units))}${shortUnitLabel(units)} of putts today out on the course. Putting is starting to click. @The_golfpracticeapp`
+              : `Holed ${shareFtHero(ftToUnit(stats.ftMade, units))}${shortUnitLabel(units)} of putts today out on the course. Logging every round — the reps are what count. @The_golfpracticeapp`
           }
           hashtags={["#golf", "#putting", "#golfpractice", "#strokesgained", "#golftips", "#ThePracticeApp"]}
         />
@@ -11736,7 +11874,8 @@ function TeeSessionDetailModal({ session, units, onEditShot, onClose }) {
   );
 }
 
-function TeeAccuracySummaryScreen({ shots, fairwayWidth, onNewSession, storageError, units }) {
+function TeeAccuracySummaryScreen({ shots, fairwayWidth, onNewSession, storageError, units, history }) {
+  const bestLabels = history && history[0] ? teeBestLabels(history[0], history) : [];
   const hitCount = shots.filter((s) => s.hit).length;
   const hitPct = (hitCount / shots.length) * 100;
   const unitLabel = longUnitLabel(units);
@@ -11794,6 +11933,7 @@ function TeeAccuracySummaryScreen({ shots, fairwayWidth, onNewSession, storageEr
 
       <ShareResultButton
         badge="RANGE SESSION"
+        bestLabels={bestLabels}
         hero={`${hitPct.toFixed(0)}%`}
         heroLabel="FAIRWAYS HIT"
         heroGood={hitPct >= 50}
@@ -16938,7 +17078,8 @@ function ShortGameSessionDetailModal({ session, units, onEditShot, onClose }) {
   );
 }
 
-function ShortGameSummaryScreen({ shots, onNewSession, storageError, units, feedback }) {
+function ShortGameSummaryScreen({ shots, onNewSession, storageError, units, feedback, history }) {
+  const bestLabels = history && history[0] ? shortGameBestLabels(history[0], history) : [];
   const avgResultFt = avg(shots.map((s) => s.resultFt));
   const sgValues = shots.map((s) => ({ ...s, sg: sgForShortGameShot(s.lie, s.target, s.resultFt) }));
   const avgSG = avg(sgValues.map((s) => s.sg));
@@ -16998,6 +17139,7 @@ function ShortGameSummaryScreen({ shots, onNewSession, storageError, units, feed
 
       <ShareResultButton
         badge="SHORT GAME SESSION"
+        bestLabels={bestLabels}
         hero={formatSG(avgSG)}
         heroLabel="AVG STROKES GAINED / SHOT"
         heroGood={avgSG >= 0}
@@ -17986,7 +18128,9 @@ function PuttingClockPlayScreen({ putts, pendingIndex, onOpenPutt, onRecordResul
   );
 }
 
-function PuttingClockSummaryScreen({ session, onPlayAgain, onExit, storageError, units }) {
+function PuttingClockSummaryScreen({ session, onPlayAgain, onExit, storageError, units, history }) {
+  const bestLabels = clockBestLabels(session, history || [], units);
+  const clockFtMade = puttsFtMade(session.putts);
   const perfect = session.made === 8;
   const sgList = session.putts.map((p) => sgForPutt(p.targetFt, p.strokes));
   const avgSG = avg(sgList);
@@ -18038,12 +18182,13 @@ function PuttingClockSummaryScreen({ session, onPlayAgain, onExit, storageError,
       )}
 
       <ShareResultButton
-        badge="PUTTING SESSION"
-        hero={`${session.made}/8`}
-        heroLabel="AROUND THE CLOCK"
-        heroGood={session.made >= 5}
+        badge="AROUND THE CLOCK"
+        bestLabels={bestLabels}
+        hero={shareFtHero(ftToUnit(clockFtMade, units))}
+        heroLabel={`${shortUnitLabel(units).toUpperCase()} MADE`}
+        heroGood
         stats={[
-          ["DRILL", "CLOCK"],
+          ["PUTTS MADE", `${session.made}/8`],
           ["AVG SG/PUTT", formatSG(avgSG)],
           ["TOTAL SG", formatSG(totalSG)],
         ]}
@@ -18252,7 +18397,8 @@ function PuttingStartLinePlayScreen({ madeInput, setMadeInput, onSubmit, onExit 
   );
 }
 
-function PuttingStartLineSummaryScreen({ session, onPlayAgain, onExit, storageError }) {
+function PuttingStartLineSummaryScreen({ session, onPlayAgain, onExit, storageError, history }) {
+  const bestLabels = startLineBestLabels(session, history || []);
   const perfect = session.made === session.total;
   const pct = Math.round((session.made / session.total) * 100);
 
@@ -18294,6 +18440,7 @@ function PuttingStartLineSummaryScreen({ session, onPlayAgain, onExit, storageEr
 
       <ShareResultButton
         badge="PUTTING SESSION"
+        bestLabels={bestLabels}
         hero={`${session.made}/${session.total}`}
         heroLabel="THROUGH THE GATE"
         heroGood={pct >= 70}
@@ -18603,7 +18750,8 @@ function PaceLog({ putts, units, onEditPoints }) {
   );
 }
 
-function PuttingPaceSummaryScreen({ session, onPlayAgain, onExit, storageError, units }) {
+function PuttingPaceSummaryScreen({ session, onPlayAgain, onExit, storageError, units, history }) {
+  const bestLabels = paceBestLabels(session, history || []);
   const { pct, avgPoints } = paceRoundStats(session);
   const perfect = session.totalPoints === session.maxPoints;
   const unitLabel = shortUnitLabel(units);
@@ -18692,6 +18840,7 @@ function PuttingPaceSummaryScreen({ session, onPlayAgain, onExit, storageError, 
 
       <ShareResultButton
         badge="PUTTING SESSION"
+        bestLabels={bestLabels}
         hero={`${pct}%`}
         heroLabel="OF MAX PACE POINTS"
         heroGood={pct >= 60}
@@ -19678,10 +19827,15 @@ function PuttingSessionDetailModal({ session, units, onEditShot, onClose }) {
   );
 }
 
-function PuttingSummaryScreen({ putts, onNewSession, storageError, units, feedback, isOnCourse, chipIns }) {
+function PuttingSummaryScreen({ putts, onNewSession, storageError, units, feedback, isOnCourse, chipIns, history }) {
+  const bestLabels = history && history[0] ? puttingBestLabels(history[0], history, units) : [];
+  const totalPutts = putts.reduce((a, p) => a + p.strokes, 0);
   const avgStrokes = avg(putts.map((p) => p.strokes));
-  const avgSG = avg(putts.map((p) => sgForPutt(p.targetFt, p.strokes)));
   const totalSG = putts.reduce((a, p) => a + sgForPutt(p.targetFt, p.strokes), 0);
+  // On-course, `putts` has one entry PER HOLE, so SG *per putt* is total SG over total putts (same as
+  // courseRoundStats and the Analysis tab) — not an average over holes. Practice entries are single
+  // putt attempts, so the plain average is right there.
+  const avgSG = isOnCourse ? (totalPutts ? totalSG / totalPutts : 0) : avg(putts.map((p) => sgForPutt(p.targetFt, p.strokes)));
   const onePutts = putts.filter((p) => p.strokes <= 1).length;
   const onePuttPct = (onePutts / putts.length) * 100;
   const threePutts = putts.filter((p) => p.strokes >= 3).length;
@@ -19692,10 +19846,9 @@ function PuttingSummaryScreen({ putts, onNewSession, storageError, units, feedba
   const distMin = Math.min(...putts.map((p) => p.targetFt));
   const distMax = Math.max(...putts.map((p) => p.targetFt));
   const unitLabel = shortUnitLabel(units);
-  // For an on-course round, `putts` has one entry PER HOLE (strokes = putts taken on that hole), so
-  // putts.length is holes putted, not putts. The real putt count is the sum of strokes. For practice
-  // sessions each entry is a single putt attempt, so the entry count is what's always been shown.
-  const totalPutts = putts.reduce((a, p) => a + p.strokes, 0);
+  // For an on-course round, putts.length is holes putted, not putts — the real putt count is
+  // totalPutts (above). For practice sessions each entry is a single putt attempt, so the entry
+  // count is what's always been shown.
   const puttsDisplayed = isOnCourse ? totalPutts : putts.length;
 
   return (
@@ -19761,9 +19914,10 @@ function PuttingSummaryScreen({ putts, onNewSession, storageError, units, feedba
 
       <ShareResultButton
         badge="PUTTING SESSION"
-        hero={`${onePuttPct.toFixed(0)}%`}
-        heroLabel="ONE-PUTT PERCENTAGE"
-        heroGood={onePuttPct >= 50}
+        bestLabels={bestLabels}
+        hero={shareFtHero(ftToUnit(ftMade, units))}
+        heroLabel={`${unitLabel.toUpperCase()} MADE`}
+        heroGood
         stats={
           isOnCourse
             ? [
@@ -19778,9 +19932,9 @@ function PuttingSummaryScreen({ putts, onNewSession, storageError, units, feedba
               ]
         }
         caption={
-          onePuttPct >= 50
-            ? `${onePuttPct.toFixed(0)}% one-putts today ${isOnCourse ? "out on the course" : "on the practice green"}. Putting is finally starting to click. @The_golfpracticeapp`
-            : `Rough day on the greens today. Logging it anyway — the only way through is more reps. @The_golfpracticeapp`
+          avgSG >= 0
+            ? `Holed ${shareFtHero(ftToUnit(ftMade, units))}${unitLabel} of putts today ${isOnCourse ? "out on the course" : "on the practice green"}. Putting is starting to click. @The_golfpracticeapp`
+            : `Holed ${shareFtHero(ftToUnit(ftMade, units))}${unitLabel} of putts today ${isOnCourse ? "out on the course" : "on the practice green"}. Logging every round — the reps are what count. @The_golfpracticeapp`
         }
         hashtags={["#golf", "#putting", "#golfpractice", "#strokesgained", "#golftips", "#ThePracticeApp"]}
       />
@@ -21699,6 +21853,7 @@ function OnCourseAnalysisBody({ history, loaded, onDeleteSession, onEditCourseHo
       {selectedRound && (
         <RoundSummaryModal
           session={selectedRound}
+          allRounds={history}
           units={units}
           onEditHole={(action) => onEditCourseHole(selectedRound.id, action)}
           onClose={() => setSelectedRoundId(null)}
