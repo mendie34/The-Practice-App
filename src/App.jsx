@@ -37,7 +37,7 @@ export const FONT_IMPORT = `@import url('https://fonts.googleapis.com/css2?famil
 @media print {
   .no-print { display: none !important; }
   .print-only { display: block !important; }
-  * { color: #14291F !important; background: #ffffff !important; border-color: #ccc !important; box-shadow: none !important; }
+  * { color: #1C1C1A !important; background: #ffffff !important; border-color: #ccc !important; box-shadow: none !important; }
 }
 .print-only { display: none; }
 .home-info-tooltip { display: none; }
@@ -49,14 +49,14 @@ export const FONT_IMPORT = `@import url('https://fonts.googleapis.com/css2?famil
 }`;
 
 export const COLORS = {
-  turfDark: "#14291F",
-  turf: "#1D3A2B",
-  fairway: "#2F6B4F",
-  fairwayLight: "#4C8A68",
-  cream: "#F1EAD6",
-  creamDim: "#E4DBC2",
-  flag: "#C1440E",
-  sand: "#C9A66B",
+  turfDark: "#1C1C1A",
+  turf: "#262624",
+  fairway: "#3FA377",
+  fairwayLight: "#4CAF7D",
+  cream: "#F2F0EB",
+  creamDim: "#9a9a94",
+  flag: "#E0655A",
+  sand: "#D9AA4C",
 };
 
 // Real static asset (see public/logo.png) rather than an inline data URI — this is a normal
@@ -136,8 +136,7 @@ function shareWrapCenteredText(ctx, text, cx, y, maxWidth, lineHeight) {
 }
 
 // stats: up to 3 [label, value] pairs shown in the row below the hero number.
-// best: optional string (e.g. "FT MADE") — when set, a gold "PERSONAL BEST" pill is drawn under the hero.
-function drawShareCard(canvas, { badge, hero, heroLabel, heroGood, stats, best }) {
+function drawShareCard(canvas, { badge, hero, heroLabel, heroGood, stats }) {
   const ctx = canvas.getContext("2d");
   const W = canvas.width;
   const H = canvas.height;
@@ -166,12 +165,12 @@ function drawShareCard(canvas, { badge, hero, heroLabel, heroGood, stats, best }
   ctx.textAlign = "center";
 
   ctx.fillStyle = COLORS.cream;
-  ctx.font = "600 30px 'JetBrains Mono', monospace";
+  ctx.font = "600 30px system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
   ctx.fillText("THE PRACTICE APP", W / 2, 70);
 
   drawShareLogoBadge(ctx, W / 2, 195, 190);
 
-  ctx.font = "700 28px 'JetBrains Mono', monospace";
+  ctx.font = "700 28px system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
   const badgeW = ctx.measureText(badge).width + 60;
   ctx.fillStyle = COLORS.turf;
   shareRoundRectPath(ctx, W / 2 - badgeW / 2, 310, badgeW, 60, 30);
@@ -181,28 +180,12 @@ function drawShareCard(canvas, { badge, hero, heroLabel, heroGood, stats, best }
 
   const heroColor = heroGood ? COLORS.fairwayLight : COLORS.flag;
   ctx.fillStyle = heroColor;
-  ctx.font = "700 260px 'Bebas Neue', sans-serif";
+  ctx.font = "700 260px system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
   ctx.fillText(hero, W / 2, 650);
 
   ctx.fillStyle = COLORS.creamDim;
-  ctx.font = "600 30px 'JetBrains Mono', monospace";
+  ctx.font = "600 30px system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
   ctx.fillText(heroLabel, W / 2, 710);
-
-  if (best) {
-    const text = `★ PERSONAL BEST · ${best}`;
-    let fs = 28;
-    ctx.font = `700 ${fs}px 'JetBrains Mono', monospace`;
-    while (ctx.measureText(text).width + 60 > W - 120 && fs > 16) {
-      fs -= 2;
-      ctx.font = `700 ${fs}px 'JetBrains Mono', monospace`;
-    }
-    const pillW = ctx.measureText(text).width + 60;
-    ctx.fillStyle = COLORS.sand;
-    shareRoundRectPath(ctx, W / 2 - pillW / 2, 728, pillW, 46, 23);
-    ctx.fill();
-    ctx.fillStyle = COLORS.turfDark;
-    ctx.fillText(text, W / 2, 728 + 32);
-  }
 
   ctx.strokeStyle = `${COLORS.creamDim}33`;
   ctx.lineWidth = 2;
@@ -216,20 +199,20 @@ function drawShareCard(canvas, { badge, hero, heroLabel, heroGood, stats, best }
   stats.slice(0, 3).forEach((st, i) => {
     const cx = 80 + colW * i + colW / 2;
     ctx.fillStyle = COLORS.cream;
-    ctx.font = "700 58px 'Bebas Neue', sans-serif";
+    ctx.font = "700 58px system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
     ctx.fillText(st[1], cx, statY);
     ctx.fillStyle = COLORS.creamDim;
-    ctx.font = "500 20px 'JetBrains Mono', monospace";
+    ctx.font = "500 20px system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
     shareWrapCenteredText(ctx, st[0], cx, statY + 40, colW - 10, 24);
   });
 
   const dateStr = new Date().toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" });
   ctx.fillStyle = COLORS.creamDim;
-  ctx.font = "500 26px 'JetBrains Mono', monospace";
+  ctx.font = "500 26px system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
   ctx.fillText(dateStr, W / 2, H - 110);
 
   ctx.fillStyle = COLORS.sand;
-  ctx.font = "600 24px 'JetBrains Mono', monospace";
+  ctx.font = "600 24px system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
   ctx.fillText("TRACK YOUR GAME → THEPRACTICEAPP.CO.UK", W / 2, H - 60);
 }
 
@@ -257,9 +240,7 @@ function generateShareCardBlob(cardData) {
 // ShareResultButton — the caller (each Summary screen) computes its own hero stat, mood, caption
 // and hashtags from its own local session data, same as it already computes its own StatBoxes.
 // This component only knows how to render the card and run the share/fallback flow.
-// bestLabels: names of the stats that are a genuine new personal best (see personalBestLabels) — empty/omitted
-// means no callout. It's drawn on the card AND opens the caption, so the post says it too.
-function ShareResultButton({ badge, hero, heroLabel, heroGood, stats, caption, hashtags, bestLabels }) {
+function ShareResultButton({ badge, hero, heroLabel, heroGood, stats, caption, hashtags }) {
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -267,10 +248,9 @@ function ShareResultButton({ badge, hero, heroLabel, heroGood, stats, caption, h
     setBusy(true);
     setStatus("");
     try {
-      const best = bestLabels && bestLabels.length ? bestLabels.join(" + ") : null;
-      const blob = await generateShareCardBlob({ badge, hero, heroLabel, heroGood, stats, best });
+      const blob = await generateShareCardBlob({ badge, hero, heroLabel, heroGood, stats });
       const file = new File([blob], "practice-app-result.png", { type: "image/png" });
-      const fullCaption = `${best ? `★ New personal best — ${best}! ` : ""}${caption}\n\n${hashtags.join(" ")}`;
+      const fullCaption = `${caption}\n\n${hashtags.join(" ")}`;
 
       if (navigator.canShare && navigator.canShare({ files: [file] })) {
         try {
@@ -312,7 +292,7 @@ function ShareResultButton({ badge, hero, heroLabel, heroGood, stats, caption, h
           border: `1px solid ${COLORS.sand}`,
           background: "transparent",
           color: COLORS.sand,
-          fontFamily: "'Bebas Neue', sans-serif",
+          fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
           fontSize: 20,
           letterSpacing: 2,
           cursor: busy ? "not-allowed" : "pointer",
@@ -324,7 +304,7 @@ function ShareResultButton({ badge, hero, heroLabel, heroGood, stats, caption, h
       {status && (
         <div
           style={{
-            fontFamily: "'JetBrains Mono', monospace",
+            fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
             fontSize: 11,
             color: COLORS.creamDim,
             marginTop: 6,
@@ -344,7 +324,7 @@ export function PlayerBadge({ style }) {
     <div
       style={{
         display: "inline-block",
-        fontFamily: "'JetBrains Mono', monospace",
+        fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
         fontSize: 10,
         letterSpacing: 1.5,
         color: COLORS.turfDark,
@@ -1322,7 +1302,7 @@ function DistanceScoreInfoModal({ onClose }) {
           overflowY: "auto",
         }}
       >
-        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 20, letterSpacing: 1, color: COLORS.cream }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 20, letterSpacing: 1, color: COLORS.cream }}>
           PAR SCORING
         </div>
         <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 12, color: COLORS.cream, lineHeight: 1.55, marginTop: 8 }}>
@@ -1334,7 +1314,7 @@ function DistanceScoreInfoModal({ onClose }) {
         <div
           style={{
             marginTop: 12,
-            fontFamily: "'JetBrains Mono', monospace",
+            fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
             fontSize: 10,
             color: COLORS.creamDim,
             letterSpacing: 1,
@@ -1352,7 +1332,7 @@ function DistanceScoreInfoModal({ onClose }) {
                 alignItems: "center",
                 padding: "8px 12px",
                 borderTop: i === 0 ? "none" : `1px solid ${COLORS.creamDim}11`,
-                fontFamily: "'JetBrains Mono', monospace",
+                fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                 fontSize: 12,
               }}
             >
@@ -1361,7 +1341,7 @@ function DistanceScoreInfoModal({ onClose }) {
             </div>
           ))}
         </div>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginTop: 10, lineHeight: 1.5 }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.creamDim, marginTop: 10, lineHeight: 1.5 }}>
           Change your baseline in Settings to switch bands — every level now has its own.
         </div>
         <button
@@ -1374,7 +1354,7 @@ function DistanceScoreInfoModal({ onClose }) {
             border: "none",
             background: COLORS.fairway,
             color: COLORS.cream,
-            fontFamily: "'Bebas Neue', sans-serif",
+            fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
             fontSize: 16,
             letterSpacing: 1,
             cursor: "pointer",
@@ -1592,11 +1572,11 @@ function buildWedgeMatrixSVG(matrix, units) {
   const width = padding * 2 + labelColW + colW * swings.length;
   const height = padding * 2 + titleH + headerH + rowH * clubs.length;
 
-  const TURF_DARK = "#14291F";
-  const TURF = "#1D3A2B";
-  const CREAM = "#F1EAD6";
-  const CREAM_DIM = "#E4DBC2";
-  const FLAG = "#C1440E";
+  const TURF_DARK = "#1C1C1A";
+  const TURF = "#262624";
+  const CREAM = "#F2F0EB";
+  const CREAM_DIM = "#9a9a94";
+  const FLAG = "#E0655A";
 
   let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">`;
   svg += `<rect width="${width}" height="${height}" fill="${TURF_DARK}"/>`;
@@ -1678,11 +1658,11 @@ function buildGappingChartSVG(chart, units) {
   const width = padding * 2 + labelColW + valueColW;
   const height = padding * 2 + titleH + rowH * clubs.length;
 
-  const TURF_DARK = "#14291F";
-  const TURF = "#1D3A2B";
-  const CREAM = "#F1EAD6";
-  const CREAM_DIM = "#E4DBC2";
-  const FLAG = "#C1440E";
+  const TURF_DARK = "#1C1C1A";
+  const TURF = "#262624";
+  const CREAM = "#F2F0EB";
+  const CREAM_DIM = "#9a9a94";
+  const FLAG = "#E0655A";
 
   let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">`;
   svg += `<rect width="${width}" height="${height}" fill="${TURF_DARK}"/>`;
@@ -2010,7 +1990,7 @@ function ShortGameScoreInfoModal({ onClose }) {
           overflowY: "auto",
         }}
       >
-        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 20, letterSpacing: 1, color: COLORS.cream }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 20, letterSpacing: 1, color: COLORS.cream }}>
           PAR SCORING
         </div>
         <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 12, color: COLORS.cream, lineHeight: 1.55, marginTop: 8 }}>
@@ -2023,7 +2003,7 @@ function ShortGameScoreInfoModal({ onClose }) {
         <div
           style={{
             marginTop: 12,
-            fontFamily: "'JetBrains Mono', monospace",
+            fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
             fontSize: 10,
             color: COLORS.creamDim,
             letterSpacing: 1,
@@ -2040,7 +2020,7 @@ function ShortGameScoreInfoModal({ onClose }) {
           );
           return (
             <div key={lie} style={{ marginTop: 12 }}>
-              <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.sand, letterSpacing: 1 }}>
+              <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.sand, letterSpacing: 1 }}>
                 {LIE_LABELS[lie]}
               </div>
               <div style={{ marginTop: 4, border: `1px solid ${COLORS.creamDim}22`, borderRadius: 10, overflow: "hidden" }}>
@@ -2053,7 +2033,7 @@ function ShortGameScoreInfoModal({ onClose }) {
                       alignItems: "center",
                       padding: "7px 12px",
                       borderTop: i === 0 ? "none" : `1px solid ${COLORS.creamDim}11`,
-                      fontFamily: "'JetBrains Mono', monospace",
+                      fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                       fontSize: 12,
                     }}
                   >
@@ -2065,7 +2045,7 @@ function ShortGameScoreInfoModal({ onClose }) {
             </div>
           );
         })}
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginTop: 12, lineHeight: 1.5 }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.creamDim, marginTop: 12, lineHeight: 1.5 }}>
           Change your baseline in Settings to switch bands — every level has its own for Short
           Game, same as Distance Control.
         </div>
@@ -2079,7 +2059,7 @@ function ShortGameScoreInfoModal({ onClose }) {
             border: "none",
             background: COLORS.fairway,
             color: COLORS.cream,
-            fontFamily: "'Bebas Neue', sans-serif",
+            fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
             fontSize: 16,
             letterSpacing: 1,
             cursor: "pointer",
@@ -2150,13 +2130,6 @@ function sgRagColor(avgSG) {
   if (avgSG >= 0) return COLORS.fairwayLight;
   if (avgSG >= -0.15) return COLORS.sand;
   return COLORS.flag;
-}
-
-// Strokes-gained BAR charts use a plain two-colour rule instead of the three-band sgRagColor above:
-// positive (0 or better) = green, negative = red. Bars are compared side by side, so the sign is the
-// thing that has to read at a glance — there is no amber "in between" bar.
-function sgBarColor(sg) {
-  return sg >= 0 ? COLORS.fairwayLight : COLORS.flag;
 }
 
 // A hole is complete once its most recent putt attempt actually went in — everything before
@@ -2481,17 +2454,17 @@ function RatingBucketRow({ bucket }) {
   return (
     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0" }}>
       <div>
-        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 20, color: COLORS.cream }}>{bucket.label}y</div>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim }}>{bucket.count} shots</div>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 20, color: COLORS.cream }}>{bucket.label}y</div>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim }}>{bucket.count} shots</div>
       </div>
       <div style={{ textAlign: "right" }}>
-        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 22, color: ratingRagColor(bucket.avgRating) }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 22, color: ratingRagColor(bucket.avgRating) }}>
           {bucket.avgRating.toFixed(1)}/5
         </div>
         {bucket.improvement !== null && bucket.improvement !== undefined && (
           <div
             style={{
-              fontFamily: "'JetBrains Mono', monospace",
+              fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
               fontSize: 11,
               color: bucket.improvement > 0 ? COLORS.fairwayLight : COLORS.flag,
             }}
@@ -2509,13 +2482,13 @@ function RatingInsightCard({ title, subtitle, items, emptyText }) {
     <Card style={{ marginBottom: 14 }}>
       <SectionLabel>{title}</SectionLabel>
       {subtitle && (
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
           {subtitle}
         </div>
       )}
       <div style={{ marginTop: 8 }}>
         {items.length === 0 ? (
-          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: COLORS.creamDim, padding: "6px 0" }}>
+          <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 12, color: COLORS.creamDim, padding: "6px 0" }}>
             {emptyText}
           </div>
         ) : (
@@ -2528,113 +2501,6 @@ function RatingInsightCard({ title, subtitle, items, emptyText }) {
       </div>
     </Card>
   );
-}
-
-// ===== Personal bests for the share cards =====
-// A card only calls something a personal best when it is a STRICT improvement over EVERY earlier
-// session it can fairly be compared with. Ties don't count, a first-ever session has nothing to beat,
-// and "fairly" is decided per stat (e.g. a 9-hole round is never compared with 18-hole rounds on
-// total feet made) — so the callout can be trusted, not just handed out.
-// metrics: [{ label, fn(session) -> number, comparable?(otherSession, session) -> bool }]
-function personalBestLabels(session, sessions, metrics) {
-  if (!session || !sessions) return [];
-  const t = new Date(session.date).getTime();
-  const earlier = sessions.filter((s) => s.id !== session.id && new Date(s.date).getTime() < t);
-  const labels = [];
-  metrics.forEach(({ label, fn, comparable }) => {
-    const cur = fn(session);
-    if (typeof cur !== "number" || !isFinite(cur)) return;
-    const prior = earlier.filter((s) => !comparable || comparable(s, session));
-    const vals = prior.map(fn).filter((v) => typeof v === "number" && isFinite(v));
-    if (vals.length === 0) return;
-    if (cur > Math.max(...vals) + 1e-9) labels.push(label);
-  });
-  return labels;
-}
-
-// Feet of putts actually holed: the exact holing distance where it was recorded, otherwise the
-// old approximation (only holes/putts that went in first time count) — same rule as FT MADE elsewhere.
-function puttsFtMade(putts) {
-  return putts.reduce((a, p) => a + (p.holedFromFt != null ? p.holedFromFt : p.strokes === 1 ? p.targetFt : 0), 0);
-}
-function puttsAvgSG(putts) {
-  return avg(putts.map((p) => sgForPutt(p.targetFt, p.strokes)));
-}
-// Big share-card number for feet/metres made: one decimal under 100, whole number above.
-function shareFtHero(v) {
-  const r = Math.round(v * 10) / 10;
-  return r >= 100 ? String(Math.round(v)) : r.toFixed(1);
-}
-// 9-hole-ish rounds vs 18-hole-ish rounds — only like is compared with like for total feet made.
-function courseRoundBucket(s) {
-  return s.putts.length + (s.chipIns || 0) <= 10 ? 9 : 18;
-}
-
-function rangeBestLabels(session, sessions) {
-  const isRating = session.mode === "rating";
-  return personalBestLabels(session, sessions, [
-    isRating
-      ? { label: "AVG RATING", fn: (s) => avg(s.shots.map((sh) => sh.rating)), comparable: (s) => s.mode === "rating" }
-      : {
-          label: "AVG SG",
-          fn: (s) => avg(s.shots.map((sh) => sgForApproachShot(sh.target, sh.actual))),
-          comparable: (s) => s.mode !== "rating",
-        },
-  ]);
-}
-function teeBestLabels(session, sessions) {
-  // Hit % only means the same thing at the same fairway width.
-  return personalBestLabels(session, sessions, [
-    { label: "FAIRWAYS HIT", fn: (s) => s.hitPct, comparable: (s, cur) => s.fairwayWidth === cur.fairwayWidth },
-  ]);
-}
-function shortGameBestLabels(session, sessions) {
-  return personalBestLabels(session, sessions, [
-    { label: "AVG SG", fn: (s) => avg(s.shots.map((sh) => sgForShortGameShot(sh.lie, sh.target, sh.resultFt))) },
-  ]);
-}
-// Random Practice + On Course share puttHistory, told apart by session.type.
-function puttingBestLabels(session, sessions, units) {
-  const madeLabel = `${shortUnitLabel(units).toUpperCase()} MADE`;
-  if (session.type === "course") {
-    return personalBestLabels(session, sessions, [
-      {
-        label: madeLabel,
-        fn: (s) => puttsFtMade(s.putts),
-        comparable: (s, cur) => s.type === "course" && courseRoundBucket(s) === courseRoundBucket(cur),
-      },
-      { label: "AVG SG/PUTT", fn: (s) => courseRoundStats(s).avgSG, comparable: (s) => s.type === "course" },
-    ]);
-  }
-  return personalBestLabels(session, sessions, [
-    {
-      label: madeLabel,
-      fn: (s) => puttsFtMade(s.putts),
-      // Feet made depends on how many putts, from how far — compare the same setup only.
-      comparable: (s, cur) =>
-        s.type !== "course" && s.puttCount === cur.puttCount && s.puttMinFt === cur.puttMinFt && s.puttMaxFt === cur.puttMaxFt,
-    },
-    { label: "AVG SG/PUTT", fn: (s) => puttsAvgSG(s.putts), comparable: (s) => s.type !== "course" },
-  ]);
-}
-function clockBestLabels(session, sessions, units) {
-  return personalBestLabels(session, sessions, [
-    { label: `${shortUnitLabel(units).toUpperCase()} MADE`, fn: (s) => puttsFtMade(s.putts) },
-    { label: "AVG SG/PUTT", fn: (s) => puttsAvgSG(s.putts) },
-  ]);
-}
-function startLineBestLabels(session, sessions) {
-  return personalBestLabels(session, sessions, [{ label: "THROUGH THE GATE", fn: (s) => s.made }]);
-}
-function paceBestLabels(session, sessions) {
-  // Same distances and same putts-per-distance, or the % of max points isn't like-for-like.
-  return personalBestLabels(session, sessions, [
-    {
-      label: "PACE POINTS",
-      fn: (s) => (s.maxPoints ? s.totalPoints / s.maxPoints : NaN),
-      comparable: (s, cur) => s.puttsPerDistance === cur.puttsPerDistance && JSON.stringify(s.distances) === JSON.stringify(cur.distances),
-    },
-  ]);
 }
 
 // ===== Post-session feedback ("that was your 2nd best session ever") =====
@@ -2726,10 +2592,10 @@ function SessionFeedbackBanner({ feedback }) {
   const c = toneColors[feedback.tone] || toneColors.neutral;
   return (
     <Card style={{ marginBottom: 10, border: `1px solid ${c.border}`, background: c.bg }}>
-      <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 20, letterSpacing: 1, color: COLORS.cream }}>
+      <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 20, letterSpacing: 1, color: COLORS.cream }}>
         {feedback.headline}
       </div>
-      <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 4 }}>
+      <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, marginTop: 4 }}>
         {feedback.detail}
       </div>
     </Card>
@@ -3514,15 +3380,6 @@ export default function GolfPracticeApp({ onSwitchProfile, onCreateProfile, prof
     }
   }
 
-  // Replaces a whole hole in one go (the hole editor needs to set putts AND noPutt together — two
-  // updateOnCourseHole calls in a row would each start from the same stale array and the second
-  // would overwrite the first).
-  function setOnCourseHole(index, hole) {
-    const next = onCourseHoles.map((h, i) => (i === index ? hole : h));
-    setOnCourseHoles(next);
-    persistOnCourseHoles(next);
-  }
-
   function updateOnCourseHole(index, field, value) {
     const next = onCourseHoles.map((h, i) => (i === index ? { ...h, [field]: value } : h));
     setOnCourseHoles(next);
@@ -3542,16 +3399,10 @@ export default function GolfPracticeApp({ onSwitchProfile, onCreateProfile, prof
   async function finishOnCourseRound() {
     const completed = onCourseHoles.filter(isHoleComplete);
     if (completed.length === 0) return;
-    // Keep each hole's REAL number (index + 1) — without it, a hole that was skipped or chipped in
-    // is indistinguishable from one that was never played, and the saved round can't be checked
-    // hole by hole afterwards.
-    const numbered = onCourseHoles.map((h, i) => ({ h, hole: i + 1 })).filter(({ h }) => isHoleComplete(h));
-    const puttedHoles = numbered.filter(({ h }) => !h.noPutt);
-    const chipInHoles = numbered.filter(({ h }) => h.noPutt).map(({ hole }) => hole);
-    const chipIns = chipInHoles.length;
+    const puttedHoles = completed.filter((h) => !h.noPutt);
+    const chipIns = completed.filter((h) => h.noPutt).length;
     if (puttedHoles.length === 0) return; // every completed hole was a chip-in — nothing to compute putting stats from
-    const finalPutts = puttedHoles.map(({ h, hole }) => ({
-      hole,
+    const finalPutts = puttedHoles.map((h) => ({
       targetFt: h.putts[0].distanceFt,
       strokes: h.putts.length,
       holedFromFt: h.putts[h.putts.length - 1].distanceFt,
@@ -3567,7 +3418,6 @@ export default function GolfPracticeApp({ onSwitchProfile, onCreateProfile, prof
       totalStrokes: finalPutts.reduce((a, p) => a + p.strokes, 0),
       avgStrokes: avg(finalPutts.map((p) => p.strokes)),
       chipIns, // holes chipped in from off the green — tracked separately, not part of putt stats
-      chipInHoles, // which holes those were, so the round can be reviewed hole by hole later
       holesPlayed: completed.length, // puttedHoles + chipIns, for context
     };
     const newHistory = [session, ...puttHistory];
@@ -3642,23 +3492,6 @@ export default function GolfPracticeApp({ onSwitchProfile, onCreateProfile, prof
     } catch (e) {
       setPuttStorageError(true);
     }
-  }
-
-  // Adds / corrects / removes one hole on an already-saved ON-COURSE round (see
-  // applyCourseHoleChange for the rules). Resolves true if it applied, false if it was refused.
-  async function editCourseRoundHole(sessionId, action) {
-    const target = puttHistory.find((s) => s.id === sessionId);
-    if (!target) return false;
-    const updated = applyCourseHoleChange(target, action.hole, action);
-    if (!updated) return false;
-    const newHistory = puttHistory.map((s) => (s.id === sessionId ? updated : s));
-    setPuttHistory(newHistory);
-    try {
-      await window.storage.set("putting:sessions", JSON.stringify(newHistory), false);
-    } catch (e) {
-      setPuttStorageError(true);
-    }
-    return true;
   }
 
   // ===== Putting — "Around the Clock" handlers =====
@@ -5312,7 +5145,11 @@ export default function GolfPracticeApp({ onSwitchProfile, onCreateProfile, prof
     <div
       style={{
         fontFamily: "'Inter', sans-serif",
-        background: `radial-gradient(circle at 20% 0%, ${COLORS.turf} 0%, ${COLORS.turfDark} 60%)`,
+        backgroundColor: COLORS.turfDark,
+        backgroundImage:
+          "radial-gradient(circle, rgba(255,255,255,0.045) 1.3px, transparent 1.5px), radial-gradient(circle, rgba(255,255,255,0.045) 1.3px, transparent 1.5px)",
+        backgroundSize: "20px 20px, 20px 20px",
+        backgroundPosition: "0 0, 10px 10px",
         minHeight: "100vh",
         color: COLORS.cream,
         display: "flex",
@@ -5392,7 +5229,6 @@ export default function GolfPracticeApp({ onSwitchProfile, onCreateProfile, prof
             storageError={storageError}
             units={units}
             feedback={rangeSessionFeedback}
-            history={history}
           />
         )}
 
@@ -5410,7 +5246,6 @@ export default function GolfPracticeApp({ onSwitchProfile, onCreateProfile, prof
             puttingLoaded={puttLoaded}
             onDeletePuttingSession={deletePuttingSession}
             onEditPuttingSessionShot={editPuttingSessionPutt}
-            onEditCourseHole={editCourseRoundHole}
             clockHistory={clockHistory}
             clockLoaded={clockLoaded}
             onDeleteClockSession={deleteClockSession}
@@ -5595,7 +5430,6 @@ export default function GolfPracticeApp({ onSwitchProfile, onCreateProfile, prof
             shots={teeShots}
             fairwayWidth={teeFairwayWidth}
             onNewSession={resetTeeToSetup}
-            history={teeHistory}
             storageError={teeStorageError}
             units={units}
           />
@@ -5954,7 +5788,6 @@ export default function GolfPracticeApp({ onSwitchProfile, onCreateProfile, prof
             storageError={shortStorageError}
             units={units}
             feedback={shortSessionFeedback}
-            history={shortHistory}
           />
         )}
 
@@ -5987,7 +5820,6 @@ export default function GolfPracticeApp({ onSwitchProfile, onCreateProfile, prof
           <PuttingCourseSetupScreen
             onCourseHoles={onCourseHoles}
             onUpdateCourseHole={updateOnCourseHole}
-            onSetCourseHole={setOnCourseHole}
             onFinishOnCourse={finishOnCourseRound}
             onClearOnCourse={clearOnCourseRound}
             onLoadTestCourseData={loadTestCourseRounds}
@@ -6017,7 +5849,6 @@ export default function GolfPracticeApp({ onSwitchProfile, onCreateProfile, prof
         {screen === "puttingClockSummary" && clockHistory.length > 0 && (
           <PuttingClockSummaryScreen
             session={clockHistory[0]}
-            history={clockHistory}
             onPlayAgain={startClockRound}
             onExit={() => setScreen("puttingChoose")}
             storageError={clockStorageError}
@@ -6041,7 +5872,6 @@ export default function GolfPracticeApp({ onSwitchProfile, onCreateProfile, prof
         {screen === "puttingStartLineSummary" && startLineHistory.length > 0 && (
           <PuttingStartLineSummaryScreen
             session={startLineHistory[0]}
-            history={startLineHistory}
             onPlayAgain={startStartLineDrill}
             onExit={() => setScreen("puttingChoose")}
             storageError={startLineStorageError}
@@ -6076,7 +5906,6 @@ export default function GolfPracticeApp({ onSwitchProfile, onCreateProfile, prof
         {screen === "puttingPaceSummary" && paceHistory.length > 0 && (
           <PuttingPaceSummaryScreen
             session={paceHistory[0]}
-            history={paceHistory}
             onPlayAgain={() => setScreen("puttingPaceSetup")}
             onExit={() => setScreen("puttingChoose")}
             storageError={paceStorageError}
@@ -6114,7 +5943,6 @@ export default function GolfPracticeApp({ onSwitchProfile, onCreateProfile, prof
             feedback={puttSessionFeedback}
             isOnCourse={puttSummaryIsOnCourse}
             chipIns={puttSummaryChipIns}
-            history={puttHistory}
           />
         )}
       </div>
@@ -6141,7 +5969,7 @@ function Header({ screen, onSettings, onHome, onBack, backDestination }) {
         <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
           <div
             style={{
-              fontFamily: "'Bebas Neue', sans-serif",
+              fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
               fontSize: 19,
               letterSpacing: 0.5,
               lineHeight: 1,
@@ -6161,7 +5989,7 @@ function Header({ screen, onSettings, onHome, onBack, backDestination }) {
               background: "none",
               border: `1px solid ${COLORS.creamDim}55`,
               color: COLORS.creamDim,
-              fontFamily: "'JetBrains Mono', monospace",
+              fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
               fontSize: 10,
               padding: "4px 7px",
               borderRadius: 6,
@@ -6178,7 +6006,7 @@ function Header({ screen, onSettings, onHome, onBack, backDestination }) {
               background: "none",
               border: `1px solid ${COLORS.creamDim}55`,
               color: COLORS.creamDim,
-              fontFamily: "'JetBrains Mono', monospace",
+              fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
               fontSize: 10,
               padding: "4px 7px",
               borderRadius: 6,
@@ -6195,7 +6023,7 @@ function Header({ screen, onSettings, onHome, onBack, backDestination }) {
               background: "none",
               border: `1px solid ${COLORS.creamDim}55`,
               color: COLORS.creamDim,
-              fontFamily: "'JetBrains Mono', monospace",
+              fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
               fontSize: 10,
               padding: "4px 7px",
               borderRadius: 6,
@@ -6221,7 +6049,7 @@ function PillOption({ label, active, onClick }) {
         border: active ? `2px solid ${COLORS.fairwayLight}` : `1px solid ${COLORS.creamDim}33`,
         background: active ? COLORS.fairway : "transparent",
         color: active ? COLORS.cream : COLORS.creamDim,
-        fontFamily: "'Bebas Neue', sans-serif",
+        fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
         fontSize: 18,
         letterSpacing: 1,
         cursor: "pointer",
@@ -6239,8 +6067,8 @@ function RangeOnboardingScreen({ onAnswer }) {
   return (
     <div>
       <div style={{ marginBottom: 16 }}>
-        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 24, letterSpacing: 1, lineHeight: 1 }}>THE RANGE</div>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 24, letterSpacing: 1, lineHeight: 1 }}>THE RANGE</div>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
           One quick question before you start
         </div>
       </div>
@@ -6261,7 +6089,7 @@ function RangeOnboardingScreen({ onAnswer }) {
                 border: "none",
                 background: COLORS.flag,
                 color: COLORS.cream,
-                fontFamily: "'Bebas Neue', sans-serif",
+                fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                 fontSize: 18,
                 letterSpacing: 1,
                 cursor: "pointer",
@@ -6278,7 +6106,7 @@ function RangeOnboardingScreen({ onAnswer }) {
                 border: `1px solid ${COLORS.creamDim}33`,
                 background: "transparent",
                 color: COLORS.cream,
-                fontFamily: "'Bebas Neue', sans-serif",
+                fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                 fontSize: 18,
                 letterSpacing: 1,
                 cursor: "pointer",
@@ -6304,7 +6132,7 @@ function RangeOnboardingScreen({ onAnswer }) {
                 border: `1px solid ${COLORS.creamDim}33`,
                 background: "transparent",
                 color: COLORS.cream,
-                fontFamily: "'Bebas Neue', sans-serif",
+                fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                 fontSize: 16,
                 letterSpacing: 1,
                 cursor: "pointer",
@@ -6320,7 +6148,7 @@ function RangeOnboardingScreen({ onAnswer }) {
                 border: "none",
                 background: COLORS.flag,
                 color: COLORS.cream,
-                fontFamily: "'Bebas Neue', sans-serif",
+                fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                 fontSize: 16,
                 letterSpacing: 1,
                 cursor: "pointer",
@@ -6335,7 +6163,7 @@ function RangeOnboardingScreen({ onAnswer }) {
               textAlign: "center",
               marginTop: 12,
               color: COLORS.creamDim,
-              fontFamily: "'JetBrains Mono', monospace",
+              fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
               fontSize: 10,
               cursor: "pointer",
               textDecoration: "underline",
@@ -6347,7 +6175,7 @@ function RangeOnboardingScreen({ onAnswer }) {
         </Card>
       )}
 
-      <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginTop: 12, lineHeight: 1.5 }}>
+      <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.creamDim, marginTop: 12, lineHeight: 1.5 }}>
         You can change this later in Settings.
       </div>
     </div>
@@ -6374,8 +6202,8 @@ function SetupScreen({
   return (
     <div>
       <div style={{ marginBottom: 12 }}>
-        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 24, letterSpacing: 1, lineHeight: 1 }}>THE RANGE</div>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 24, letterSpacing: 1, lineHeight: 1 }}>THE RANGE</div>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
           Distance control practice
         </div>
       </div>
@@ -6383,10 +6211,10 @@ function SetupScreen({
       {activeSaved && (
         <Card style={{ marginBottom: 10, border: `1px solid ${COLORS.sand}66` }}>
           <SectionLabel>Session in progress</SectionLabel>
-          <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 22, marginTop: 3 }}>
+          <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 22, marginTop: 3 }}>
             Shot {activeSaved.shots.length + 1} of {activeSaved.shotCount}
           </div>
-          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
+          <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
             {ydsToUnitRound(activeSaved.minDist, units)}-{ydsToUnitRound(activeSaved.maxDist, units)}
             {unitLabel} window
           </div>
@@ -6400,7 +6228,7 @@ function SetupScreen({
                 border: "none",
                 background: COLORS.sand,
                 color: COLORS.turfDark,
-                fontFamily: "'Bebas Neue', sans-serif",
+                fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                 fontSize: 16,
                 letterSpacing: 1,
                 cursor: "pointer",
@@ -6416,7 +6244,7 @@ function SetupScreen({
                 border: `1px solid ${COLORS.creamDim}33`,
                 background: "transparent",
                 color: COLORS.creamDim,
-                fontFamily: "'JetBrains Mono', monospace",
+                fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                 fontSize: 11,
                 cursor: "pointer",
               }}
@@ -6444,7 +6272,7 @@ function SetupScreen({
             value={ydsToUnitRound(minDist, units)}
             onChange={(v) => setMinDist(unitToYdsRound(v, units))}
           />
-          <div style={{ color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", paddingTop: 12 }}>—</div>
+          <div style={{ color: COLORS.creamDim, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", paddingTop: 12 }}>—</div>
           <NumberField
             label="MAX"
             value={ydsToUnitRound(maxDist, units)}
@@ -6452,7 +6280,7 @@ function SetupScreen({
           />
         </div>
         {invalidRange && (
-          <div style={{ color: COLORS.flag, fontSize: 11, marginTop: 8, fontFamily: "'JetBrains Mono', monospace" }}>
+          <div style={{ color: COLORS.flag, fontSize: 11, marginTop: 8, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" }}>
             Max must be greater than min.
           </div>
         )}
@@ -6469,7 +6297,7 @@ function SetupScreen({
           border: "none",
           background: invalidRange ? `${COLORS.fairway}66` : COLORS.flag,
           color: COLORS.cream,
-          fontFamily: "'Bebas Neue', sans-serif",
+          fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
           fontSize: 22,
           letterSpacing: 2,
           cursor: invalidRange ? "not-allowed" : "pointer",
@@ -6484,7 +6312,7 @@ function SetupScreen({
           textAlign: "center",
           marginTop: 12,
           color: COLORS.creamDim,
-          fontFamily: "'JetBrains Mono', monospace",
+          fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
           fontSize: 11,
           cursor: "pointer",
           textDecoration: "underline",
@@ -6500,7 +6328,7 @@ function SetupScreen({
 function NumberField({ label, value, onChange }) {
   return (
     <div style={{ flex: 1 }}>
-      <div style={{ fontSize: 11, color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", marginBottom: 4 }}>
+      <div style={{ fontSize: 11, color: COLORS.creamDim, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", marginBottom: 4 }}>
         {label}
       </div>
       <input
@@ -6514,7 +6342,7 @@ function NumberField({ label, value, onChange }) {
           border: `1px solid ${COLORS.creamDim}33`,
           borderRadius: 8,
           color: COLORS.cream,
-          fontFamily: "'Bebas Neue', sans-serif",
+          fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
           fontSize: 20,
           padding: "6px 10px",
           boxSizing: "border-box",
@@ -6568,7 +6396,7 @@ function DistanceGauge({ min, max, target, actual, unit = "y" }) {
           />
         )}
       </div>
-      <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6, fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim }}>
+      <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim }}>
         <span>{min}{unit}</span>
         <span>{max}{unit}</span>
       </div>
@@ -6605,13 +6433,13 @@ function PracticeScreen({
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 5 }}>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim }}>
           SHOT {shotNum} OF {shotCount}
         </div>
         <div
           onClick={onExit}
           style={{
-            fontFamily: "'JetBrains Mono', monospace",
+            fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
             fontSize: 10,
             color: COLORS.creamDim,
             cursor: "pointer",
@@ -6625,10 +6453,10 @@ function PracticeScreen({
 
       <Card>
         <div style={{ textAlign: "center" }}>
-          <div style={{ fontSize: 12, color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", letterSpacing: 2 }}>
+          <div style={{ fontSize: 12, color: COLORS.creamDim, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", letterSpacing: 2 }}>
             TARGET
           </div>
-          <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 56, lineHeight: 1, color: COLORS.flag }}>
+          <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 56, lineHeight: 1, color: COLORS.flag }}>
             {ydsToUnitRound(currentTarget, units)}
             <span style={{ fontSize: 20, marginLeft: 6, color: COLORS.creamDim }}>{unitLabel}</span>
           </div>
@@ -6644,7 +6472,7 @@ function PracticeScreen({
 
         {isRating ? (
           <div style={{ marginTop: 14 }}>
-            <div style={{ fontSize: 10, color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", marginBottom: 6 }}>
+            <div style={{ fontSize: 10, color: COLORS.creamDim, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", marginBottom: 6 }}>
               RATE THIS SHOT (5 = GREAT)
             </div>
             <div style={{ display: "flex", gap: 6 }}>
@@ -6659,7 +6487,7 @@ function PracticeScreen({
                     border: `2px solid ${ratingRagColor(n)}`,
                     background: "transparent",
                     color: COLORS.cream,
-                    fontFamily: "'Bebas Neue', sans-serif",
+                    fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                     fontSize: 20,
                     cursor: "pointer",
                   }}
@@ -6671,7 +6499,7 @@ function PracticeScreen({
           </div>
         ) : (
           <div style={{ marginTop: 14 }}>
-            <div style={{ fontSize: 10, color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", marginBottom: 5 }}>
+            <div style={{ fontSize: 10, color: COLORS.creamDim, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", marginBottom: 5 }}>
               YOUR CARRY ({unitLabel.toUpperCase()})
             </div>
             <div style={{ display: "flex", gap: 8 }}>
@@ -6689,7 +6517,7 @@ function PracticeScreen({
                   border: `1px solid ${COLORS.creamDim}33`,
                   borderRadius: 8,
                   color: COLORS.cream,
-                  fontFamily: "'Bebas Neue', sans-serif",
+                  fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                   fontSize: 24,
                   padding: "7px 12px",
                   boxSizing: "border-box",
@@ -6704,7 +6532,7 @@ function PracticeScreen({
                   border: "none",
                   background: actualInput === "" ? `${COLORS.fairway}66` : COLORS.fairway,
                   color: COLORS.cream,
-                  fontFamily: "'Bebas Neue', sans-serif",
+                  fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                   fontSize: 16,
                   letterSpacing: 1,
                   cursor: actualInput === "" ? "not-allowed" : "pointer",
@@ -6740,7 +6568,7 @@ function PracticeScreen({
       {!isRating && (
         <>
           <div style={{ display: "flex", alignItems: "center", marginTop: 10 }}>
-            <div style={{ fontSize: 10, color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", letterSpacing: 1 }}>
+            <div style={{ fontSize: 10, color: COLORS.creamDim, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", letterSpacing: 1 }}>
               PAR SCORING
             </div>
             <InlineInfoButton onClick={() => setShowScoreInfo(true)} />
@@ -6815,10 +6643,10 @@ function StatBox({ label, value, valueColor }) {
         padding: "9px 12px",
       }}
     >
-      <div style={{ fontSize: 9, color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", letterSpacing: 1 }}>
+      <div style={{ fontSize: 9, color: COLORS.creamDim, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", letterSpacing: 1 }}>
         {label}
       </div>
-      <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 24, color: valueColor || COLORS.cream, marginTop: 1 }}>
+      <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 24, color: valueColor || COLORS.cream, marginTop: 1 }}>
         {value}
       </div>
     </div>
@@ -6833,7 +6661,7 @@ function ShotLog({ shots, units, onEditShot }) {
         border: `1px solid ${COLORS.creamDim}22`,
         borderRadius: 10,
         overflow: "hidden",
-        fontFamily: "'JetBrains Mono', monospace",
+        fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
         fontSize: 12,
       }}
     >
@@ -6899,7 +6727,7 @@ function RatingLog({ shots, units, onEditShot }) {
         border: `1px solid ${COLORS.creamDim}22`,
         borderRadius: 10,
         overflow: "hidden",
-        fontFamily: "'JetBrains Mono', monospace",
+        fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
         fontSize: 12,
       }}
     >
@@ -6938,8 +6766,7 @@ function RatingLog({ shots, units, onEditShot }) {
   );
 }
 
-function SummaryScreen({ shots, minDist, maxDist, onNewSession, storageError, units, feedback, history }) {
-  const bestLabels = history && history[0] ? rangeBestLabels(history[0], history) : [];
+function SummaryScreen({ shots, minDist, maxDist, onNewSession, storageError, units, feedback }) {
   const isRating = shots.length > 0 && shots[0].rating !== undefined;
   const unitLabel = longUnitLabel(units);
   const [showScoreInfo, setShowScoreInfo] = useState(false);
@@ -6954,7 +6781,7 @@ function SummaryScreen({ shots, minDist, maxDist, onNewSession, storageError, un
         <SessionFeedbackBanner feedback={feedback} />
         <Card>
           <div style={{ textAlign: "center", marginBottom: 4 }}>
-            <div style={{ fontSize: 11, color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", letterSpacing: 2 }}>
+            <div style={{ fontSize: 11, color: COLORS.creamDim, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", letterSpacing: 2 }}>
               SESSION COMPLETE — {shots.length} SHOTS · {ydsToUnitRound(minDist, units)}-{ydsToUnitRound(maxDist, units)}
               {unitLabel.toUpperCase()}
             </div>
@@ -6977,14 +6804,13 @@ function SummaryScreen({ shots, minDist, maxDist, onNewSession, storageError, un
         </div>
 
         {storageError && (
-          <div style={{ color: COLORS.flag, fontSize: 11, marginTop: 8, fontFamily: "'JetBrains Mono', monospace" }}>
+          <div style={{ color: COLORS.flag, fontSize: 11, marginTop: 8, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" }}>
             Couldn't save this session to history — it's still shown above.
           </div>
         )}
 
         <ShareResultButton
           badge="RANGE SESSION"
-          bestLabels={bestLabels}
           hero={`${avgRating.toFixed(1)}/5`}
           heroLabel="AVG RATING"
           heroGood={avgRating >= 3}
@@ -7011,7 +6837,7 @@ function SummaryScreen({ shots, minDist, maxDist, onNewSession, storageError, un
             border: "none",
             background: COLORS.flag,
             color: COLORS.cream,
-            fontFamily: "'Bebas Neue', sans-serif",
+            fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
             fontSize: 20,
             letterSpacing: 2,
             cursor: "pointer",
@@ -7036,7 +6862,7 @@ function SummaryScreen({ shots, minDist, maxDist, onNewSession, storageError, un
       <SessionFeedbackBanner feedback={feedback} />
       <Card>
         <div style={{ textAlign: "center", marginBottom: 4 }}>
-          <div style={{ fontSize: 11, color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", letterSpacing: 2 }}>
+          <div style={{ fontSize: 11, color: COLORS.creamDim, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", letterSpacing: 2 }}>
             SESSION COMPLETE — {shots.length} SHOTS · {ydsToUnitRound(minDist, units)}-{ydsToUnitRound(maxDist, units)}
             {unitLabel.toUpperCase()}
           </div>
@@ -7050,7 +6876,7 @@ function SummaryScreen({ shots, minDist, maxDist, onNewSession, storageError, un
           <StatBox label="AVG MISS" value={`${fmt1(ydsToUnit(average, units))}${unitLabel}`} />
         </div>
         <div style={{ display: "flex", alignItems: "center", marginTop: 8 }}>
-          <div style={{ fontSize: 10, color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", letterSpacing: 1 }}>
+          <div style={{ fontSize: 10, color: COLORS.creamDim, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", letterSpacing: 1 }}>
             PAR SCORING
           </div>
           <InlineInfoButton onClick={() => setShowScoreInfo(true)} />
@@ -7074,7 +6900,7 @@ function SummaryScreen({ shots, minDist, maxDist, onNewSession, storageError, un
 
       <Card style={{ marginTop: 10 }}>
         <SectionLabel>Short vs long of the pin</SectionLabel>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginTop: 2, marginBottom: 10 }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.creamDim, marginTop: 2, marginBottom: 10 }}>
           Each dot is one shot, colored by its own strokes gained
         </div>
         <ShotDispersionChart
@@ -7091,14 +6917,13 @@ function SummaryScreen({ shots, minDist, maxDist, onNewSession, storageError, un
       </div>
 
       {storageError && (
-        <div style={{ color: COLORS.flag, fontSize: 11, marginTop: 8, fontFamily: "'JetBrains Mono', monospace" }}>
+        <div style={{ color: COLORS.flag, fontSize: 11, marginTop: 8, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" }}>
           Couldn't save this session to history — it's still shown above.
         </div>
       )}
 
       <ShareResultButton
         badge="RANGE SESSION"
-        bestLabels={bestLabels}
         hero={formatSG(avgSG)}
         heroLabel="AVG STROKES GAINED / SHOT"
         heroGood={avgSG >= 0}
@@ -7125,7 +6950,7 @@ function SummaryScreen({ shots, minDist, maxDist, onNewSession, storageError, un
           border: "none",
           background: COLORS.flag,
           color: COLORS.cream,
-          fontFamily: "'Bebas Neue', sans-serif",
+          fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
           fontSize: 20,
           letterSpacing: 2,
           cursor: "pointer",
@@ -7153,7 +6978,7 @@ function TimescalePicker({ value, onChange }) {
             border: value === t.key ? `1px solid ${COLORS.fairwayLight}` : `1px solid ${COLORS.creamDim}33`,
             background: value === t.key ? COLORS.fairway : "transparent",
             color: value === t.key ? COLORS.cream : COLORS.creamDim,
-            fontFamily: "'JetBrains Mono', monospace",
+            fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
             fontSize: 11,
             letterSpacing: 0.5,
             cursor: "pointer",
@@ -7170,19 +6995,19 @@ function BucketRow({ bucket, showImprovement }) {
   return (
     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0" }}>
       <div>
-        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 20, color: COLORS.cream }}>{bucket.label}y</div>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 20, color: COLORS.cream }}>{bucket.label}y</div>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim }}>
           {bucket.count} shots · avg {bucket.avgMissYds.toFixed(1)}y off
         </div>
       </div>
       <div style={{ textAlign: "right" }}>
-        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 22, color: sgRagColor(bucket.avgSG) }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 22, color: sgRagColor(bucket.avgSG) }}>
           {formatSG(bucket.avgSG)}
         </div>
         {showImprovement && bucket.improvement !== null && (
           <div
             style={{
-              fontFamily: "'JetBrains Mono', monospace",
+              fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
               fontSize: 11,
               color: bucket.improvement > 0 ? COLORS.fairwayLight : COLORS.flag,
             }}
@@ -7224,7 +7049,7 @@ function ShotDispersionStrip({ label, rows, units }) {
 
   return (
     <div style={{ marginBottom: 16 }}>
-      <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim }}>
+      <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim }}>
         {label}
         {unitLabel} · {rows.length} shot{rows.length === 1 ? "" : "s"}
       </div>
@@ -7234,10 +7059,10 @@ function ShotDispersionStrip({ label, rows, units }) {
           <g key={g}>
             <line x1={xFor(-g)} y1={8} x2={xFor(-g)} y2={44} stroke={COLORS.creamDim} strokeOpacity={0.2} strokeWidth={1} strokeDasharray="2 2" />
             <line x1={xFor(g)} y1={8} x2={xFor(g)} y2={44} stroke={COLORS.creamDim} strokeOpacity={0.2} strokeWidth={1} strokeDasharray="2 2" />
-            <text x={xFor(-g)} y={54} fontSize={7} fill={COLORS.creamDim} textAnchor="middle" fontFamily="'JetBrains Mono', monospace">
+            <text x={xFor(-g)} y={54} fontSize={7} fill={COLORS.creamDim} textAnchor="middle" fontFamily="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">
               {ydsToUnitRound(g, units)}
             </text>
-            <text x={xFor(g)} y={54} fontSize={7} fill={COLORS.creamDim} textAnchor="middle" fontFamily="'JetBrains Mono', monospace">
+            <text x={xFor(g)} y={54} fontSize={7} fill={COLORS.creamDim} textAnchor="middle" fontFamily="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">
               {ydsToUnitRound(g, units)}
             </text>
           </g>
@@ -7247,7 +7072,7 @@ function ShotDispersionStrip({ label, rows, units }) {
           <circle key={i} cx={xFor(r.signedMiss)} cy={yFor(i)} r={5} fill={sgRagColor(r.sg)} fillOpacity={0.88} />
         ))}
       </svg>
-      <div style={{ display: "flex", justifyContent: "space-between", fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: COLORS.creamDim, marginTop: 2 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 9, color: COLORS.creamDim, marginTop: 2 }}>
         <span>← SHORT</span>
         <span>PIN</span>
         <span>LONG →</span>
@@ -7270,7 +7095,7 @@ function ShotDispersionChart({ rows, units }) {
 
   if (bands.length === 0) {
     return (
-      <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: COLORS.creamDim }}>
+      <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 12, color: COLORS.creamDim }}>
         Need at least 2 shots in a single distance band to plot this.
       </div>
     );
@@ -7290,13 +7115,13 @@ function InsightCard({ title, subtitle, items, emptyText }) {
     <Card style={{ marginBottom: 14 }}>
       <SectionLabel>{title}</SectionLabel>
       {subtitle && (
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
           {subtitle}
         </div>
       )}
       <div style={{ marginTop: 8 }}>
         {items.length === 0 ? (
-          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: COLORS.creamDim, padding: "6px 0" }}>
+          <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 12, color: COLORS.creamDim, padding: "6px 0" }}>
             {emptyText}
           </div>
         ) : (
@@ -7325,7 +7150,7 @@ function YardagePicker({ min, max, onMin, onMax, onPreset, activePresetLabel }) 
               border: activePresetLabel === p.label ? `1px solid ${COLORS.fairwayLight}` : `1px solid ${COLORS.creamDim}33`,
               background: activePresetLabel === p.label ? COLORS.fairway : "transparent",
               color: activePresetLabel === p.label ? COLORS.cream : COLORS.creamDim,
-              fontFamily: "'JetBrains Mono', monospace",
+              fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
               fontSize: 11,
               cursor: "pointer",
             }}
@@ -7336,7 +7161,7 @@ function YardagePicker({ min, max, onMin, onMax, onPreset, activePresetLabel }) 
       </div>
       <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
         <NumberField label="MIN YDS" value={min} onChange={onMin} />
-        <div style={{ color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", paddingTop: 14 }}>—</div>
+        <div style={{ color: COLORS.creamDim, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", paddingTop: 14 }}>—</div>
         <NumberField label="MAX YDS" value={max} onChange={onMax} />
       </div>
     </div>
@@ -7354,7 +7179,7 @@ function ChartTooltip({ active, payload, label, suffix, formatter }) {
         border: `1px solid ${COLORS.creamDim}33`,
         borderRadius: 8,
         padding: "8px 10px",
-        fontFamily: "'JetBrains Mono', monospace",
+        fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
         fontSize: 11,
         color: COLORS.cream,
       }}
@@ -7414,12 +7239,12 @@ function SettingsScreen({
   return (
     <div>
       <div style={{ marginBottom: 16 }}>
-        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 24, letterSpacing: 1, lineHeight: 1 }}>SETTINGS</div>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 24, letterSpacing: 1, lineHeight: 1 }}>SETTINGS</div>
       </div>
 
       <Card>
         <SectionLabel>Baseline</SectionLabel>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 4, lineHeight: 1.5 }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, marginTop: 4, lineHeight: 1.5 }}>
           Strokes gained everywhere in the app is measured against this level. Round-level data
           converted to a flat per-shot offset — a useful approximation, not a precise
           distance-calibrated model like the PGA Tour numbers. Distance Control's and Short
@@ -7437,7 +7262,7 @@ function SettingsScreen({
                 border: baselineHandicap === b.key ? `2px solid ${COLORS.fairwayLight}` : `1px solid ${COLORS.creamDim}33`,
                 background: baselineHandicap === b.key ? COLORS.fairway : "transparent",
                 color: baselineHandicap === b.key ? COLORS.cream : COLORS.creamDim,
-                fontFamily: "'JetBrains Mono', monospace",
+                fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                 fontSize: 10,
                 letterSpacing: 0.3,
                 cursor: "pointer",
@@ -7451,7 +7276,7 @@ function SettingsScreen({
 
       <Card style={{ marginTop: 12 }}>
         <SectionLabel>Units</SectionLabel>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 4, lineHeight: 1.5 }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, marginTop: 4, lineHeight: 1.5 }}>
           Distances are always calculated internally in yards/feet, then converted for display —
           switching units won't change past sessions.
         </div>
@@ -7465,7 +7290,7 @@ function SettingsScreen({
               border: units === "imperial" ? `2px solid ${COLORS.fairwayLight}` : `1px solid ${COLORS.creamDim}33`,
               background: units === "imperial" ? COLORS.fairway : "transparent",
               color: units === "imperial" ? COLORS.cream : COLORS.creamDim,
-              fontFamily: "'Bebas Neue', sans-serif",
+              fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
               fontSize: 16,
               letterSpacing: 1,
               cursor: "pointer",
@@ -7482,7 +7307,7 @@ function SettingsScreen({
               border: units === "metric" ? `2px solid ${COLORS.fairwayLight}` : `1px solid ${COLORS.creamDim}33`,
               background: units === "metric" ? COLORS.fairway : "transparent",
               color: units === "metric" ? COLORS.cream : COLORS.creamDim,
-              fontFamily: "'Bebas Neue', sans-serif",
+              fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
               fontSize: 16,
               letterSpacing: 1,
               cursor: "pointer",
@@ -7495,7 +7320,7 @@ function SettingsScreen({
 
       <Card style={{ marginTop: 12 }}>
         <SectionLabel>Range tracking</SectionLabel>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 4, lineHeight: 1.5 }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, marginTop: 4, lineHeight: 1.5 }}>
           Without a launch monitor or distance measuring device, exact carry distances aren't
           reliable. Switch to self-rating and score each shot out of 5 instead — strokes gained and
           miss-distance stats won't apply to those sessions, but you'll still see useful trends.
@@ -7510,7 +7335,7 @@ function SettingsScreen({
               border: rangeTrackingMode === "distance" ? `2px solid ${COLORS.fairwayLight}` : `1px solid ${COLORS.creamDim}33`,
               background: rangeTrackingMode === "distance" ? COLORS.fairway : "transparent",
               color: rangeTrackingMode === "distance" ? COLORS.cream : COLORS.creamDim,
-              fontFamily: "'Bebas Neue', sans-serif",
+              fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
               fontSize: 14,
               letterSpacing: 1,
               cursor: "pointer",
@@ -7527,7 +7352,7 @@ function SettingsScreen({
               border: rangeTrackingMode === "rating" ? `2px solid ${COLORS.fairwayLight}` : `1px solid ${COLORS.creamDim}33`,
               background: rangeTrackingMode === "rating" ? COLORS.fairway : "transparent",
               color: rangeTrackingMode === "rating" ? COLORS.cream : COLORS.creamDim,
-              fontFamily: "'Bebas Neue', sans-serif",
+              fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
               fontSize: 14,
               letterSpacing: 1,
               cursor: "pointer",
@@ -7540,10 +7365,10 @@ function SettingsScreen({
 
       <Card style={{ marginTop: 12 }}>
         <SectionLabel>Profile</SectionLabel>
-        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 20, marginTop: 6, color: COLORS.cream }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 20, marginTop: 6, color: COLORS.cream }}>
           {profileName}
         </div>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 4, lineHeight: 1.5 }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, marginTop: 4, lineHeight: 1.5 }}>
           Your data is synced to your account, not just this device — sign in with the same email
           on another phone or browser and it'll all be there. Export a backup any time if you want
           a local copy too.
@@ -7558,7 +7383,7 @@ function SettingsScreen({
               border: `1px solid ${COLORS.creamDim}33`,
               background: "transparent",
               color: COLORS.cream,
-              fontFamily: "'Bebas Neue', sans-serif",
+              fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
               fontSize: 13,
               letterSpacing: 0.5,
               cursor: "pointer",
@@ -7574,7 +7399,7 @@ function SettingsScreen({
               border: `1px solid ${COLORS.creamDim}33`,
               background: "transparent",
               color: COLORS.cream,
-              fontFamily: "'Bebas Neue', sans-serif",
+              fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
               fontSize: 13,
               letterSpacing: 0.5,
               cursor: "pointer",
@@ -7601,7 +7426,7 @@ function SettingsScreen({
             border: `1px solid ${COLORS.fairwayLight}`,
             background: "transparent",
             color: COLORS.fairwayLight,
-            fontFamily: "'JetBrains Mono', monospace",
+            fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
             fontSize: 11,
             letterSpacing: 0.5,
             cursor: "pointer",
@@ -7630,7 +7455,7 @@ function SettingsScreen({
             border: `1px solid ${COLORS.creamDim}33`,
             background: "transparent",
             color: COLORS.creamDim,
-            fontFamily: "'JetBrains Mono', monospace",
+            fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
             fontSize: 11,
             letterSpacing: 0.5,
             cursor: "pointer",
@@ -7644,7 +7469,7 @@ function SettingsScreen({
         <SectionLabel>Coach</SectionLabel>
         {!currentCoachLink && (
           <>
-            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 4, lineHeight: 1.5 }}>
+            <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, marginTop: 4, lineHeight: 1.5 }}>
               Search for your coach and send them a request — once they approve it, they'll be
               able to see your stats and help you focus your practice.
             </div>
@@ -7658,7 +7483,7 @@ function SettingsScreen({
                 border: `1px solid ${COLORS.fairwayLight}66`,
                 background: "transparent",
                 color: COLORS.fairwayLight,
-                fontFamily: "'Bebas Neue', sans-serif",
+                fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                 fontSize: 15,
                 letterSpacing: 0.5,
                 cursor: "pointer",
@@ -7670,10 +7495,10 @@ function SettingsScreen({
         )}
         {currentCoachLink && currentCoachLink.status === "pending" && (
           <>
-            <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 18, marginTop: 6, color: COLORS.cream }}>
+            <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 18, marginTop: 6, color: COLORS.cream }}>
               {currentCoachLink.coachName}
             </div>
-            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.sand, marginTop: 4 }}>
+            <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.sand, marginTop: 4 }}>
               Request pending — waiting for them to approve
             </div>
             <button
@@ -7686,7 +7511,7 @@ function SettingsScreen({
                 border: `1px solid ${COLORS.creamDim}33`,
                 background: "transparent",
                 color: COLORS.creamDim,
-                fontFamily: "'JetBrains Mono', monospace",
+                fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                 fontSize: 11,
                 letterSpacing: 0.5,
                 cursor: "pointer",
@@ -7698,10 +7523,10 @@ function SettingsScreen({
         )}
         {currentCoachLink && currentCoachLink.status === "approved" && (
           <>
-            <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 18, marginTop: 6, color: COLORS.cream }}>
+            <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 18, marginTop: 6, color: COLORS.cream }}>
               {currentCoachLink.coachName}
             </div>
-            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.fairwayLight, marginTop: 4 }}>
+            <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.fairwayLight, marginTop: 4 }}>
               Connected — they can see your stats
             </div>
             {!confirmingDisconnect && (
@@ -7715,7 +7540,7 @@ function SettingsScreen({
                   border: `1px solid ${COLORS.creamDim}33`,
                   background: "transparent",
                   color: COLORS.creamDim,
-                  fontFamily: "'JetBrains Mono', monospace",
+                  fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                   fontSize: 11,
                   letterSpacing: 0.5,
                   cursor: "pointer",
@@ -7726,7 +7551,7 @@ function SettingsScreen({
             )}
             {confirmingDisconnect && (
               <>
-                <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 10, lineHeight: 1.5 }}>
+                <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, marginTop: 10, lineHeight: 1.5 }}>
                   Remove {currentCoachLink.coachName}? They'll lose access to your stats and you'll
                   need to send a new request to reconnect.
                 </div>
@@ -7740,7 +7565,7 @@ function SettingsScreen({
                       border: `1px solid ${COLORS.creamDim}33`,
                       background: "transparent",
                       color: COLORS.creamDim,
-                      fontFamily: "'Bebas Neue', sans-serif",
+                      fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                       fontSize: 14,
                       letterSpacing: 0.5,
                       cursor: "pointer",
@@ -7760,7 +7585,7 @@ function SettingsScreen({
                       border: `1px solid ${COLORS.flag}66`,
                       background: "transparent",
                       color: COLORS.flag,
-                      fontFamily: "'Bebas Neue', sans-serif",
+                      fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                       fontSize: 14,
                       letterSpacing: 0.5,
                       cursor: "pointer",
@@ -7775,7 +7600,7 @@ function SettingsScreen({
         )}
         {currentCoachLink && currentCoachLink.status === "declined" && (
           <>
-            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 4, lineHeight: 1.5 }}>
+            <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, marginTop: 4, lineHeight: 1.5 }}>
               Your request to {currentCoachLink.coachName} wasn't accepted. You can search for a
               different coach, or try again.
             </div>
@@ -7789,7 +7614,7 @@ function SettingsScreen({
                 border: `1px solid ${COLORS.fairwayLight}66`,
                 background: "transparent",
                 color: COLORS.fairwayLight,
-                fontFamily: "'Bebas Neue', sans-serif",
+                fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                 fontSize: 15,
                 letterSpacing: 0.5,
                 cursor: "pointer",
@@ -7803,12 +7628,12 @@ function SettingsScreen({
 
       <Card style={{ marginTop: 12 }}>
         <SectionLabel>Sample data</SectionLabel>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 4, lineHeight: 1.5 }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, marginTop: 4, lineHeight: 1.5 }}>
           Load 10 generated sample sessions into every section at once to try out Analysis, or
           clear all of them to start fresh. Applies only to this profile.
         </div>
 
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 12 }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, marginTop: 12 }}>
           {sampleDataAreas.reduce((a, area) => a + area.count, 0)} sample session
           {sampleDataAreas.reduce((a, area) => a + area.count, 0) === 1 ? "" : "s"} across every section
         </div>
@@ -7823,7 +7648,7 @@ function SettingsScreen({
             border: `1px solid ${COLORS.sand}66`,
             background: "transparent",
             color: COLORS.sand,
-            fontFamily: "'Bebas Neue', sans-serif",
+            fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
             fontSize: 15,
             letterSpacing: 0.5,
             cursor: "pointer",
@@ -7843,7 +7668,7 @@ function SettingsScreen({
             border: `1px solid ${sampleDataAreas.every((area) => area.count === 0) ? COLORS.creamDim + "33" : COLORS.flag}`,
             background: "transparent",
             color: sampleDataAreas.every((area) => area.count === 0) ? COLORS.creamDim : COLORS.flag,
-            fontFamily: "'Bebas Neue', sans-serif",
+            fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
             fontSize: 15,
             letterSpacing: 0.5,
             cursor: sampleDataAreas.every((area) => area.count === 0) ? "not-allowed" : "pointer",
@@ -7863,7 +7688,7 @@ function SettingsScreen({
           border: `1px solid ${COLORS.creamDim}33`,
           background: "transparent",
           color: COLORS.cream,
-          fontFamily: "'Bebas Neue', sans-serif",
+          fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
           fontSize: 18,
           letterSpacing: 1,
           cursor: "pointer",
@@ -7882,7 +7707,7 @@ function CoachSearchResultCard({ coach, link, onApply, applying }) {
   const status = link ? link.status : null;
   return (
     <Card style={{ marginBottom: 8 }}>
-      <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 18, color: COLORS.cream }}>{coach.name}</div>
+      <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 18, color: COLORS.cream }}>{coach.name}</div>
       {coach.bio && (
         <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 12, color: COLORS.creamDim, marginTop: 4, lineHeight: 1.45 }}>
           {coach.bio}
@@ -7890,12 +7715,12 @@ function CoachSearchResultCard({ coach, link, onApply, applying }) {
       )}
       <div style={{ marginTop: 10 }}>
         {status === "approved" && (
-          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.fairwayLight }}>
+          <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.fairwayLight }}>
             Connected — they can see your stats
           </div>
         )}
         {status === "pending" && (
-          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.sand }}>
+          <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.sand }}>
             Request pending
           </div>
         )}
@@ -7910,7 +7735,7 @@ function CoachSearchResultCard({ coach, link, onApply, applying }) {
               border: `1px solid ${COLORS.fairwayLight}66`,
               background: "transparent",
               color: COLORS.fairwayLight,
-              fontFamily: "'Bebas Neue', sans-serif",
+              fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
               fontSize: 14,
               letterSpacing: 0.5,
               cursor: applying ? "not-allowed" : "pointer",
@@ -7962,7 +7787,7 @@ function AddCoachScreen({ profileId, profileName, myCoachLinks, onBack }) {
     <div>
       <div style={{ marginBottom: 16 }}>
         <SectionLabel>SETTINGS · COACH</SectionLabel>
-        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 24, marginTop: 2 }}>Add a coach</div>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 24, marginTop: 2 }}>Add a coach</div>
       </div>
 
       <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
@@ -7993,7 +7818,7 @@ function AddCoachScreen({ profileId, profileName, myCoachLinks, onBack }) {
             border: "none",
             background: COLORS.fairway,
             color: COLORS.cream,
-            fontFamily: "'Bebas Neue', sans-serif",
+            fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
             fontSize: 14,
             letterSpacing: 0.5,
             cursor: "pointer",
@@ -8004,22 +7829,22 @@ function AddCoachScreen({ profileId, profileName, myCoachLinks, onBack }) {
       </div>
 
       {error && (
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: COLORS.flag, marginBottom: 12 }}>{error}</div>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 12, color: COLORS.flag, marginBottom: 12 }}>{error}</div>
       )}
 
       {results === null && !loading && (
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, opacity: 0.75, lineHeight: 1.5 }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, opacity: 0.75, lineHeight: 1.5 }}>
           Search for your coach by name, or leave it blank and tap Search to see every coach
           currently on The Practice App.
         </div>
       )}
 
       {loading && (
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim }}>Searching…</div>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim }}>Searching…</div>
       )}
 
       {results !== null && !loading && results.length === 0 && (
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, opacity: 0.75 }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, opacity: 0.75 }}>
           No coaches found for that search.
         </div>
       )}
@@ -8046,7 +7871,7 @@ function AddCoachScreen({ profileId, profileName, myCoachLinks, onBack }) {
           border: `1px solid ${COLORS.creamDim}33`,
           background: "transparent",
           color: COLORS.cream,
-          fontFamily: "'Bebas Neue', sans-serif",
+          fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
           fontSize: 18,
           letterSpacing: 1,
           cursor: "pointer",
@@ -8192,10 +8017,10 @@ function CoachSummaryScreen({ profileName, profileHandicap, baselineHandicap, ra
       </div>
 
       <Card style={{ padding: "16px 16px" }}>
-        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 22, letterSpacing: 1, color: COLORS.cream }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 22, letterSpacing: 1, color: COLORS.cream }}>
           THE PRACTICE APP — PLAYER SUMMARY
         </div>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 6, lineHeight: 1.6 }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, marginTop: 6, lineHeight: 1.6 }}>
           {profileName || "Player"}
           {profileHandicap !== null && profileHandicap !== undefined ? ` · ${profileHandicap} hcp` : ""} · SG baseline: {baselineLabel}
           <br />
@@ -8204,7 +8029,7 @@ function CoachSummaryScreen({ profileName, profileHandicap, baselineHandicap, ra
       </Card>
 
       {!totalSessions ? (
-        <div style={{ color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", fontSize: 13, marginTop: 14 }}>
+        <div style={{ color: COLORS.creamDim, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 13, marginTop: 14 }}>
           No sessions logged in this period yet across any section. Log a few sessions, then come back here.
         </div>
       ) : (
@@ -8216,12 +8041,12 @@ function CoachSummaryScreen({ profileName, profileHandicap, baselineHandicap, ra
                 <div key={r.label} style={rowStyle}>
                   <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 13, color: COLORS.cream }}>
                     {r.label}
-                    <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginLeft: 6 }}>
+                    <span style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.creamDim, marginLeft: 6 }}>
                       {r.sessions} sess.
                     </span>
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <span style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 16, color: r.metricColor }}>{r.metric}</span>
+                    <span style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 16, color: r.metricColor }}>{r.metric}</span>
                     <span style={{ color: r.trend.color, fontSize: 12 }}>{r.trend.icon}</span>
                   </div>
                 </div>
@@ -8235,7 +8060,7 @@ function CoachSummaryScreen({ profileName, profileHandicap, baselineHandicap, ra
               <div style={{ marginTop: 6 }}>
                 {highlightLines.map((h, i) => (
                   <div key={i} style={rowStyle}>
-                    <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim }}>{h.area}</div>
+                    <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim }}>{h.area}</div>
                     <div
                       style={{
                         fontFamily: "'Inter', sans-serif",
@@ -8253,7 +8078,7 @@ function CoachSummaryScreen({ profileName, profileHandicap, baselineHandicap, ra
             </Card>
           )}
 
-          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: COLORS.creamDim, marginTop: 12, lineHeight: 1.5 }}>
+          <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 9, color: COLORS.creamDim, marginTop: 12, lineHeight: 1.5 }}>
             ▲/▼ = trending better/worse across this period · ◆ = steady · Strokes gained figures are
             approximations based on the selected baseline, not precise tour-calibrated numbers for
             every category.
@@ -8277,7 +8102,6 @@ function AnalysisScreen({
   puttingLoaded,
   onDeletePuttingSession,
   onEditPuttingSessionShot,
-  onEditCourseHole,
   clockHistory,
   clockLoaded,
   onDeleteClockSession,
@@ -8307,8 +8131,8 @@ function AnalysisScreen({
   return (
     <div>
       <div style={{ marginBottom: 18 }}>
-        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 30, letterSpacing: 1, lineHeight: 1 }}>ANALYSIS</div>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: COLORS.creamDim, marginTop: 2 }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 30, letterSpacing: 1, lineHeight: 1 }}>ANALYSIS</div>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 12, color: COLORS.creamDim, marginTop: 2 }}>
           Track your progress across every session
         </div>
       </div>
@@ -8324,7 +8148,7 @@ function AnalysisScreen({
           border: section === "coach" ? `2px solid ${COLORS.fairwayLight}` : `1px solid ${COLORS.sand}88`,
           background: section === "coach" ? COLORS.fairway : "transparent",
           color: section === "coach" ? COLORS.cream : COLORS.sand,
-          fontFamily: "'Bebas Neue', sans-serif",
+          fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
           fontSize: 16,
           letterSpacing: 1,
           cursor: "pointer",
@@ -8345,7 +8169,7 @@ function AnalysisScreen({
               border: section === s.key ? `1px solid ${COLORS.fairwayLight}` : `1px solid ${COLORS.creamDim}33`,
               background: section === s.key ? COLORS.fairway : "transparent",
               color: section === s.key ? COLORS.cream : COLORS.creamDim,
-              fontFamily: "'JetBrains Mono', monospace",
+              fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
               fontSize: 11,
               letterSpacing: 0.5,
               cursor: "pointer",
@@ -8385,7 +8209,6 @@ function AnalysisScreen({
           loaded={puttingLoaded}
           onDeleteSession={onDeletePuttingSession}
           onEditSessionShot={onEditPuttingSessionShot}
-          onEditCourseHole={onEditCourseHole}
           clockHistory={clockHistory}
           clockLoaded={clockLoaded}
           onDeleteClockSession={onDeleteClockSession}
@@ -8432,7 +8255,7 @@ function AnalysisScreen({
           border: `1px solid ${COLORS.creamDim}33`,
           background: "transparent",
           color: COLORS.cream,
-          fontFamily: "'Bebas Neue', sans-serif",
+          fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
           fontSize: 20,
           letterSpacing: 1,
           cursor: "pointer",
@@ -8529,19 +8352,19 @@ function ShortGameBucketRow({ bucket }) {
   return (
     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0" }}>
       <div>
-        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 18, color: COLORS.cream }}>{LIE_LABELS[bucket.lie]}</div>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 18, color: COLORS.cream }}>{LIE_LABELS[bucket.lie]}</div>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim }}>
           {bucket.count} shots · avg {bucket.avgFt.toFixed(1)}ft
         </div>
       </div>
       <div style={{ textAlign: "right" }}>
-        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 20, color: sgRagColor(bucket.avgSG) }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 20, color: sgRagColor(bucket.avgSG) }}>
           {formatSG(bucket.avgSG)}
         </div>
         {bucket.improvement !== null && bucket.improvement !== undefined && (
           <div
             style={{
-              fontFamily: "'JetBrains Mono', monospace",
+              fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
               fontSize: 11,
               color: bucket.improvement > 0 ? COLORS.fairwayLight : COLORS.flag,
             }}
@@ -8559,13 +8382,13 @@ function ShortGameInsightCard({ title, subtitle, items, emptyText }) {
     <Card style={{ marginBottom: 14 }}>
       <SectionLabel>{title}</SectionLabel>
       {subtitle && (
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
           {subtitle}
         </div>
       )}
       <div style={{ marginTop: 8 }}>
         {items.length === 0 ? (
-          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: COLORS.creamDim, padding: "6px 0" }}>
+          <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 12, color: COLORS.creamDim, padding: "6px 0" }}>
             {emptyText}
           </div>
         ) : (
@@ -8645,7 +8468,7 @@ function TeeAccuracyAnalysisBody({ history, loaded, onDeleteSession, onEditSessi
   const viewingSession = viewingSessionId ? history.find((s) => s.id === viewingSessionId) : null;
 
   if (!loaded) {
-    return <div style={{ color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace" }}>Loading sessions…</div>;
+    return <div style={{ color: COLORS.creamDim, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" }}>Loading sessions…</div>;
   }
 
   const filtered = filterByTimescale(history, timescale);
@@ -8654,7 +8477,7 @@ function TeeAccuracyAnalysisBody({ history, loaded, onDeleteSession, onEditSessi
     return (
       <div>
         <TimescalePicker value={timescale} onChange={setTimescale} />
-        <div style={{ color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", fontSize: 13, marginTop: 10 }}>
+        <div style={{ color: COLORS.creamDim, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 13, marginTop: 10 }}>
           No Tee Accuracy sessions in this window yet. Log a session to see your analysis here.
         </div>
       </div>
@@ -8677,7 +8500,7 @@ function TeeAccuracyAnalysisBody({ history, loaded, onDeleteSession, onEditSessi
             border: tab === "insights" ? `1px solid ${COLORS.fairwayLight}` : `1px solid ${COLORS.creamDim}33`,
             background: tab === "insights" ? COLORS.fairway : "transparent",
             color: tab === "insights" ? COLORS.cream : COLORS.creamDim,
-            fontFamily: "'JetBrains Mono', monospace",
+            fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
             fontSize: 11,
             letterSpacing: 0.5,
             cursor: "pointer",
@@ -8694,7 +8517,7 @@ function TeeAccuracyAnalysisBody({ history, loaded, onDeleteSession, onEditSessi
             border: tab === "graphs" ? `1px solid ${COLORS.fairwayLight}` : `1px solid ${COLORS.creamDim}33`,
             background: tab === "graphs" ? COLORS.fairway : "transparent",
             color: tab === "graphs" ? COLORS.cream : COLORS.creamDim,
-            fontFamily: "'JetBrains Mono', monospace",
+            fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
             fontSize: 11,
             letterSpacing: 0.5,
             cursor: "pointer",
@@ -8721,7 +8544,7 @@ function TeeAccuracyAnalysisBody({ history, loaded, onDeleteSession, onEditSessi
                 valueColor={ratingRagColor(analysis.overallHitPct / 20)}
               />
             </div>
-            <div style={{ marginTop: 12, fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}>
+            <div style={{ marginTop: 12, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 12 }}>
               {Math.abs(analysis.trendDelta) < 1 ? (
                 <span style={{ color: COLORS.creamDim }}>◆ Steady across this period</span>
               ) : analysis.trendDelta > 0 ? (
@@ -8743,14 +8566,14 @@ function TeeAccuracyAnalysisBody({ history, loaded, onDeleteSession, onEditSessi
                 <div key={c.club} style={{ borderTop: i > 0 ? `1px solid ${COLORS.creamDim}15` : "none" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0" }}>
                     <div>
-                      <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 18, color: COLORS.cream }}>
+                      <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 18, color: COLORS.cream }}>
                         {CLUB_LABELS[c.club]}
                       </div>
-                      <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim }}>
+                      <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim }}>
                         {c.count} shots
                       </div>
                     </div>
-                    <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 20, color: ratingRagColor(c.hitPct / 20) }}>
+                    <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 20, color: ratingRagColor(c.hitPct / 20) }}>
                       {c.hitPct.toFixed(0)}%
                     </div>
                   </div>
@@ -8763,7 +8586,7 @@ function TeeAccuracyAnalysisBody({ history, loaded, onDeleteSession, onEditSessi
             {filtered.map((s) => (
               <SwipeToDelete key={s.id} onDelete={() => onDeleteSession(s.id)}>
                 <Card style={{ marginBottom: 12, cursor: "pointer" }} onClick={() => setViewingSessionId(s.id)}>
-                  <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, paddingRight: 20 }}>
+                  <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, paddingRight: 20 }}>
                     {new Date(s.date).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
                     {"  ·  "}
                     {s.shotCount} shots · {s.clubs.map((c) => CLUB_LABELS[c]).join(", ")}
@@ -8792,7 +8615,7 @@ function TeeAccuracyAnalysisBody({ history, loaded, onDeleteSession, onEditSessi
         <>
           <Card style={{ marginBottom: 14 }}>
             <SectionLabel>Fairways hit over time</SectionLabel>
-            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
+            <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
               Hit % per session
             </div>
             <div style={{ height: 200, marginTop: 12 }}>
@@ -8801,13 +8624,13 @@ function TeeAccuracyAnalysisBody({ history, loaded, onDeleteSession, onEditSessi
                   <CartesianGrid stroke={`${COLORS.creamDim}22`} vertical={false} />
                   <XAxis
                     dataKey="dateLabel"
-                    tick={{ fill: COLORS.creamDim, fontSize: 10, fontFamily: "JetBrains Mono, monospace" }}
+                    tick={{ fill: COLORS.creamDim, fontSize: 10, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" }}
                     axisLine={{ stroke: `${COLORS.creamDim}33` }}
                     tickLine={false}
                   />
                   <YAxis
                     domain={[0, 100]}
-                    tick={{ fill: COLORS.creamDim, fontSize: 10, fontFamily: "JetBrains Mono, monospace" }}
+                    tick={{ fill: COLORS.creamDim, fontSize: 10, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" }}
                     axisLine={{ stroke: `${COLORS.creamDim}33` }}
                     tickLine={false}
                     unit="%"
@@ -8838,13 +8661,13 @@ function TeeAccuracyAnalysisBody({ history, loaded, onDeleteSession, onEditSessi
                     <CartesianGrid stroke={`${COLORS.creamDim}22`} vertical={false} />
                     <XAxis
                       dataKey="label"
-                      tick={{ fill: COLORS.creamDim, fontSize: 9, fontFamily: "JetBrains Mono, monospace" }}
+                      tick={{ fill: COLORS.creamDim, fontSize: 9, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" }}
                       axisLine={{ stroke: `${COLORS.creamDim}33` }}
                       tickLine={false}
                     />
                     <YAxis
                       domain={[0, 100]}
-                      tick={{ fill: COLORS.creamDim, fontSize: 10, fontFamily: "JetBrains Mono, monospace" }}
+                      tick={{ fill: COLORS.creamDim, fontSize: 10, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" }}
                       axisLine={{ stroke: `${COLORS.creamDim}33` }}
                       tickLine={false}
                       unit="%"
@@ -8877,7 +8700,7 @@ function ShortGameAnalysisBody({ history, loaded, onDeleteSession, onEditSession
   const viewingSession = viewingSessionId ? history.find((s) => s.id === viewingSessionId) : null;
 
   if (!loaded) {
-    return <div style={{ color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace" }}>Loading sessions…</div>;
+    return <div style={{ color: COLORS.creamDim, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" }}>Loading sessions…</div>;
   }
 
   const filtered = filterByTimescale(history, timescale);
@@ -8886,7 +8709,7 @@ function ShortGameAnalysisBody({ history, loaded, onDeleteSession, onEditSession
     return (
       <div>
         <TimescalePicker value={timescale} onChange={setTimescale} />
-        <div style={{ color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", fontSize: 13, marginTop: 10 }}>
+        <div style={{ color: COLORS.creamDim, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 13, marginTop: 10 }}>
           No short game sessions in this window yet. Log a session to see your analysis here.
         </div>
       </div>
@@ -8912,7 +8735,7 @@ function ShortGameAnalysisBody({ history, loaded, onDeleteSession, onEditSession
             border: tab === "insights" ? `1px solid ${COLORS.fairwayLight}` : `1px solid ${COLORS.creamDim}33`,
             background: tab === "insights" ? COLORS.fairway : "transparent",
             color: tab === "insights" ? COLORS.cream : COLORS.creamDim,
-            fontFamily: "'JetBrains Mono', monospace",
+            fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
             fontSize: 11,
             letterSpacing: 0.5,
             cursor: "pointer",
@@ -8929,7 +8752,7 @@ function ShortGameAnalysisBody({ history, loaded, onDeleteSession, onEditSession
             border: tab === "graphs" ? `1px solid ${COLORS.fairwayLight}` : `1px solid ${COLORS.creamDim}33`,
             background: tab === "graphs" ? COLORS.fairway : "transparent",
             color: tab === "graphs" ? COLORS.cream : COLORS.creamDim,
-            fontFamily: "'JetBrains Mono', monospace",
+            fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
             fontSize: 11,
             letterSpacing: 0.5,
             cursor: "pointer",
@@ -8945,7 +8768,7 @@ function ShortGameAnalysisBody({ history, loaded, onDeleteSession, onEditSession
         <>
           <Card style={{ marginBottom: 14 }}>
             <SectionLabel>Overview</SectionLabel>
-            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginTop: 2 }}>
+            <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.creamDim, marginTop: 2 }}>
               vs PGA Tour baseline · on-green finish assumed
             </div>
             <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
@@ -8956,7 +8779,7 @@ function ShortGameAnalysisBody({ history, loaded, onDeleteSession, onEditSession
               <StatBox label="AVG SG / SHOT" value={formatSG(analysis.overallAvgSG)} valueColor={sgRagColor(analysis.overallAvgSG)} />
               <StatBox label="AVG FT FROM HOLE" value={`${overallAvgFt.toFixed(1)}ft`} />
             </div>
-            <div style={{ marginTop: 12, fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}>
+            <div style={{ marginTop: 12, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 12 }}>
               {Math.abs(analysis.trendDelta) < 0.03 ? (
                 <span style={{ color: COLORS.creamDim }}>◆ Steady across this period</span>
               ) : analysis.trendDelta > 0 ? (
@@ -9008,14 +8831,14 @@ function ShortGameAnalysisBody({ history, loaded, onDeleteSession, onEditSession
                 <div key={l.lie} style={{ borderTop: i > 0 ? `1px solid ${COLORS.creamDim}15` : "none" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0" }}>
                     <div>
-                      <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 18, color: COLORS.cream }}>
+                      <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 18, color: COLORS.cream }}>
                         {LIE_LABELS[l.lie]}
                       </div>
-                      <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim }}>
+                      <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim }}>
                         {l.count} shots · avg {l.avgFt.toFixed(1)}ft
                       </div>
                     </div>
-                    <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 20, color: sgRagColor(l.avgSG) }}>
+                    <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 20, color: sgRagColor(l.avgSG) }}>
                       {formatSG(l.avgSG)}
                     </div>
                   </div>
@@ -9030,7 +8853,7 @@ function ShortGameAnalysisBody({ history, loaded, onDeleteSession, onEditSession
               return (
                 <SwipeToDelete key={s.id} onDelete={() => onDeleteSession(s.id)}>
                   <Card style={{ marginBottom: 12, cursor: "pointer" }} onClick={() => setViewingSessionId(s.id)}>
-                    <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, paddingRight: 20 }}>
+                    <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, paddingRight: 20 }}>
                       {new Date(s.date).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
                       {"  ·  "}
                       {s.shotCount} shots · {s.minYds}-{s.maxYds}y · {s.lies.map((l) => LIE_LABELS[l]).join("/")}
@@ -9060,7 +8883,7 @@ function ShortGameAnalysisBody({ history, loaded, onDeleteSession, onEditSession
         <>
           <Card style={{ marginBottom: 14 }}>
             <SectionLabel>Strokes gained over time</SectionLabel>
-            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
+            <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
               Average SG per shot per session
             </div>
             <div style={{ height: 200, marginTop: 12 }}>
@@ -9069,12 +8892,12 @@ function ShortGameAnalysisBody({ history, loaded, onDeleteSession, onEditSession
                   <CartesianGrid stroke={`${COLORS.creamDim}22`} vertical={false} />
                   <XAxis
                     dataKey="dateLabel"
-                    tick={{ fill: COLORS.creamDim, fontSize: 10, fontFamily: "JetBrains Mono, monospace" }}
+                    tick={{ fill: COLORS.creamDim, fontSize: 10, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" }}
                     axisLine={{ stroke: `${COLORS.creamDim}33` }}
                     tickLine={false}
                   />
                   <YAxis
-                    tick={{ fill: COLORS.creamDim, fontSize: 10, fontFamily: "JetBrains Mono, monospace" }}
+                    tick={{ fill: COLORS.creamDim, fontSize: 10, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" }}
                     axisLine={{ stroke: `${COLORS.creamDim}33` }}
                     tickLine={false}
                   />
@@ -9098,7 +8921,7 @@ function ShortGameAnalysisBody({ history, loaded, onDeleteSession, onEditSession
               <SectionLabel>Par scoring over time</SectionLabel>
               <InlineInfoButton onClick={() => setShowScoreInfo(true)} />
             </div>
-            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
+            <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
               Round to par per session, {activeDistanceScoreBaselineLabel()} baseline
             </div>
             <div style={{ height: 200, marginTop: 12 }}>
@@ -9107,12 +8930,12 @@ function ShortGameAnalysisBody({ history, loaded, onDeleteSession, onEditSession
                   <CartesianGrid stroke={`${COLORS.creamDim}22`} vertical={false} />
                   <XAxis
                     dataKey="dateLabel"
-                    tick={{ fill: COLORS.creamDim, fontSize: 10, fontFamily: "JetBrains Mono, monospace" }}
+                    tick={{ fill: COLORS.creamDim, fontSize: 10, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" }}
                     axisLine={{ stroke: `${COLORS.creamDim}33` }}
                     tickLine={false}
                   />
                   <YAxis
-                    tick={{ fill: COLORS.creamDim, fontSize: 10, fontFamily: "JetBrains Mono, monospace" }}
+                    tick={{ fill: COLORS.creamDim, fontSize: 10, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" }}
                     axisLine={{ stroke: `${COLORS.creamDim}33` }}
                     tickLine={false}
                     tickFormatter={formatToPar}
@@ -9153,12 +8976,12 @@ function ShortGameAnalysisBody({ history, loaded, onDeleteSession, onEditSession
                     <CartesianGrid stroke={`${COLORS.creamDim}22`} vertical={false} />
                     <XAxis
                       dataKey="label"
-                      tick={{ fill: COLORS.creamDim, fontSize: 10, fontFamily: "JetBrains Mono, monospace" }}
+                      tick={{ fill: COLORS.creamDim, fontSize: 10, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" }}
                       axisLine={{ stroke: `${COLORS.creamDim}33` }}
                       tickLine={false}
                     />
                     <YAxis
-                      tick={{ fill: COLORS.creamDim, fontSize: 10, fontFamily: "JetBrains Mono, monospace" }}
+                      tick={{ fill: COLORS.creamDim, fontSize: 10, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" }}
                       axisLine={{ stroke: `${COLORS.creamDim}33` }}
                       tickLine={false}
                     />
@@ -9166,7 +8989,7 @@ function ShortGameAnalysisBody({ history, loaded, onDeleteSession, onEditSession
                     <Tooltip content={<ChartTooltip suffix=" SG" />} />
                     <Bar dataKey="avgSG" radius={[4, 4, 0, 0]}>
                       {lieStats.map((l, i) => (
-                        <Cell key={i} fill={sgBarColor(l.avgSG)} />
+                        <Cell key={i} fill={sgRagColor(l.avgSG)} />
                       ))}
                     </Bar>
                   </BarChart>
@@ -9202,7 +9025,7 @@ function RangeAnalysisHub({ history, loaded, onDeleteSession, onEditSessionShot,
             border: subTab === "distance" ? `1px solid ${COLORS.fairwayLight}` : `1px solid ${COLORS.creamDim}33`,
             background: subTab === "distance" ? COLORS.fairway : "transparent",
             color: subTab === "distance" ? COLORS.cream : COLORS.creamDim,
-            fontFamily: "'JetBrains Mono', monospace",
+            fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
             fontSize: 11,
             letterSpacing: 0.5,
             cursor: "pointer",
@@ -9219,7 +9042,7 @@ function RangeAnalysisHub({ history, loaded, onDeleteSession, onEditSessionShot,
             border: subTab === "rating" ? `1px solid ${COLORS.fairwayLight}` : `1px solid ${COLORS.creamDim}33`,
             background: subTab === "rating" ? COLORS.fairway : "transparent",
             color: subTab === "rating" ? COLORS.cream : COLORS.creamDim,
-            fontFamily: "'JetBrains Mono', monospace",
+            fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
             fontSize: 11,
             letterSpacing: 0.5,
             cursor: "pointer",
@@ -9258,7 +9081,7 @@ function RangeRatingAnalysisBody({ history, loaded, onDeleteSession, onEditSessi
   const viewingSession = viewingSessionId ? history.find((s) => s.id === viewingSessionId) : null;
 
   if (!loaded) {
-    return <div style={{ color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace" }}>Loading sessions…</div>;
+    return <div style={{ color: COLORS.creamDim, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" }}>Loading sessions…</div>;
   }
 
   const filtered = filterByTimescale(history, timescale);
@@ -9271,7 +9094,7 @@ function RangeRatingAnalysisBody({ history, loaded, onDeleteSession, onEditSessi
       <TimescalePicker value={timescale} onChange={setTimescale} />
 
       {!analysis && (
-        <div style={{ color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", fontSize: 13, marginTop: 10 }}>
+        <div style={{ color: COLORS.creamDim, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 13, marginTop: 10 }}>
           No self-rated sessions in this window yet. Switch to rating mode in Settings and log a
           session to see your analysis here.
         </div>
@@ -9281,7 +9104,7 @@ function RangeRatingAnalysisBody({ history, loaded, onDeleteSession, onEditSessi
         <>
           <Card style={{ marginBottom: 14 }}>
             <SectionLabel>Overview</SectionLabel>
-            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginTop: 2 }}>
+            <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.creamDim, marginTop: 2 }}>
               Self-rated shots — no distance measurement, so no strokes gained or miss stats
             </div>
             <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
@@ -9295,7 +9118,7 @@ function RangeRatingAnalysisBody({ history, loaded, onDeleteSession, onEditSessi
                 valueColor={ratingRagColor(analysis.overallAvgRating)}
               />
             </div>
-            <div style={{ marginTop: 12, fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}>
+            <div style={{ marginTop: 12, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 12 }}>
               {Math.abs(analysis.trendDelta) < 0.1 ? (
                 <span style={{ color: COLORS.creamDim }}>◆ Steady across this period</span>
               ) : analysis.trendDelta > 0 ? (
@@ -9342,7 +9165,7 @@ function RangeRatingAnalysisBody({ history, loaded, onDeleteSession, onEditSessi
 
           <Card style={{ marginBottom: 14 }}>
             <SectionLabel>Rating over time</SectionLabel>
-            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
+            <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
               Average self-rating per session
             </div>
             <div style={{ height: 200, marginTop: 12 }}>
@@ -9351,13 +9174,13 @@ function RangeRatingAnalysisBody({ history, loaded, onDeleteSession, onEditSessi
                   <CartesianGrid stroke={`${COLORS.creamDim}22`} vertical={false} />
                   <XAxis
                     dataKey="dateLabel"
-                    tick={{ fill: COLORS.creamDim, fontSize: 10, fontFamily: "JetBrains Mono, monospace" }}
+                    tick={{ fill: COLORS.creamDim, fontSize: 10, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" }}
                     axisLine={{ stroke: `${COLORS.creamDim}33` }}
                     tickLine={false}
                   />
                   <YAxis
                     domain={[1, 5]}
-                    tick={{ fill: COLORS.creamDim, fontSize: 10, fontFamily: "JetBrains Mono, monospace" }}
+                    tick={{ fill: COLORS.creamDim, fontSize: 10, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" }}
                     axisLine={{ stroke: `${COLORS.creamDim}33` }}
                     tickLine={false}
                   />
@@ -9381,7 +9204,7 @@ function RangeRatingAnalysisBody({ history, loaded, onDeleteSession, onEditSessi
               return (
                 <SwipeToDelete key={s.id} onDelete={() => onDeleteSession(s.id)}>
                   <Card style={{ marginBottom: 12, cursor: "pointer" }} onClick={() => setViewingSessionId(s.id)}>
-                    <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, paddingRight: 20 }}>
+                    <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, paddingRight: 20 }}>
                       {new Date(s.date).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
                       {"  ·  "}
                       {s.shotCount} shots · {s.minDist}-{s.maxDist}y
@@ -9427,7 +9250,7 @@ function RangeAnalysisBody({ history, loaded, onDeleteSession, onEditSessionShot
   const viewingSession = viewingSessionId ? history.find((s) => s.id === viewingSessionId) : null;
 
   if (!loaded) {
-    return <div style={{ color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace" }}>Loading sessions…</div>;
+    return <div style={{ color: COLORS.creamDim, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" }}>Loading sessions…</div>;
   }
 
   const filtered = filterByTimescale(history, timescale);
@@ -9462,7 +9285,7 @@ function RangeAnalysisBody({ history, loaded, onDeleteSession, onEditSessionShot
             border: tab === "insights" ? `1px solid ${COLORS.fairwayLight}` : `1px solid ${COLORS.creamDim}33`,
             background: tab === "insights" ? COLORS.fairway : "transparent",
             color: tab === "insights" ? COLORS.cream : COLORS.creamDim,
-            fontFamily: "'JetBrains Mono', monospace",
+            fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
             fontSize: 11,
             letterSpacing: 0.5,
             cursor: "pointer",
@@ -9479,7 +9302,7 @@ function RangeAnalysisBody({ history, loaded, onDeleteSession, onEditSessionShot
             border: tab === "graphs" ? `1px solid ${COLORS.fairwayLight}` : `1px solid ${COLORS.creamDim}33`,
             background: tab === "graphs" ? COLORS.fairway : "transparent",
             color: tab === "graphs" ? COLORS.cream : COLORS.creamDim,
-            fontFamily: "'JetBrains Mono', monospace",
+            fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
             fontSize: 11,
             letterSpacing: 0.5,
             cursor: "pointer",
@@ -9492,7 +9315,7 @@ function RangeAnalysisBody({ history, loaded, onDeleteSession, onEditSessionShot
       <TimescalePicker value={timescale} onChange={setTimescale} />
 
       {!analysis && (
-        <div style={{ color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", fontSize: 13, marginTop: 10 }}>
+        <div style={{ color: COLORS.creamDim, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 13, marginTop: 10 }}>
           No sessions in this window yet. Log a session to see your analysis here.
         </div>
       )}
@@ -9501,7 +9324,7 @@ function RangeAnalysisBody({ history, loaded, onDeleteSession, onEditSessionShot
         <>
           <Card style={{ marginBottom: 14 }}>
             <SectionLabel>Overview</SectionLabel>
-            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginTop: 2 }}>
+            <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.creamDim, marginTop: 2 }}>
               vs PGA Tour baseline · fairway lie, on-green finish assumed
             </div>
             <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
@@ -9512,7 +9335,7 @@ function RangeAnalysisBody({ history, loaded, onDeleteSession, onEditSessionShot
               <StatBox label="AVG SG / SHOT" value={formatSG(analysis.overallAvgSG)} valueColor={sgRagColor(analysis.overallAvgSG)} />
               <StatBox label="AVG MISS" value={`${analysis.overallAvgMissYds.toFixed(1)}y`} />
             </div>
-            <div style={{ marginTop: 12, fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}>
+            <div style={{ marginTop: 12, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 12 }}>
               {Math.abs(analysis.trendDelta) < 0.03 ? (
                 <span style={{ color: COLORS.creamDim }}>◆ Steady across this period</span>
               ) : analysis.trendDelta > 0 ? (
@@ -9559,7 +9382,7 @@ function RangeAnalysisBody({ history, loaded, onDeleteSession, onEditSessionShot
 
           <Card style={{ marginBottom: 14 }}>
             <SectionLabel>Short vs long of the pin</SectionLabel>
-            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginTop: 2, marginBottom: 10 }}>
+            <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.creamDim, marginTop: 2, marginBottom: 10 }}>
               Each dot is one shot, colored by its own strokes gained
             </div>
             <ShotDispersionChart rows={flattenShots(filtered)} units={units} />
@@ -9567,7 +9390,7 @@ function RangeAnalysisBody({ history, loaded, onDeleteSession, onEditSessionShot
 
           <CollapsibleSection title="All sessions" count={filtered.length}>
             {filtered.length === 0 ? (
-              <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: COLORS.creamDim }}>
+              <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 12, color: COLORS.creamDim }}>
                 No sessions in this window.
               </div>
             ) : (
@@ -9576,7 +9399,7 @@ function RangeAnalysisBody({ history, loaded, onDeleteSession, onEditSessionShot
                 return (
                   <SwipeToDelete key={s.id} onDelete={() => onDeleteSession(s.id)}>
                     <Card style={{ marginBottom: 12, cursor: "pointer" }} onClick={() => setViewingSessionId(s.id)}>
-                      <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, paddingRight: 20 }}>
+                      <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, paddingRight: 20 }}>
                         {new Date(s.date).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
                         {"  ·  "}
                         {s.shotCount} shots · {s.minDist}-{s.maxDist}y
@@ -9615,7 +9438,7 @@ function RangeAnalysisBody({ history, loaded, onDeleteSession, onEditSessionShot
           />
 
           {!hasGraphData && (
-            <div style={{ color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", fontSize: 13 }}>
+            <div style={{ color: COLORS.creamDim, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 13 }}>
               No shots match this timescale + yardage combination yet.
             </div>
           )}
@@ -9624,7 +9447,7 @@ function RangeAnalysisBody({ history, loaded, onDeleteSession, onEditSessionShot
             <>
               <Card style={{ marginBottom: 14 }}>
                 <SectionLabel>Strokes gained over time</SectionLabel>
-                <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
+                <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
                   Average SG per shot per session, vs PGA Tour baseline, {minYds}-{maxYds}y shots only
                 </div>
                 <div style={{ height: 200, marginTop: 12 }}>
@@ -9633,12 +9456,12 @@ function RangeAnalysisBody({ history, loaded, onDeleteSession, onEditSessionShot
                       <CartesianGrid stroke={`${COLORS.creamDim}22`} vertical={false} />
                       <XAxis
                         dataKey="dateLabel"
-                        tick={{ fill: COLORS.creamDim, fontSize: 10, fontFamily: "JetBrains Mono, monospace" }}
+                        tick={{ fill: COLORS.creamDim, fontSize: 10, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" }}
                         axisLine={{ stroke: `${COLORS.creamDim}33` }}
                         tickLine={false}
                       />
                       <YAxis
-                        tick={{ fill: COLORS.creamDim, fontSize: 10, fontFamily: "JetBrains Mono, monospace" }}
+                        tick={{ fill: COLORS.creamDim, fontSize: 10, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" }}
                         axisLine={{ stroke: `${COLORS.creamDim}33` }}
                         tickLine={false}
                       />
@@ -9662,7 +9485,7 @@ function RangeAnalysisBody({ history, loaded, onDeleteSession, onEditSessionShot
                   <SectionLabel>Par scoring over time</SectionLabel>
                   <InlineInfoButton onClick={() => setShowScoreInfo(true)} />
                 </div>
-                <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
+                <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
                   Round to par per session, {activeDistanceScoreBaselineLabel()} baseline, {minYds}-{maxYds}y shots only
                 </div>
                 <div style={{ height: 200, marginTop: 12 }}>
@@ -9671,12 +9494,12 @@ function RangeAnalysisBody({ history, loaded, onDeleteSession, onEditSessionShot
                       <CartesianGrid stroke={`${COLORS.creamDim}22`} vertical={false} />
                       <XAxis
                         dataKey="dateLabel"
-                        tick={{ fill: COLORS.creamDim, fontSize: 10, fontFamily: "JetBrains Mono, monospace" }}
+                        tick={{ fill: COLORS.creamDim, fontSize: 10, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" }}
                         axisLine={{ stroke: `${COLORS.creamDim}33` }}
                         tickLine={false}
                       />
                       <YAxis
-                        tick={{ fill: COLORS.creamDim, fontSize: 10, fontFamily: "JetBrains Mono, monospace" }}
+                        tick={{ fill: COLORS.creamDim, fontSize: 10, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" }}
                         axisLine={{ stroke: `${COLORS.creamDim}33` }}
                         tickLine={false}
                         tickFormatter={formatToPar}
@@ -9709,7 +9532,7 @@ function RangeAnalysisBody({ history, loaded, onDeleteSession, onEditSessionShot
 
               <Card>
                 <SectionLabel>Strokes gained by distance band</SectionLabel>
-                <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
+                <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
                   10y bands within {minYds}-{maxYds}y, this timescale
                 </div>
                 <div style={{ height: 250, marginTop: 12 }}>
@@ -9722,12 +9545,12 @@ function RangeAnalysisBody({ history, loaded, onDeleteSession, onEditSessionShot
                         angle={-45}
                         textAnchor="end"
                         height={54}
-                        tick={{ fill: COLORS.creamDim, fontSize: 9, fontFamily: "JetBrains Mono, monospace" }}
+                        tick={{ fill: COLORS.creamDim, fontSize: 9, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" }}
                         axisLine={{ stroke: `${COLORS.creamDim}33` }}
                         tickLine={false}
                       />
                       <YAxis
-                        tick={{ fill: COLORS.creamDim, fontSize: 10, fontFamily: "JetBrains Mono, monospace" }}
+                        tick={{ fill: COLORS.creamDim, fontSize: 10, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" }}
                         axisLine={{ stroke: `${COLORS.creamDim}33` }}
                         tickLine={false}
                       />
@@ -9735,7 +9558,7 @@ function RangeAnalysisBody({ history, loaded, onDeleteSession, onEditSessionShot
                       <Tooltip content={<ChartTooltip suffix=" SG" />} />
                       <Bar dataKey="avgSG" radius={[4, 4, 0, 0]}>
                         {graphBuckets.map((b, i) => (
-                          <Cell key={i} fill={sgBarColor(b.avgSG)} />
+                          <Cell key={i} fill={sgRagColor(b.avgSG)} />
                         ))}
                       </Bar>
                     </BarChart>
@@ -9746,16 +9569,19 @@ function RangeAnalysisBody({ history, loaded, onDeleteSession, onEditSessionShot
                     display: "flex",
                     gap: 14,
                     marginTop: 10,
-                    fontFamily: "'JetBrains Mono', monospace",
+                    fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                     fontSize: 10,
                     color: COLORS.creamDim,
                   }}
                 >
                   <span>
-                    <span style={{ color: COLORS.fairwayLight }}>●</span> positive (at or above baseline)
+                    <span style={{ color: COLORS.fairwayLight }}>●</span> ≥0 (tour avg or better)
                   </span>
                   <span>
-                    <span style={{ color: COLORS.flag }}>●</span> negative (below baseline)
+                    <span style={{ color: COLORS.sand }}>●</span> ≥-0.15
+                  </span>
+                  <span>
+                    <span style={{ color: COLORS.flag }}>●</span> &lt;-0.15
                   </span>
                 </div>
               </Card>
@@ -9792,7 +9618,7 @@ function SectionLabel({ children }) {
       style={{
         fontSize: 11,
         color: COLORS.creamDim,
-        fontFamily: "'JetBrains Mono', monospace",
+        fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
         letterSpacing: 1.5,
       }}
     >
@@ -9855,7 +9681,7 @@ function RangeIllustration() {
       <polygon points="330,105 350,113 330,121" fill="#C1440E" opacity="0.85" />
       <rect x="194" y="88" width="7" height="95" fill="#F1EAD6" />
       <circle cx="197.5" cy="82" r="24" fill="#F1EAD6" stroke="#14291F" strokeWidth="2" />
-      <text x="197.5" y="90" textAnchor="middle" fontFamily="'Bebas Neue', sans-serif" fontSize="22" fill="#14291F">
+      <text x="197.5" y="90" textAnchor="middle" fontFamily="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" fontSize="22" fill="#14291F">
         100
       </text>
     </svg>
@@ -9935,7 +9761,7 @@ function PuttingRandomIllustration() {
           key={i}
           x={d.x}
           y={d.y}
-          fontFamily="'Bebas Neue', sans-serif"
+          fontFamily="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
           fontSize={d.size}
           fill="#F1EAD6"
           opacity={d.o}
@@ -10064,9 +9890,9 @@ function PuttingPaceIllustration() {
       <circle cx="200" cy="130" r="60" fill="none" stroke="#F1EAD6" strokeOpacity="0.18" strokeWidth="2" />
       <circle cx="200" cy="130" r="30" fill="none" stroke="#F1EAD6" strokeOpacity="0.28" strokeWidth="2" />
       <circle cx="200" cy="130" r="8" fill="#0A160F" stroke="#F1EAD6" strokeWidth="1.5" />
-      <text x="200" y="58" textAnchor="middle" fontFamily="'Bebas Neue', sans-serif" fontSize="16" fill="#F1EAD6" opacity="0.55">3</text>
-      <text x="200" y="88" textAnchor="middle" fontFamily="'Bebas Neue', sans-serif" fontSize="16" fill="#F1EAD6" opacity="0.6">2</text>
-      <text x="200" y="112" textAnchor="middle" fontFamily="'Bebas Neue', sans-serif" fontSize="16" fill="#F1EAD6" opacity="0.7">1</text>
+      <text x="200" y="58" textAnchor="middle" fontFamily="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" fontSize="16" fill="#F1EAD6" opacity="0.55">3</text>
+      <text x="200" y="88" textAnchor="middle" fontFamily="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" fontSize="16" fill="#F1EAD6" opacity="0.6">2</text>
+      <text x="200" y="112" textAnchor="middle" fontFamily="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" fontSize="16" fill="#F1EAD6" opacity="0.7">1</text>
       <circle cx="130" cy="70" r="7" fill="#F1EAD6" opacity="0.85" />
     </svg>
   );
@@ -10115,9 +9941,9 @@ function CompeteIllustration() {
       <rect x="85" y="152" width="90" height="68" fill="#E4DBC2" opacity="0.22" />
       <rect x="180" y="108" width="90" height="112" fill="#E4DBC2" opacity="0.32" />
       <rect x="275" y="172" width="90" height="48" fill="#E4DBC2" opacity="0.18" />
-      <text x="130" y="196" textAnchor="middle" fontFamily="'Bebas Neue', sans-serif" fontSize="34" fill="#F1EAD6" opacity="0.55">2</text>
-      <text x="225" y="174" textAnchor="middle" fontFamily="'Bebas Neue', sans-serif" fontSize="42" fill="#F1EAD6" opacity="0.7">1</text>
-      <text x="320" y="206" textAnchor="middle" fontFamily="'Bebas Neue', sans-serif" fontSize="28" fill="#F1EAD6" opacity="0.5">3</text>
+      <text x="130" y="196" textAnchor="middle" fontFamily="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" fontSize="34" fill="#F1EAD6" opacity="0.55">2</text>
+      <text x="225" y="174" textAnchor="middle" fontFamily="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" fontSize="42" fill="#F1EAD6" opacity="0.7">1</text>
+      <text x="320" y="206" textAnchor="middle" fontFamily="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" fontSize="28" fill="#F1EAD6" opacity="0.5">3</text>
 
       {/* trophy, standing on the 1st place block */}
       <g transform="translate(225 34)">
@@ -10240,7 +10066,7 @@ function GappingIllustration() {
         return (
           <g key={i}>
             <rect x="30" y={rowY} width={barWidth} height="16" rx="3" fill="#F1EAD6" opacity={0.2 + i * 0.12} />
-            <text x={44 + barWidth} y={rowY + 13} fontFamily="'JetBrains Mono', monospace" fontSize="11" fill="#F1EAD6" opacity="0.8">
+            <text x={44 + barWidth} y={rowY + 13} fontFamily="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" fontSize="11" fill="#F1EAD6" opacity="0.8">
               {y}
             </text>
           </g>
@@ -10278,7 +10104,7 @@ function ManualYardagesIllustration() {
             <text x="130" y={y} fontFamily="Georgia, serif" fontSize="17" fontWeight="700" fill="#1D3A2B">
               {r.club}
             </text>
-            <text x="250" y={y} fontFamily="'JetBrains Mono', monospace" fontSize="15" fill="#1D3A2B" textAnchor="end">
+            <text x="250" y={y} fontFamily="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" fontSize="15" fill="#1D3A2B" textAnchor="end">
               {r.yard}
             </text>
             <circle cx="270" cy={y - 5} r="9" fill="#4C8A68" />
@@ -10452,7 +10278,7 @@ function HomeInfoModal({ infoKey, onClose }) {
           width: "100%",
         }}
       >
-        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 22, letterSpacing: 1, color: COLORS.cream }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 22, letterSpacing: 1, color: COLORS.cream }}>
           {info.title}
         </div>
         <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 14, color: COLORS.cream, marginTop: 10, lineHeight: 1.6 }}>
@@ -10468,7 +10294,7 @@ function HomeInfoModal({ infoKey, onClose }) {
             border: "none",
             background: COLORS.fairway,
             color: COLORS.cream,
-            fontFamily: "'Bebas Neue', sans-serif",
+            fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
             fontSize: 16,
             letterSpacing: 1,
             cursor: "pointer",
@@ -10539,10 +10365,10 @@ function CompeteRoundEditModal({ round, players, mode, units, valueKind, onSave,
           width: "100%",
         }}
       >
-        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 20, letterSpacing: 1, color: COLORS.cream }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 20, letterSpacing: 1, color: COLORS.cream }}>
           EDIT ROUND
         </div>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 4 }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, marginTop: 4 }}>
           Target {isYds ? ydsToUnitRound(round.target, units) : ftToUnitRound(round.target, units)}
           {unitLabel}
         </div>
@@ -10551,7 +10377,7 @@ function CompeteRoundEditModal({ round, players, mode, units, valueKind, onSave,
           {mode === "distance"
             ? players.map((p) => (
                 <div key={p}>
-                  <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginBottom: 4 }}>
+                  <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, marginBottom: 4 }}>
                     {p}
                   </div>
                   <input
@@ -10565,7 +10391,7 @@ function CompeteRoundEditModal({ round, players, mode, units, valueKind, onSave,
                       border: `1px solid ${COLORS.creamDim}33`,
                       borderRadius: 8,
                       color: COLORS.cream,
-                      fontFamily: "'Bebas Neue', sans-serif",
+                      fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                       fontSize: 18,
                       padding: "8px 10px",
                       boxSizing: "border-box",
@@ -10583,7 +10409,7 @@ function CompeteRoundEditModal({ round, players, mode, units, valueKind, onSave,
                     border: winner === p ? `2px solid ${COLORS.fairwayLight}` : `1px solid ${COLORS.creamDim}33`,
                     background: winner === p ? COLORS.fairway : "transparent",
                     color: COLORS.cream,
-                    fontFamily: "'Bebas Neue', sans-serif",
+                    fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                     fontSize: 16,
                     cursor: "pointer",
                   }}
@@ -10603,7 +10429,7 @@ function CompeteRoundEditModal({ round, players, mode, units, valueKind, onSave,
               border: `1px solid ${COLORS.creamDim}33`,
               background: "transparent",
               color: COLORS.creamDim,
-              fontFamily: "'Bebas Neue', sans-serif",
+              fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
               fontSize: 15,
               cursor: "pointer",
             }}
@@ -10619,7 +10445,7 @@ function CompeteRoundEditModal({ round, players, mode, units, valueKind, onSave,
               border: "none",
               background: COLORS.fairway,
               color: COLORS.cream,
-              fontFamily: "'Bebas Neue', sans-serif",
+              fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
               fontSize: 15,
               cursor: "pointer",
             }}
@@ -10673,10 +10499,10 @@ function PuttingCompeteHoleEditModal({ hole, players, units, onSave, onCancel })
           width: "100%",
         }}
       >
-        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 20, letterSpacing: 1, color: COLORS.cream }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 20, letterSpacing: 1, color: COLORS.cream }}>
           EDIT HOLE
         </div>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 4 }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, marginTop: 4 }}>
           Distance {ftToUnitRound(hole.target, units)}
           {shortUnitLabel(units)}
         </div>
@@ -10684,7 +10510,7 @@ function PuttingCompeteHoleEditModal({ hole, players, units, onSave, onCancel })
         <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 12 }}>
           {players.map((p) => (
             <div key={p}>
-              <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginBottom: 6 }}>
+              <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, marginBottom: 6 }}>
                 {p}
               </div>
               <div style={{ display: "flex", gap: 6 }}>
@@ -10699,7 +10525,7 @@ function PuttingCompeteHoleEditModal({ hole, players, units, onSave, onCancel })
                       border: putts[p] === n ? `2px solid ${COLORS.fairwayLight}` : `1px solid ${COLORS.creamDim}33`,
                       background: putts[p] === n ? COLORS.fairway : "transparent",
                       color: COLORS.cream,
-                      fontFamily: "'Bebas Neue', sans-serif",
+                      fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                       fontSize: 16,
                       cursor: "pointer",
                     }}
@@ -10722,7 +10548,7 @@ function PuttingCompeteHoleEditModal({ hole, players, units, onSave, onCancel })
               border: `1px solid ${COLORS.creamDim}33`,
               background: "transparent",
               color: COLORS.creamDim,
-              fontFamily: "'Bebas Neue', sans-serif",
+              fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
               fontSize: 15,
               cursor: "pointer",
             }}
@@ -10738,7 +10564,7 @@ function PuttingCompeteHoleEditModal({ hole, players, units, onSave, onCancel })
               border: "none",
               background: COLORS.fairway,
               color: COLORS.cream,
-              fontFamily: "'Bebas Neue', sans-serif",
+              fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
               fontSize: 15,
               cursor: "pointer",
             }}
@@ -10752,36 +10578,19 @@ function PuttingCompeteHoleEditModal({ hole, players, units, onSave, onCancel })
 }
 
 // Full detail view for a single on-course round, opened by tapping it in "All rounds" — same
-// stat layout as the post-round Summary screen, plus a check-every-hole grid: all 18 holes at a
-// glance, any of them tappable to fix, and any hole that was never logged can be added.
-function RoundSummaryModal({ session, units, allRounds, onEditHole, onClose }) {
-  const [editingHole, setEditingHole] = useState(null); // hole number being edited, or null
-  const [addingMissing, setAddingMissing] = useState(false);
+// stat layout as the post-round Summary screen, plus the full hole-by-hole log.
+function RoundSummaryModal({ session, units, onEditShot, onClose }) {
+  const [editingShotIndex, setEditingShotIndex] = useState(null);
   const stats = courseRoundStats(session);
-  const view = courseSessionHoleView(session);
   const onePutts = session.putts.filter((p) => p.strokes <= 1).length;
   const onePuttPct = (onePutts / session.putts.length) * 100;
   const threePutts = session.putts.filter((p) => p.strokes >= 3).length;
   const avgStrokes = avg(session.putts.map((p) => p.strokes));
-  const notLogged = view.holes.filter((c) => c.status === "empty").map((c) => c.hole);
-  const editingCell = editingHole !== null ? view.holes[editingHole - 1] : null;
 
-  function initialForCell(c) {
-    if (!c || c.status === "empty") return { noPutt: false, strokes: 1, firstFt: null, lastFt: null };
-    if (c.status === "chip") return { noPutt: true, strokes: 1, firstFt: null, lastFt: null };
-    return {
-      noPutt: false,
-      strokes: c.entry.strokes,
-      firstFt: c.entry.targetFt,
-      lastFt: c.entry.strokes > 1 ? c.entry.holedFromFt ?? null : null,
-    };
+  function handleSave(updatedHole) {
+    onEditShot(editingShotIndex, updatedHole);
+    setEditingShotIndex(null);
   }
-
-  // Add-missing-hole picker: a numbered round can only add to holes that are still empty; a legacy
-  // round (no hole numbers stored) can slot the new hole in at any number, and the holes after it
-  // move up by one.
-  const pickerOptions = view.legacy ? Array.from({ length: 18 }, (_, i) => i + 1) : notLogged;
-  const pickerDefault = view.legacy ? (notLogged.length ? notLogged[0] : 18) : notLogged[0];
 
   return (
     <div
@@ -10810,10 +10619,10 @@ function RoundSummaryModal({ session, units, allRounds, onEditHole, onClose }) {
           overflowY: "auto",
         }}
       >
-        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 20, letterSpacing: 1, color: COLORS.cream }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 20, letterSpacing: 1, color: COLORS.cream }}>
           ROUND SUMMARY
         </div>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 4 }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, marginTop: 4 }}>
           {new Date(session.date).toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" })} ·{" "}
           {session.putts.length} holes putted
         </div>
@@ -10834,75 +10643,17 @@ function RoundSummaryModal({ session, units, allRounds, onEditHole, onClose }) {
           <StatBox label="FT MADE" value={`${fmt1(ftToUnit(stats.ftMade, units))}${shortUnitLabel(units)}`} valueColor={COLORS.sand} />
         </div>
         {session.chipIns > 0 && (
-          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginTop: 8 }}>
+          <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.creamDim, marginTop: 8 }}>
             + {session.chipIns} hole{session.chipIns === 1 ? "" : "s"} chipped in, no putt taken
           </div>
         )}
 
         <div style={{ marginTop: 16 }}>
-          <SectionLabel>Check every hole</SectionLabel>
-          <div style={{ marginTop: 8 }}>
-            <CourseHoleGrid cells={view.holes} onTapHole={setEditingHole} />
-          </div>
-          {notLogged.length > 0 && (
-            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.sand, marginTop: 8 }}>
-              Not logged: {formatHoleRanges(notLogged)}
-            </div>
-          )}
-          {view.legacy && (
-            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginTop: 6, lineHeight: 1.5 }}>
-              This round was saved before hole numbers were recorded, so its holes are numbered in the order they were putted. If one is
-              missing, use ADD MISSING HOLE and pick its number — the holes after it move up by one.
-              {session.chipIns > 0 ? " Its chip-ins can't be placed on a hole number." : ""}
-            </div>
-          )}
-          {pickerOptions.length > 0 && (
-            <button
-              onClick={() => setAddingMissing(true)}
-              style={{
-                width: "100%",
-                marginTop: 10,
-                padding: "10px 0",
-                borderRadius: 10,
-                border: `1px solid ${COLORS.fairwayLight}`,
-                background: "transparent",
-                color: COLORS.fairwayLight,
-                fontFamily: "'Bebas Neue', sans-serif",
-                fontSize: 15,
-                letterSpacing: 1,
-                cursor: "pointer",
-              }}
-            >
-              + ADD MISSING HOLE
-            </button>
-          )}
-        </div>
-
-        <div style={{ marginTop: 16 }}>
           <SectionLabel>Hole by hole — tap a hole to amend</SectionLabel>
           <div style={{ marginTop: 6 }}>
-            <CourseHoleTable view={view} units={units} onTapHole={setEditingHole} />
+            <PuttLog putts={session.putts} units={units} onEditShot={setEditingShotIndex} />
           </div>
         </div>
-
-        <ShareResultButton
-          badge="PUTTING SESSION"
-          bestLabels={puttingBestLabels(session, allRounds || [], units)}
-          hero={shareFtHero(ftToUnit(stats.ftMade, units))}
-          heroLabel={`${shortUnitLabel(units).toUpperCase()} MADE`}
-          heroGood
-          stats={[
-            ["PUTTS", String(stats.totalPutts)],
-            ["AVG SG/PUTT", formatSG(stats.avgSG)],
-            ["3+ PUTTS", String(threePutts)],
-          ]}
-          caption={
-            stats.avgSG >= 0
-              ? `Holed ${shareFtHero(ftToUnit(stats.ftMade, units))}${shortUnitLabel(units)} of putts today out on the course. Putting is starting to click. @The_golfpracticeapp`
-              : `Holed ${shareFtHero(ftToUnit(stats.ftMade, units))}${shortUnitLabel(units)} of putts today out on the course. Logging every round — the reps are what count. @The_golfpracticeapp`
-          }
-          hashtags={["#golf", "#putting", "#golfpractice", "#strokesgained", "#golftips", "#ThePracticeApp"]}
-        />
 
         <button
           onClick={onClose}
@@ -10914,7 +10665,7 @@ function RoundSummaryModal({ session, units, allRounds, onEditHole, onClose }) {
             border: `1px solid ${COLORS.creamDim}33`,
             background: "transparent",
             color: COLORS.creamDim,
-            fontFamily: "'Bebas Neue', sans-serif",
+            fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
             fontSize: 15,
             cursor: "pointer",
           }}
@@ -10923,53 +10674,13 @@ function RoundSummaryModal({ session, units, allRounds, onEditHole, onClose }) {
         </button>
       </div>
 
-      {editingHole !== null && (
+      {editingShotIndex !== null && (
         <div onClick={(e) => e.stopPropagation()}>
-          <CourseHoleEditModal
-            key={`edit-${editingHole}`}
-            holeNumber={editingHole}
-            initial={initialForCell(editingCell)}
+          <PuttShotEditModal
+            shot={session.putts[editingShotIndex]}
             units={units}
-            onSave={async (r) => {
-              const ok = await onEditHole({ type: "save", hole: editingHole, noPutt: r.noPutt, distancesFt: r.distancesFt });
-              if (ok) setEditingHole(null);
-              return ok;
-            }}
-            onRemove={
-              editingCell && editingCell.status !== "empty"
-                ? async () => {
-                    const ok = await onEditHole({ type: "remove", hole: editingHole });
-                    if (ok) setEditingHole(null);
-                    return ok;
-                  }
-                : null
-            }
-            removeLabel="REMOVE THIS HOLE FROM THE ROUND"
-            onCancel={() => setEditingHole(null)}
-          />
-        </div>
-      )}
-
-      {addingMissing && (
-        <div onClick={(e) => e.stopPropagation()}>
-          <CourseHoleEditModal
-            key="add-missing"
-            holeNumber={pickerDefault}
-            initial={null}
-            units={units}
-            holeChoices={{ options: pickerOptions, defaultHole: pickerDefault }}
-            onSave={async (r) => {
-              const ok = await onEditHole({
-                type: "save",
-                hole: r.hole,
-                noPutt: r.noPutt,
-                distancesFt: r.distancesFt,
-                insert: view.legacy,
-              });
-              if (ok) setAddingMissing(false);
-              return ok;
-            }}
-            onCancel={() => setAddingMissing(false)}
+            onSave={handleSave}
+            onCancel={() => setEditingShotIndex(null)}
           />
         </div>
       )}
@@ -11020,10 +10731,10 @@ function ShotEditModal({ shot, mode, units, onSave, onCancel }) {
           width: "100%",
         }}
       >
-        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 20, letterSpacing: 1, color: COLORS.cream }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 20, letterSpacing: 1, color: COLORS.cream }}>
           EDIT SHOT
         </div>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 4 }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, marginTop: 4 }}>
           Target {ydsToUnitRound(shot.target, units)}
           {unitLabel}
         </div>
@@ -11042,7 +10753,7 @@ function ShotEditModal({ shot, mode, units, onSave, onCancel }) {
                     border: ratingValue === n ? `2px solid ${ratingRagColor(n)}` : `1px solid ${COLORS.creamDim}33`,
                     background: ratingValue === n ? COLORS.fairway : "transparent",
                     color: COLORS.cream,
-                    fontFamily: "'Bebas Neue', sans-serif",
+                    fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                     fontSize: 18,
                     cursor: "pointer",
                   }}
@@ -11063,7 +10774,7 @@ function ShotEditModal({ shot, mode, units, onSave, onCancel }) {
                 border: `1px solid ${COLORS.creamDim}33`,
                 borderRadius: 8,
                 color: COLORS.cream,
-                fontFamily: "'Bebas Neue', sans-serif",
+                fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                 fontSize: 22,
                 padding: "10px 12px",
                 boxSizing: "border-box",
@@ -11082,7 +10793,7 @@ function ShotEditModal({ shot, mode, units, onSave, onCancel }) {
               border: `1px solid ${COLORS.creamDim}33`,
               background: "transparent",
               color: COLORS.creamDim,
-              fontFamily: "'Bebas Neue', sans-serif",
+              fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
               fontSize: 15,
               cursor: "pointer",
             }}
@@ -11098,7 +10809,7 @@ function ShotEditModal({ shot, mode, units, onSave, onCancel }) {
               border: "none",
               background: COLORS.fairway,
               color: COLORS.cream,
-              fontFamily: "'Bebas Neue', sans-serif",
+              fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
               fontSize: 15,
               cursor: "pointer",
             }}
@@ -11153,10 +10864,10 @@ function RangeSessionDetailModal({ session, units, onEditShot, onClose }) {
           overflowY: "auto",
         }}
       >
-        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 20, letterSpacing: 1, color: COLORS.cream }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 20, letterSpacing: 1, color: COLORS.cream }}>
           SESSION DETAIL
         </div>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 4 }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, marginTop: 4 }}>
           {new Date(session.date).toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" })}
           {"  ·  "}
           {session.shotCount} shots · {session.minDist}-{session.maxDist}y
@@ -11194,7 +10905,7 @@ function RangeSessionDetailModal({ session, units, onEditShot, onClose }) {
             border: `1px solid ${COLORS.creamDim}33`,
             background: "transparent",
             color: COLORS.creamDim,
-            fontFamily: "'Bebas Neue', sans-serif",
+            fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
             fontSize: 15,
             cursor: "pointer",
           }}
@@ -11224,10 +10935,10 @@ function HomeScreen({ onNavigate }) {
   return (
     <div>
       <div style={{ marginBottom: 14 }}>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, letterSpacing: 1.5 }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, letterSpacing: 1.5 }}>
           WELCOME BACK
         </div>
-        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 26, marginTop: 2 }}>Pick a session</div>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 26, marginTop: 2 }}>Pick a session</div>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
@@ -11262,7 +10973,7 @@ function HomeScreen({ onNavigate }) {
                   border: `1px solid ${COLORS.creamDim}44`,
                   borderRadius: 5,
                   padding: "2px 6px",
-                  fontFamily: "'JetBrains Mono', monospace",
+                  fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                   fontSize: 8,
                   color: COLORS.creamDim,
                   letterSpacing: 0.5,
@@ -11279,7 +10990,7 @@ function HomeScreen({ onNavigate }) {
             <div style={{ position: "absolute", left: 10, bottom: 8, right: 10 }}>
               <div
                 style={{
-                  fontFamily: "'Bebas Neue', sans-serif",
+                  fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                   fontSize: 20,
                   letterSpacing: 0.5,
                   lineHeight: 1.05,
@@ -11291,7 +11002,7 @@ function HomeScreen({ onNavigate }) {
               </div>
               <div
                 style={{
-                  fontFamily: "'JetBrains Mono', monospace",
+                  fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                   fontSize: 9,
                   color: COLORS.creamDim,
                   marginTop: 2,
@@ -11337,8 +11048,8 @@ function TeeAccuracySetupScreen({
   return (
     <div>
       <div style={{ marginBottom: 12 }}>
-        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 24, letterSpacing: 1, lineHeight: 1 }}>TEE ACCURACY</div>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 24, letterSpacing: 1, lineHeight: 1 }}>TEE ACCURACY</div>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
           Fairways found off the tee
         </div>
       </div>
@@ -11354,18 +11065,18 @@ function TeeAccuracySetupScreen({
 
       <Card style={{ marginTop: 10 }}>
         <SectionLabel>Fairway width</SectionLabel>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 4 }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, marginTop: 4 }}>
           Defaults to a reasonable average fairway width — adjust for the course you're picturing.
         </div>
 
         <div style={{ textAlign: "center", marginTop: 14 }}>
-          <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 40, lineHeight: 1, color: COLORS.flag }}>
+          <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 40, lineHeight: 1, color: COLORS.flag }}>
             {ydsToUnitRound(fairwayWidth, units)}
             <span style={{ fontSize: 16, marginLeft: 6, color: COLORS.creamDim }}>{unitLabel}</span>
           </div>
           <div
             style={{
-              fontFamily: "'JetBrains Mono', monospace",
+              fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
               fontSize: 11,
               letterSpacing: 0.5,
               marginTop: 4,
@@ -11391,11 +11102,11 @@ function TeeAccuracySetupScreen({
           }}
         />
         <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
-          <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: COLORS.creamDim }}>
+          <span style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 9, color: COLORS.creamDim }}>
             TIGHT ({ydsToUnitRound(15, units)}
             {unitLabel})
           </span>
-          <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: COLORS.creamDim }}>
+          <span style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 9, color: COLORS.creamDim }}>
             WIDE ({ydsToUnitRound(50, units)}
             {unitLabel})
           </span>
@@ -11411,7 +11122,7 @@ function TeeAccuracySetupScreen({
           <ClubToggle club="iron" active={clubs.includes("iron")} onClick={() => onToggleClub("iron")} />
         </div>
         {clubs.length === 0 && (
-          <div style={{ color: COLORS.flag, fontSize: 11, marginTop: 8, fontFamily: "'JetBrains Mono', monospace" }}>
+          <div style={{ color: COLORS.flag, fontSize: 11, marginTop: 8, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" }}>
             Select at least one club.
           </div>
         )}
@@ -11428,7 +11139,7 @@ function TeeAccuracySetupScreen({
           border: "none",
           background: !canStart ? `${COLORS.fairway}66` : COLORS.flag,
           color: COLORS.cream,
-          fontFamily: "'Bebas Neue', sans-serif",
+          fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
           fontSize: 22,
           letterSpacing: 2,
           cursor: !canStart ? "not-allowed" : "pointer",
@@ -11443,7 +11154,7 @@ function TeeAccuracySetupScreen({
           textAlign: "center",
           marginTop: 12,
           color: COLORS.creamDim,
-          fontFamily: "'JetBrains Mono', monospace",
+          fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
           fontSize: 11,
           cursor: "pointer",
           textDecoration: "underline",
@@ -11458,7 +11169,7 @@ function TeeAccuracySetupScreen({
           {history.map((s) => (
             <SwipeToDelete key={s.id} onDelete={() => onDeleteSession(s.id)}>
               <Card style={{ marginBottom: 12 }}>
-                <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, paddingRight: 20 }}>
+                <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, paddingRight: 20 }}>
                   {new Date(s.date).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
                   {"  ·  "}
                   {s.shotCount} shots · {s.clubs.map((c) => CLUB_LABELS[c]).join(", ")}
@@ -11497,13 +11208,13 @@ function TeeAccuracyPracticeScreen({
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 5 }}>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim }}>
           SHOT {shotNum} OF {shotCount}
         </div>
         <div
           onClick={onExit}
           style={{
-            fontFamily: "'JetBrains Mono', monospace",
+            fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
             fontSize: 10,
             color: COLORS.creamDim,
             cursor: "pointer",
@@ -11517,20 +11228,20 @@ function TeeAccuracyPracticeScreen({
 
       <Card>
         <div style={{ textAlign: "center" }}>
-          <div style={{ fontSize: 12, color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", letterSpacing: 2 }}>
+          <div style={{ fontSize: 12, color: COLORS.creamDim, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", letterSpacing: 2 }}>
             CLUB
           </div>
-          <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 44, lineHeight: 1, color: COLORS.flag, marginTop: 2 }}>
+          <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 44, lineHeight: 1, color: COLORS.flag, marginTop: 2 }}>
             {CLUB_LABELS[currentClub]}
           </div>
-          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 6 }}>
+          <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, marginTop: 6 }}>
             Aiming at a {ydsToUnitRound(fairwayWidth, units)}
             {unitLabel} wide fairway
           </div>
         </div>
 
         <div style={{ marginTop: 16 }}>
-          <div style={{ fontSize: 10, color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", marginBottom: 8, textAlign: "center" }}>
+          <div style={{ fontSize: 10, color: COLORS.creamDim, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", marginBottom: 8, textAlign: "center" }}>
             DID YOU FIND THE FAIRWAY?
           </div>
           <div style={{ display: "flex", gap: 10 }}>
@@ -11543,7 +11254,7 @@ function TeeAccuracyPracticeScreen({
                 border: "none",
                 background: COLORS.fairway,
                 color: COLORS.cream,
-                fontFamily: "'Bebas Neue', sans-serif",
+                fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                 fontSize: 22,
                 letterSpacing: 1,
                 cursor: "pointer",
@@ -11560,7 +11271,7 @@ function TeeAccuracyPracticeScreen({
                 border: `2px solid ${COLORS.flag}`,
                 background: "transparent",
                 color: COLORS.cream,
-                fontFamily: "'Bebas Neue', sans-serif",
+                fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                 fontSize: 22,
                 letterSpacing: 1,
                 cursor: "pointer",
@@ -11604,7 +11315,7 @@ function TeeShotLog({ shots, units, onEditShot }) {
         border: `1px solid ${COLORS.creamDim}22`,
         borderRadius: 10,
         overflow: "hidden",
-        fontFamily: "'JetBrains Mono', monospace",
+        fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
         fontSize: 12,
       }}
     >
@@ -11677,12 +11388,12 @@ function TeeShotEditModal({ shot, onSave, onCancel }) {
           width: "100%",
         }}
       >
-        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 20, letterSpacing: 1, color: COLORS.cream }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 20, letterSpacing: 1, color: COLORS.cream }}>
           EDIT SHOT
         </div>
 
         <div style={{ marginTop: 14 }}>
-          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginBottom: 6 }}>
+          <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.creamDim, marginBottom: 6 }}>
             CLUB
           </div>
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
@@ -11696,7 +11407,7 @@ function TeeShotEditModal({ shot, onSave, onCancel }) {
                   border: club === c ? `2px solid ${COLORS.fairwayLight}` : `1px solid ${COLORS.creamDim}33`,
                   background: club === c ? COLORS.fairway : "transparent",
                   color: COLORS.cream,
-                  fontFamily: "'Bebas Neue', sans-serif",
+                  fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                   fontSize: 12,
                   cursor: "pointer",
                 }}
@@ -11708,7 +11419,7 @@ function TeeShotEditModal({ shot, onSave, onCancel }) {
         </div>
 
         <div style={{ marginTop: 14 }}>
-          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginBottom: 6 }}>
+          <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.creamDim, marginBottom: 6 }}>
             RESULT
           </div>
           <div style={{ display: "flex", gap: 8 }}>
@@ -11721,7 +11432,7 @@ function TeeShotEditModal({ shot, onSave, onCancel }) {
                 border: hit ? "none" : `1px solid ${COLORS.creamDim}33`,
                 background: hit ? COLORS.fairway : "transparent",
                 color: COLORS.cream,
-                fontFamily: "'Bebas Neue', sans-serif",
+                fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                 fontSize: 16,
                 letterSpacing: 1,
                 cursor: "pointer",
@@ -11738,7 +11449,7 @@ function TeeShotEditModal({ shot, onSave, onCancel }) {
                 border: !hit ? `2px solid ${COLORS.flag}` : `1px solid ${COLORS.creamDim}33`,
                 background: "transparent",
                 color: COLORS.cream,
-                fontFamily: "'Bebas Neue', sans-serif",
+                fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                 fontSize: 16,
                 letterSpacing: 1,
                 cursor: "pointer",
@@ -11759,7 +11470,7 @@ function TeeShotEditModal({ shot, onSave, onCancel }) {
               border: `1px solid ${COLORS.creamDim}33`,
               background: "transparent",
               color: COLORS.creamDim,
-              fontFamily: "'Bebas Neue', sans-serif",
+              fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
               fontSize: 15,
               cursor: "pointer",
             }}
@@ -11775,7 +11486,7 @@ function TeeShotEditModal({ shot, onSave, onCancel }) {
               border: "none",
               background: COLORS.fairway,
               color: COLORS.cream,
-              fontFamily: "'Bebas Neue', sans-serif",
+              fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
               fontSize: 15,
               cursor: "pointer",
             }}
@@ -11825,10 +11536,10 @@ function TeeSessionDetailModal({ session, units, onEditShot, onClose }) {
           overflowY: "auto",
         }}
       >
-        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 20, letterSpacing: 1, color: COLORS.cream }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 20, letterSpacing: 1, color: COLORS.cream }}>
           SESSION DETAIL
         </div>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 4 }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, marginTop: 4 }}>
           {new Date(session.date).toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" })}
           {"  ·  "}
           {session.shotCount} shots · {session.clubs.map((c) => CLUB_LABELS[c]).join(", ")}
@@ -11856,7 +11567,7 @@ function TeeSessionDetailModal({ session, units, onEditShot, onClose }) {
             border: `1px solid ${COLORS.creamDim}33`,
             background: "transparent",
             color: COLORS.creamDim,
-            fontFamily: "'Bebas Neue', sans-serif",
+            fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
             fontSize: 15,
             cursor: "pointer",
           }}
@@ -11878,8 +11589,7 @@ function TeeSessionDetailModal({ session, units, onEditShot, onClose }) {
   );
 }
 
-function TeeAccuracySummaryScreen({ shots, fairwayWidth, onNewSession, storageError, units, history }) {
-  const bestLabels = history && history[0] ? teeBestLabels(history[0], history) : [];
+function TeeAccuracySummaryScreen({ shots, fairwayWidth, onNewSession, storageError, units }) {
   const hitCount = shots.filter((s) => s.hit).length;
   const hitPct = (hitCount / shots.length) * 100;
   const unitLabel = longUnitLabel(units);
@@ -11899,7 +11609,7 @@ function TeeAccuracySummaryScreen({ shots, fairwayWidth, onNewSession, storageEr
     <div>
       <Card>
         <div style={{ textAlign: "center", marginBottom: 4 }}>
-          <div style={{ fontSize: 11, color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", letterSpacing: 2 }}>
+          <div style={{ fontSize: 11, color: COLORS.creamDim, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", letterSpacing: 2 }}>
             SESSION COMPLETE — {shots.length} SHOTS · {ydsToUnitRound(fairwayWidth, units)}
             {unitLabel.toUpperCase()} FAIRWAY
           </div>
@@ -11917,10 +11627,10 @@ function TeeAccuracySummaryScreen({ shots, fairwayWidth, onNewSession, storageEr
             <div key={c.club} style={{ borderTop: i > 0 ? `1px solid ${COLORS.creamDim}15` : "none" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0" }}>
                 <div>
-                  <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 16, color: COLORS.cream }}>{CLUB_LABELS[c.club]}</div>
-                  <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim }}>{c.count} shots</div>
+                  <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 16, color: COLORS.cream }}>{CLUB_LABELS[c.club]}</div>
+                  <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim }}>{c.count} shots</div>
                 </div>
-                <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 20, color: ratingRagColor(c.hitPct / 20) }}>
+                <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 20, color: ratingRagColor(c.hitPct / 20) }}>
                   {c.hitPct.toFixed(0)}%
                 </div>
               </div>
@@ -11930,14 +11640,13 @@ function TeeAccuracySummaryScreen({ shots, fairwayWidth, onNewSession, storageEr
       )}
 
       {storageError && (
-        <div style={{ color: COLORS.flag, fontSize: 11, marginTop: 8, fontFamily: "'JetBrains Mono', monospace" }}>
+        <div style={{ color: COLORS.flag, fontSize: 11, marginTop: 8, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" }}>
           Couldn't save this session to history — it's still shown above.
         </div>
       )}
 
       <ShareResultButton
         badge="RANGE SESSION"
-        bestLabels={bestLabels}
         hero={`${hitPct.toFixed(0)}%`}
         heroLabel="FAIRWAYS HIT"
         heroGood={hitPct >= 50}
@@ -11966,7 +11675,7 @@ function TeeAccuracySummaryScreen({ shots, fairwayWidth, onNewSession, storageEr
           border: "none",
           background: COLORS.flag,
           color: COLORS.cream,
-          fontFamily: "'Bebas Neue', sans-serif",
+          fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
           fontSize: 20,
           letterSpacing: 2,
           cursor: "pointer",
@@ -12007,16 +11716,16 @@ function WedgeMatrixSetupScreen({
     return (
       <div>
         <div style={{ marginBottom: 12 }}>
-          <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 24, letterSpacing: 1, lineHeight: 1 }}>WEDGE MATRIX</div>
-          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
+          <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 24, letterSpacing: 1, lineHeight: 1 }}>WEDGE MATRIX</div>
+          <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
             You have a matrix in progress
           </div>
         </div>
         <Card>
-          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: COLORS.cream }}>
+          <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 12, color: COLORS.cream }}>
             {doneCount} of {activeMatrix.sequence.length} club/swing combos completed
           </div>
-          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 4 }}>
+          <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, marginTop: 4 }}>
             {activeMatrix.selectedClubs.length} clubs × {activeMatrix.selectedSwings.length} swings ·{" "}
             {activeMatrix.shotsPerCombo} shots each
           </div>
@@ -12030,7 +11739,7 @@ function WedgeMatrixSetupScreen({
               border: "none",
               background: COLORS.flag,
               color: COLORS.cream,
-              fontFamily: "'Bebas Neue', sans-serif",
+              fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
               fontSize: 20,
               letterSpacing: 1,
               cursor: "pointer",
@@ -12043,7 +11752,7 @@ function WedgeMatrixSetupScreen({
             style={{
               textAlign: "center",
               marginTop: 10,
-              fontFamily: "'JetBrains Mono', monospace",
+              fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
               fontSize: 10,
               color: COLORS.creamDim,
               cursor: "pointer",
@@ -12061,8 +11770,8 @@ function WedgeMatrixSetupScreen({
   return (
     <div>
       <div style={{ marginBottom: 12 }}>
-        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 24, letterSpacing: 1, lineHeight: 1 }}>WEDGE MATRIX</div>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 24, letterSpacing: 1, lineHeight: 1 }}>WEDGE MATRIX</div>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
           Build a personal yardage chart for every club and swing length
         </div>
       </div>
@@ -12084,10 +11793,10 @@ function WedgeMatrixSetupScreen({
                     cursor: "pointer",
                   }}
                 >
-                  <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 16, color: COLORS.sand }}>
+                  <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 16, color: COLORS.sand }}>
                     {new Date(m.date).toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" })}
                   </div>
-                  <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginTop: 2 }}>
+                  <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.creamDim, marginTop: 2 }}>
                     {m.selectedClubs.length} clubs × {m.selectedSwings.length} swings · {comboCount} combos · {m.shotsPerCombo} shots each
                   </div>
                 </div>
@@ -12110,7 +11819,7 @@ function WedgeMatrixSetupScreen({
                 border: selectedClubs.includes(c.key) ? `2px solid ${COLORS.fairwayLight}` : `1px solid ${COLORS.creamDim}33`,
                 background: selectedClubs.includes(c.key) ? COLORS.fairway : "transparent",
                 color: COLORS.cream,
-                fontFamily: "'Bebas Neue', sans-serif",
+                fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                 fontSize: 15,
                 letterSpacing: 0.5,
                 cursor: "pointer",
@@ -12137,7 +11846,7 @@ function WedgeMatrixSetupScreen({
                 border: selectedSwings.includes(s.key) ? `2px solid ${COLORS.fairwayLight}` : `1px solid ${COLORS.creamDim}33`,
                 background: selectedSwings.includes(s.key) ? COLORS.fairway : "transparent",
                 color: COLORS.cream,
-                fontFamily: "'Bebas Neue', sans-serif",
+                fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                 fontSize: 14,
                 cursor: "pointer",
               }}
@@ -12150,7 +11859,7 @@ function WedgeMatrixSetupScreen({
 
       <Card style={{ marginTop: 10 }}>
         <SectionLabel>Shots per combo</SectionLabel>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginTop: 4 }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.creamDim, marginTop: 4 }}>
           The middle 60% of shots count toward the average — the rest are dropped evenly from the
           shortest and longest ends. You can also manually include/exclude individual shots
           afterward.
@@ -12182,7 +11891,7 @@ function WedgeMatrixSetupScreen({
                 unable to reach any single digit other than 1. Validation happens once, at START. */}
             <NumberField label="SHOTS" value={shotsPerCombo} onChange={setShotsPerCombo} />
             {shotsPerCombo < 1 && (
-              <div style={{ color: COLORS.flag, fontSize: 11, marginTop: 6, fontFamily: "'JetBrains Mono', monospace" }}>
+              <div style={{ color: COLORS.flag, fontSize: 11, marginTop: 6, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" }}>
                 Enter at least 1 shot per combo.
               </div>
             )}
@@ -12191,7 +11900,7 @@ function WedgeMatrixSetupScreen({
         {shotsPerCombo >= 1 && (() => {
           const { keepCount, dropLow, dropHigh } = wedgeTrimPreview(shotsPerCombo);
           return (
-            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.sand, marginTop: 8 }}>
+            <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.sand, marginTop: 8 }}>
               {shotsPerCombo} shots → keeps the middle {keepCount}
               {dropLow + dropHigh > 0 ? `, drops ${dropLow} shortest + ${dropHigh} longest` : " (too few to drop any)"}
             </div>
@@ -12200,7 +11909,7 @@ function WedgeMatrixSetupScreen({
       </Card>
 
       {canStart && (
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 10, textAlign: "center" }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, marginTop: 10, textAlign: "center" }}>
           {totalCombos} combo{totalCombos === 1 ? "" : "s"} · {totalShots} shots total
         </div>
       )}
@@ -12216,7 +11925,7 @@ function WedgeMatrixSetupScreen({
           border: "none",
           background: !canStart ? `${COLORS.fairway}66` : COLORS.flag,
           color: COLORS.cream,
-          fontFamily: "'Bebas Neue', sans-serif",
+          fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
           fontSize: 22,
           letterSpacing: 2,
           cursor: !canStart ? "not-allowed" : "pointer",
@@ -12225,7 +11934,7 @@ function WedgeMatrixSetupScreen({
         START MATRIX
       </button>
       {!canStart && (
-        <div style={{ color: COLORS.creamDim, fontSize: 11, marginTop: 8, fontFamily: "'JetBrains Mono', monospace", textAlign: "center" }}>
+        <div style={{ color: COLORS.creamDim, fontSize: 11, marginTop: 8, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", textAlign: "center" }}>
           Select at least one club and one swing length.
         </div>
       )}
@@ -12261,13 +11970,13 @@ function WedgeMatrixPracticeScreen({
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim }}>
           COMBO {comboIndex + 1} OF {sequence.length}
         </div>
         <div
           onClick={onExitEarly}
           style={{
-            fontFamily: "'JetBrains Mono', monospace",
+            fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
             fontSize: 10,
             color: COLORS.creamDim,
             cursor: "pointer",
@@ -12282,13 +11991,13 @@ function WedgeMatrixPracticeScreen({
       {!comboComplete ? (
         <Card>
           <div style={{ textAlign: "center" }}>
-            <div style={{ fontSize: 12, color: COLORS.sand, fontFamily: "'JetBrains Mono', monospace", letterSpacing: 2 }}>
+            <div style={{ fontSize: 12, color: COLORS.sand, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", letterSpacing: 2 }}>
               {combo.clubLabel}
             </div>
-            <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 32, lineHeight: 1.1, color: COLORS.flag, marginTop: 2 }}>
+            <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 32, lineHeight: 1.1, color: COLORS.flag, marginTop: 2 }}>
               {combo.swingLabel}
             </div>
-            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 8 }}>
+            <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, marginTop: 8 }}>
               {currentShots.length >= shotsPerCombo
                 ? `EXTRA SHOT ${currentShots.length - shotsPerCombo + 1}`
                 : `SHOT ${currentShots.length + 1} OF ${shotsPerCombo}`}
@@ -12296,7 +12005,7 @@ function WedgeMatrixPracticeScreen({
           </div>
 
           <div style={{ marginTop: 14 }}>
-            <div style={{ fontSize: 10, color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", marginBottom: 6 }}>
+            <div style={{ fontSize: 10, color: COLORS.creamDim, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", marginBottom: 6 }}>
               CARRY DISTANCE ({unitLabel.toUpperCase()})
             </div>
             <div style={{ display: "flex", gap: 8 }}>
@@ -12314,7 +12023,7 @@ function WedgeMatrixPracticeScreen({
                   border: `1px solid ${COLORS.creamDim}33`,
                   borderRadius: 8,
                   color: COLORS.cream,
-                  fontFamily: "'Bebas Neue', sans-serif",
+                  fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                   fontSize: 24,
                   padding: "7px 12px",
                   boxSizing: "border-box",
@@ -12329,7 +12038,7 @@ function WedgeMatrixPracticeScreen({
                   border: "none",
                   background: distanceInput === "" ? `${COLORS.fairway}66` : COLORS.fairway,
                   color: COLORS.cream,
-                  fontFamily: "'Bebas Neue', sans-serif",
+                  fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                   fontSize: 16,
                   letterSpacing: 1,
                   cursor: distanceInput === "" ? "not-allowed" : "pointer",
@@ -12341,7 +12050,7 @@ function WedgeMatrixPracticeScreen({
           </div>
 
           {currentShots.length > 0 && (
-            <div style={{ marginTop: 10, fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim }}>
+            <div style={{ marginTop: 10, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim }}>
               Logged so far: {currentShots.map((s) => `${ydsToUnitRound(s, units)}${unitLabel}`).join(", ")}
             </div>
           )}
@@ -12349,19 +12058,19 @@ function WedgeMatrixPracticeScreen({
       ) : (
         <Card>
           <div style={{ textAlign: "center" }}>
-            <div style={{ fontSize: 11, color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", letterSpacing: 2 }}>
+            <div style={{ fontSize: 11, color: COLORS.creamDim, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", letterSpacing: 2 }}>
               {combo.clubLabel} · {combo.swingLabel} COMPLETE
             </div>
-            <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 48, lineHeight: 1, color: COLORS.flag, marginTop: 4 }}>
+            <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 48, lineHeight: 1, color: COLORS.flag, marginTop: 4 }}>
               {ydsToUnitRound(result.average, units)}
               <span style={{ fontSize: 18, marginLeft: 6, color: COLORS.creamDim }}>{unitLabel}</span>
             </div>
-            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginTop: 4 }}>
+            <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.creamDim, marginTop: 4 }}>
               average of {result.shots.filter((s) => s.included).length} of {result.shots.length} shots
             </div>
           </div>
 
-          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginTop: 14, marginBottom: 6, textAlign: "center" }}>
+          <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.creamDim, marginTop: 14, marginBottom: 6, textAlign: "center" }}>
             TAP A SHOT TO INCLUDE/EXCLUDE IT — GREEN COUNTS TOWARD THE AVERAGE
           </div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 6, justifyContent: "center" }}>
@@ -12375,7 +12084,7 @@ function WedgeMatrixPracticeScreen({
                   border: s.included ? `2px solid ${COLORS.fairwayLight}` : `1px solid ${COLORS.flag}`,
                   background: s.included ? COLORS.fairway : "transparent",
                   color: s.included ? COLORS.cream : COLORS.creamDim,
-                  fontFamily: "'JetBrains Mono', monospace",
+                  fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                   fontSize: 12,
                   cursor: "pointer",
                   textDecoration: s.included ? "none" : "line-through",
@@ -12397,7 +12106,7 @@ function WedgeMatrixPracticeScreen({
               border: `1px solid ${COLORS.creamDim}33`,
               background: "transparent",
               color: COLORS.cream,
-              fontFamily: "'Bebas Neue', sans-serif",
+              fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
               fontSize: 14,
               letterSpacing: 0.5,
               cursor: "pointer",
@@ -12405,7 +12114,7 @@ function WedgeMatrixPracticeScreen({
           >
             + HIT ANOTHER SHOT
           </button>
-          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: COLORS.creamDim, marginTop: 6, textAlign: "center" }}>
+          <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 9, color: COLORS.creamDim, marginTop: 6, textAlign: "center" }}>
             Not sure about these yardages? Hit a few more — the average re-trims automatically over
             the bigger sample.
           </div>
@@ -12420,7 +12129,7 @@ function WedgeMatrixPracticeScreen({
               border: "none",
               background: COLORS.flag,
               color: COLORS.cream,
-              fontFamily: "'Bebas Neue', sans-serif",
+              fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
               fontSize: 18,
               letterSpacing: 1,
               cursor: "pointer",
@@ -12431,7 +12140,7 @@ function WedgeMatrixPracticeScreen({
         </Card>
       )}
 
-      <div style={{ marginTop: 10, fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, textAlign: "center" }}>
+      <div style={{ marginTop: 10, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.creamDim, textAlign: "center" }}>
         {Math.min(overallShotNumber, totalShots)} of {totalShots} shots overall
       </div>
     </div>
@@ -12448,8 +12157,8 @@ function WedgeMatrixResultScreen({ matrix, units, onNewMatrix, onToggleShot, onE
     <div>
       <PrintHeader title="Wedge Matrix" timescale="all" />
       <div className="no-print" style={{ marginBottom: 12 }}>
-        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 24, letterSpacing: 1, lineHeight: 1 }}>YOUR WEDGE MATRIX</div>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 24, letterSpacing: 1, lineHeight: 1 }}>YOUR WEDGE MATRIX</div>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
           {new Date(matrix.date).toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" })} ·{" "}
           {matrix.shotsPerCombo} shots per combo, outliers removed
         </div>
@@ -12466,7 +12175,7 @@ function WedgeMatrixResultScreen({ matrix, units, onNewMatrix, onToggleShot, onE
                 padding: "10px 4px",
                 background: `${COLORS.turf}aa`,
                 textAlign: "center",
-                fontFamily: "'JetBrains Mono', monospace",
+                fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                 fontSize: 10,
                 color: COLORS.creamDim,
                 borderLeft: `1px solid ${COLORS.creamDim}15`,
@@ -12483,7 +12192,7 @@ function WedgeMatrixResultScreen({ matrix, units, onNewMatrix, onToggleShot, onE
                 width: 90,
                 flexShrink: 0,
                 padding: "10px 8px",
-                fontFamily: "'Bebas Neue', sans-serif",
+                fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                 fontSize: 14,
                 color: COLORS.cream,
                 display: "flex",
@@ -12503,7 +12212,7 @@ function WedgeMatrixResultScreen({ matrix, units, onNewMatrix, onToggleShot, onE
                     padding: "10px 4px",
                     textAlign: "center",
                     borderLeft: `1px solid ${COLORS.creamDim}15`,
-                    fontFamily: "'Bebas Neue', sans-serif",
+                    fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                     fontSize: 18,
                     color: result ? COLORS.flag : COLORS.creamDim,
                   }}
@@ -12517,7 +12226,7 @@ function WedgeMatrixResultScreen({ matrix, units, onNewMatrix, onToggleShot, onE
       </Card>
 
       <CollapsibleSection title="Shot detail" count={matrix.sequence.length}>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginBottom: 10 }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.creamDim, marginBottom: 10 }}>
           Tap a shot to include/exclude it from the average · tap ✎ to correct a wrong value
         </div>
         {matrix.sequence.map((combo) => {
@@ -12526,8 +12235,8 @@ function WedgeMatrixResultScreen({ matrix, units, onNewMatrix, onToggleShot, onE
           if (!result) return null;
           return (
             <div key={comboKey} style={{ marginBottom: 14 }}>
-              <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim }}>
-                <span style={{ color: COLORS.cream, fontFamily: "'Bebas Neue', sans-serif", fontSize: 15, letterSpacing: 0.5 }}>
+              <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim }}>
+                <span style={{ color: COLORS.cream, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 15, letterSpacing: 0.5 }}>
                   {combo.clubKey}
                 </span>{" "}
                 · {combo.swingLabel} · avg {ydsToUnitRound(result.average, units)}
@@ -12545,7 +12254,7 @@ function WedgeMatrixResultScreen({ matrix, units, onNewMatrix, onToggleShot, onE
                         borderRight: "none",
                         background: s.included ? COLORS.fairway : "transparent",
                         color: s.included ? COLORS.cream : COLORS.creamDim,
-                        fontFamily: "'JetBrains Mono', monospace",
+                        fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                         fontSize: 12,
                         cursor: "pointer",
                         textDecoration: s.included ? "none" : "line-through",
@@ -12564,7 +12273,7 @@ function WedgeMatrixResultScreen({ matrix, units, onNewMatrix, onToggleShot, onE
                         borderLeft: `1px solid ${COLORS.creamDim}33`,
                         background: "transparent",
                         color: COLORS.creamDim,
-                        fontFamily: "'JetBrains Mono', monospace",
+                        fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                         fontSize: 12,
                         cursor: "pointer",
                       }}
@@ -12601,7 +12310,7 @@ function WedgeMatrixResultScreen({ matrix, units, onNewMatrix, onToggleShot, onE
             border: `1px solid ${COLORS.creamDim}33`,
             background: "transparent",
             color: COLORS.cream,
-            fontFamily: "'Bebas Neue', sans-serif",
+            fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
             fontSize: 15,
             letterSpacing: 0.5,
             cursor: "pointer",
@@ -12618,7 +12327,7 @@ function WedgeMatrixResultScreen({ matrix, units, onNewMatrix, onToggleShot, onE
             border: `1px solid ${COLORS.creamDim}33`,
             background: "transparent",
             color: COLORS.cream,
-            fontFamily: "'Bebas Neue', sans-serif",
+            fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
             fontSize: 15,
             letterSpacing: 0.5,
             cursor: "pointer",
@@ -12639,7 +12348,7 @@ function WedgeMatrixResultScreen({ matrix, units, onNewMatrix, onToggleShot, onE
           border: "none",
           background: COLORS.flag,
           color: COLORS.cream,
-          fontFamily: "'Bebas Neue', sans-serif",
+          fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
           fontSize: 18,
           letterSpacing: 1,
           cursor: "pointer",
@@ -12689,11 +12398,11 @@ function WedgeShotValueEditModal({ shot, units, onSave, onCancel }) {
           width: "100%",
         }}
       >
-        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 20, letterSpacing: 1, color: COLORS.cream }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 20, letterSpacing: 1, color: COLORS.cream }}>
           CORRECT SHOT
         </div>
         <div style={{ marginTop: 14 }}>
-          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginBottom: 6 }}>
+          <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.creamDim, marginBottom: 6 }}>
             CARRY DISTANCE ({unitLabel.toUpperCase()})
           </div>
           <input
@@ -12708,7 +12417,7 @@ function WedgeShotValueEditModal({ shot, units, onSave, onCancel }) {
               border: `1px solid ${COLORS.creamDim}33`,
               borderRadius: 8,
               color: COLORS.cream,
-              fontFamily: "'Bebas Neue', sans-serif",
+              fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
               fontSize: 22,
               padding: "10px 12px",
               boxSizing: "border-box",
@@ -12725,7 +12434,7 @@ function WedgeShotValueEditModal({ shot, units, onSave, onCancel }) {
               border: `1px solid ${COLORS.creamDim}33`,
               background: "transparent",
               color: COLORS.creamDim,
-              fontFamily: "'Bebas Neue', sans-serif",
+              fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
               fontSize: 15,
               cursor: "pointer",
             }}
@@ -12741,7 +12450,7 @@ function WedgeShotValueEditModal({ shot, units, onSave, onCancel }) {
               border: "none",
               background: COLORS.fairway,
               color: COLORS.cream,
-              fontFamily: "'Bebas Neue', sans-serif",
+              fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
               fontSize: 15,
               cursor: "pointer",
             }}
@@ -12786,7 +12495,7 @@ function GappingClubSelectionGrid({ selectedClubs, onToggleClub, customClubs, on
                     border: selectedClubs.includes(c.key) ? `2px solid ${COLORS.fairwayLight}` : `1px solid ${COLORS.creamDim}33`,
                     background: selectedClubs.includes(c.key) ? COLORS.fairway : "transparent",
                     color: COLORS.cream,
-                    fontFamily: "'Bebas Neue', sans-serif",
+                    fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                     fontSize: 14,
                     letterSpacing: 0.5,
                     textAlign: "center",
@@ -12815,7 +12524,7 @@ function GappingClubSelectionGrid({ selectedClubs, onToggleClub, customClubs, on
                     border: selectedClubs.includes(c.key) ? `2px solid ${COLORS.fairwayLight}` : `1px solid ${COLORS.creamDim}33`,
                     background: selectedClubs.includes(c.key) ? COLORS.fairway : "transparent",
                     color: COLORS.cream,
-                    fontFamily: "'Bebas Neue', sans-serif",
+                    fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                     fontSize: 12,
                     letterSpacing: 0.3,
                     textAlign: "center",
@@ -12840,7 +12549,7 @@ function GappingClubSelectionGrid({ selectedClubs, onToggleClub, customClubs, on
                     border: `1px solid ${COLORS.creamDim}44`,
                     background: COLORS.turfDark,
                     color: COLORS.creamDim,
-                    fontFamily: "'JetBrains Mono', monospace",
+                    fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                     fontSize: 11,
                     lineHeight: 1,
                     padding: 0,
@@ -12870,7 +12579,7 @@ function GappingClubSelectionGrid({ selectedClubs, onToggleClub, customClubs, on
             border: `1px solid ${COLORS.creamDim}33`,
             borderRadius: 8,
             color: COLORS.cream,
-            fontFamily: "'JetBrains Mono', monospace",
+            fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
             fontSize: 13,
             padding: "10px 12px",
             boxSizing: "border-box",
@@ -12890,7 +12599,7 @@ function GappingClubSelectionGrid({ selectedClubs, onToggleClub, customClubs, on
             border: "none",
             background: !customClubInput.trim() ? `${COLORS.fairway}66` : COLORS.fairway,
             color: COLORS.cream,
-            fontFamily: "'Bebas Neue', sans-serif",
+            fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
             fontSize: 14,
             letterSpacing: 0.5,
             cursor: !customClubInput.trim() ? "not-allowed" : "pointer",
@@ -12931,16 +12640,16 @@ function GappingSetupScreen({
     return (
       <div>
         <div style={{ marginBottom: 12 }}>
-          <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 24, letterSpacing: 1, lineHeight: 1 }}>GAPPING</div>
-          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
+          <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 24, letterSpacing: 1, lineHeight: 1 }}>GAPPING</div>
+          <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
             You have a chart in progress
           </div>
         </div>
         <Card>
-          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: COLORS.cream }}>
+          <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 12, color: COLORS.cream }}>
             {doneCount} of {activeChart.sequence.length} clubs completed
           </div>
-          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 4 }}>
+          <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, marginTop: 4 }}>
             {activeChart.selectedClubs.length} clubs · {activeChart.shotsPerClub} shots each
           </div>
           <button
@@ -12953,7 +12662,7 @@ function GappingSetupScreen({
               border: "none",
               background: COLORS.flag,
               color: COLORS.cream,
-              fontFamily: "'Bebas Neue', sans-serif",
+              fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
               fontSize: 20,
               letterSpacing: 1,
               cursor: "pointer",
@@ -12966,7 +12675,7 @@ function GappingSetupScreen({
             style={{
               textAlign: "center",
               marginTop: 10,
-              fontFamily: "'JetBrains Mono', monospace",
+              fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
               fontSize: 10,
               color: COLORS.creamDim,
               cursor: "pointer",
@@ -12984,8 +12693,8 @@ function GappingSetupScreen({
   return (
     <div>
       <div style={{ marginBottom: 12 }}>
-        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 24, letterSpacing: 1, lineHeight: 1 }}>GAPPING</div>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 24, letterSpacing: 1, lineHeight: 1 }}>GAPPING</div>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
           Build a full-swing yardage chart, club by club
         </div>
       </div>
@@ -13007,10 +12716,10 @@ function GappingSetupScreen({
                     cursor: "pointer",
                   }}
                 >
-                  <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 16, color: COLORS.sand }}>
+                  <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 16, color: COLORS.sand }}>
                     {new Date(m.date).toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" })}
                   </div>
-                  <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginTop: 2 }}>
+                  <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.creamDim, marginTop: 2 }}>
                     {clubCount} clubs · {m.shotsPerClub} shots each
                   </div>
                 </div>
@@ -13022,7 +12731,7 @@ function GappingSetupScreen({
 
       <Card>
         <SectionLabel>Clubs to test</SectionLabel>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginTop: 4, marginBottom: 8 }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.creamDim, marginTop: 4, marginBottom: 8 }}>
           Full swings only, 9 Iron up through Driver (plus 2/3/4 Hybrid). For wedges — and
           half/three-quarter swings — use the Wedge Matrix instead.
         </div>
@@ -13033,7 +12742,7 @@ function GappingSetupScreen({
           onAddCustomClub={onAddCustomClub}
           onRemoveCustomClub={onRemoveCustomClub}
         />
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: COLORS.creamDim, marginTop: 6 }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 9, color: COLORS.creamDim, marginTop: 6 }}>
           A custom club is added wherever it lands in the list above — position doesn't matter, only
           the yardage does.
         </div>
@@ -13041,7 +12750,7 @@ function GappingSetupScreen({
 
       <Card style={{ marginTop: 10 }}>
         <SectionLabel>Shots per club</SectionLabel>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginTop: 4 }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.creamDim, marginTop: 4 }}>
           The middle 60% of shots count toward the average — the rest are dropped evenly from the
           shortest and longest ends. You can also manually include/exclude individual shots
           afterward.
@@ -13070,7 +12779,7 @@ function GappingSetupScreen({
             {/* Same deliberate no-clamp-on-keystroke fix as the Wedge Matrix manual field. */}
             <NumberField label="SHOTS" value={shotsPerClub} onChange={setShotsPerClub} />
             {shotsPerClub < 1 && (
-              <div style={{ color: COLORS.flag, fontSize: 11, marginTop: 6, fontFamily: "'JetBrains Mono', monospace" }}>
+              <div style={{ color: COLORS.flag, fontSize: 11, marginTop: 6, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" }}>
                 Enter at least 1 shot per club.
               </div>
             )}
@@ -13079,7 +12788,7 @@ function GappingSetupScreen({
         {shotsPerClub >= 1 && (() => {
           const { keepCount, dropLow, dropHigh } = wedgeTrimPreview(shotsPerClub);
           return (
-            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.sand, marginTop: 8 }}>
+            <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.sand, marginTop: 8 }}>
               {shotsPerClub} shots → keeps the middle {keepCount}
               {dropLow + dropHigh > 0 ? `, drops ${dropLow} shortest + ${dropHigh} longest` : " (too few to drop any)"}
             </div>
@@ -13088,7 +12797,7 @@ function GappingSetupScreen({
       </Card>
 
       {canStart && (
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 10, textAlign: "center" }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, marginTop: 10, textAlign: "center" }}>
           {totalClubs} club{totalClubs === 1 ? "" : "s"} · {totalShots} shots total
         </div>
       )}
@@ -13104,7 +12813,7 @@ function GappingSetupScreen({
           border: "none",
           background: !canStart ? `${COLORS.fairway}66` : COLORS.flag,
           color: COLORS.cream,
-          fontFamily: "'Bebas Neue', sans-serif",
+          fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
           fontSize: 22,
           letterSpacing: 2,
           cursor: !canStart ? "not-allowed" : "pointer",
@@ -13113,7 +12822,7 @@ function GappingSetupScreen({
         START CHART
       </button>
       {!canStart && (
-        <div style={{ color: COLORS.creamDim, fontSize: 11, marginTop: 8, fontFamily: "'JetBrains Mono', monospace", textAlign: "center" }}>
+        <div style={{ color: COLORS.creamDim, fontSize: 11, marginTop: 8, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", textAlign: "center" }}>
           Select at least one club.
         </div>
       )}
@@ -13148,13 +12857,13 @@ function GappingPracticeScreen({
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim }}>
           CLUB {clubIndex + 1} OF {sequence.length}
         </div>
         <div
           onClick={onExitEarly}
           style={{
-            fontFamily: "'JetBrains Mono', monospace",
+            fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
             fontSize: 10,
             color: COLORS.creamDim,
             cursor: "pointer",
@@ -13169,10 +12878,10 @@ function GappingPracticeScreen({
       {!clubComplete ? (
         <Card>
           <div style={{ textAlign: "center" }}>
-            <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 32, lineHeight: 1.1, color: COLORS.flag, marginTop: 2 }}>
+            <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 32, lineHeight: 1.1, color: COLORS.flag, marginTop: 2 }}>
               {club.clubLabel}
             </div>
-            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 8 }}>
+            <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, marginTop: 8 }}>
               {currentShots.length >= shotsPerClub
                 ? `EXTRA SHOT ${currentShots.length - shotsPerClub + 1}`
                 : `SHOT ${currentShots.length + 1} OF ${shotsPerClub}`}
@@ -13180,7 +12889,7 @@ function GappingPracticeScreen({
           </div>
 
           <div style={{ marginTop: 14 }}>
-            <div style={{ fontSize: 10, color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", marginBottom: 6 }}>
+            <div style={{ fontSize: 10, color: COLORS.creamDim, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", marginBottom: 6 }}>
               CARRY DISTANCE ({unitLabel.toUpperCase()})
             </div>
             <div style={{ display: "flex", gap: 8 }}>
@@ -13198,7 +12907,7 @@ function GappingPracticeScreen({
                   border: `1px solid ${COLORS.creamDim}33`,
                   borderRadius: 8,
                   color: COLORS.cream,
-                  fontFamily: "'Bebas Neue', sans-serif",
+                  fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                   fontSize: 24,
                   padding: "7px 12px",
                   boxSizing: "border-box",
@@ -13213,7 +12922,7 @@ function GappingPracticeScreen({
                   border: "none",
                   background: distanceInput === "" ? `${COLORS.fairway}66` : COLORS.fairway,
                   color: COLORS.cream,
-                  fontFamily: "'Bebas Neue', sans-serif",
+                  fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                   fontSize: 16,
                   letterSpacing: 1,
                   cursor: distanceInput === "" ? "not-allowed" : "pointer",
@@ -13225,7 +12934,7 @@ function GappingPracticeScreen({
           </div>
 
           {currentShots.length > 0 && (
-            <div style={{ marginTop: 10, fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim }}>
+            <div style={{ marginTop: 10, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim }}>
               Logged so far: {currentShots.map((s) => `${ydsToUnitRound(s, units)}${unitLabel}`).join(", ")}
             </div>
           )}
@@ -13233,19 +12942,19 @@ function GappingPracticeScreen({
       ) : (
         <Card>
           <div style={{ textAlign: "center" }}>
-            <div style={{ fontSize: 11, color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", letterSpacing: 2 }}>
+            <div style={{ fontSize: 11, color: COLORS.creamDim, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", letterSpacing: 2 }}>
               {club.clubLabel} COMPLETE
             </div>
-            <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 48, lineHeight: 1, color: COLORS.flag, marginTop: 4 }}>
+            <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 48, lineHeight: 1, color: COLORS.flag, marginTop: 4 }}>
               {ydsToUnitRound(result.average, units)}
               <span style={{ fontSize: 18, marginLeft: 6, color: COLORS.creamDim }}>{unitLabel}</span>
             </div>
-            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginTop: 4 }}>
+            <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.creamDim, marginTop: 4 }}>
               average of {result.shots.filter((s) => s.included).length} of {result.shots.length} shots
             </div>
           </div>
 
-          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginTop: 14, marginBottom: 6, textAlign: "center" }}>
+          <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.creamDim, marginTop: 14, marginBottom: 6, textAlign: "center" }}>
             TAP A SHOT TO INCLUDE/EXCLUDE IT — GREEN COUNTS TOWARD THE AVERAGE
           </div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 6, justifyContent: "center" }}>
@@ -13259,7 +12968,7 @@ function GappingPracticeScreen({
                   border: s.included ? `2px solid ${COLORS.fairwayLight}` : `1px solid ${COLORS.flag}`,
                   background: s.included ? COLORS.fairway : "transparent",
                   color: s.included ? COLORS.cream : COLORS.creamDim,
-                  fontFamily: "'JetBrains Mono', monospace",
+                  fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                   fontSize: 12,
                   cursor: "pointer",
                   textDecoration: s.included ? "none" : "line-through",
@@ -13281,7 +12990,7 @@ function GappingPracticeScreen({
               border: `1px solid ${COLORS.creamDim}33`,
               background: "transparent",
               color: COLORS.cream,
-              fontFamily: "'Bebas Neue', sans-serif",
+              fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
               fontSize: 14,
               letterSpacing: 0.5,
               cursor: "pointer",
@@ -13289,7 +12998,7 @@ function GappingPracticeScreen({
           >
             + HIT ANOTHER SHOT
           </button>
-          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: COLORS.creamDim, marginTop: 6, textAlign: "center" }}>
+          <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 9, color: COLORS.creamDim, marginTop: 6, textAlign: "center" }}>
             Not sure about this yardage? Hit a few more — the average re-trims automatically over
             the bigger sample.
           </div>
@@ -13304,7 +13013,7 @@ function GappingPracticeScreen({
               border: "none",
               background: COLORS.flag,
               color: COLORS.cream,
-              fontFamily: "'Bebas Neue', sans-serif",
+              fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
               fontSize: 18,
               letterSpacing: 1,
               cursor: "pointer",
@@ -13315,7 +13024,7 @@ function GappingPracticeScreen({
         </Card>
       )}
 
-      <div style={{ marginTop: 10, fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, textAlign: "center" }}>
+      <div style={{ marginTop: 10, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.creamDim, textAlign: "center" }}>
         {Math.min(overallShotNumber, totalShots)} of {totalShots} shots overall
       </div>
     </div>
@@ -13335,8 +13044,8 @@ function GappingResultScreen({ chart, units, onNewChart, onToggleShot, onEditSho
     <div>
       <PrintHeader title="Gapping Chart" timescale="all" />
       <div className="no-print" style={{ marginBottom: 12 }}>
-        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 24, letterSpacing: 1, lineHeight: 1 }}>YOUR GAPPING CHART</div>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 24, letterSpacing: 1, lineHeight: 1 }}>YOUR GAPPING CHART</div>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
           {new Date(chart.date).toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" })} ·{" "}
           {chart.enteredManually
             ? "entered directly"
@@ -13353,7 +13062,7 @@ function GappingResultScreen({ chart, units, onNewChart, onToggleShot, onEditSho
                 style={{
                   flex: 1,
                   padding: "12px 14px",
-                  fontFamily: "'Bebas Neue', sans-serif",
+                  fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                   fontSize: 16,
                   color: COLORS.cream,
                   display: "flex",
@@ -13369,7 +13078,7 @@ function GappingResultScreen({ chart, units, onNewChart, onToggleShot, onEditSho
                   padding: "12px 4px",
                   textAlign: "center",
                   borderLeft: `1px solid ${COLORS.creamDim}15`,
-                  fontFamily: "'Bebas Neue', sans-serif",
+                  fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                   fontSize: 18,
                   color: result ? COLORS.flag : COLORS.creamDim,
                   display: "flex",
@@ -13385,7 +13094,7 @@ function GappingResultScreen({ chart, units, onNewChart, onToggleShot, onEditSho
       </Card>
 
       <CollapsibleSection title="Shot detail" count={chart.sequence.length}>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginBottom: 10 }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.creamDim, marginBottom: 10 }}>
           Tap a shot to include/exclude it from the average · tap ✎ to correct a wrong value
         </div>
         {clubs.map((c) => {
@@ -13393,8 +13102,8 @@ function GappingResultScreen({ chart, units, onNewChart, onToggleShot, onEditSho
           if (!result) return null;
           return (
             <div key={c.clubKey} style={{ marginBottom: 14 }}>
-              <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim }}>
-                <span style={{ color: COLORS.cream, fontFamily: "'Bebas Neue', sans-serif", fontSize: 15, letterSpacing: 0.5 }}>
+              <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim }}>
+                <span style={{ color: COLORS.cream, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 15, letterSpacing: 0.5 }}>
                   {c.clubLabel}
                 </span>{" "}
                 · avg {ydsToUnitRound(result.average, units)}
@@ -13412,7 +13121,7 @@ function GappingResultScreen({ chart, units, onNewChart, onToggleShot, onEditSho
                         borderRight: "none",
                         background: s.included ? COLORS.fairway : "transparent",
                         color: s.included ? COLORS.cream : COLORS.creamDim,
-                        fontFamily: "'JetBrains Mono', monospace",
+                        fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                         fontSize: 12,
                         cursor: "pointer",
                         textDecoration: s.included ? "none" : "line-through",
@@ -13431,7 +13140,7 @@ function GappingResultScreen({ chart, units, onNewChart, onToggleShot, onEditSho
                         borderLeft: `1px solid ${COLORS.creamDim}33`,
                         background: "transparent",
                         color: COLORS.creamDim,
-                        fontFamily: "'JetBrains Mono', monospace",
+                        fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                         fontSize: 12,
                         cursor: "pointer",
                       }}
@@ -13468,7 +13177,7 @@ function GappingResultScreen({ chart, units, onNewChart, onToggleShot, onEditSho
             border: `1px solid ${COLORS.creamDim}33`,
             background: "transparent",
             color: COLORS.cream,
-            fontFamily: "'Bebas Neue', sans-serif",
+            fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
             fontSize: 15,
             letterSpacing: 0.5,
             cursor: "pointer",
@@ -13485,7 +13194,7 @@ function GappingResultScreen({ chart, units, onNewChart, onToggleShot, onEditSho
             border: `1px solid ${COLORS.creamDim}33`,
             background: "transparent",
             color: COLORS.cream,
-            fontFamily: "'Bebas Neue', sans-serif",
+            fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
             fontSize: 15,
             letterSpacing: 0.5,
             cursor: "pointer",
@@ -13506,7 +13215,7 @@ function GappingResultScreen({ chart, units, onNewChart, onToggleShot, onEditSho
           border: "none",
           background: COLORS.flag,
           color: COLORS.cream,
-          fontFamily: "'Bebas Neue', sans-serif",
+          fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
           fontSize: 18,
           letterSpacing: 1,
           cursor: "pointer",
@@ -13530,15 +13239,15 @@ function GappingManualClubsScreen({ selectedClubs, onToggleClub, customClubs, on
   return (
     <div>
       <div style={{ marginBottom: 12 }}>
-        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 24, letterSpacing: 1, lineHeight: 1 }}>ENTER YOUR OWN YARDAGES</div>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 24, letterSpacing: 1, lineHeight: 1 }}>ENTER YOUR OWN YARDAGES</div>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
           Select which clubs you want to add — you'll type in a distance for each on the next screen
         </div>
       </div>
 
       <Card>
         <SectionLabel>Clubs</SectionLabel>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginTop: 4, marginBottom: 8 }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.creamDim, marginTop: 4, marginBottom: 8 }}>
           Full swings only, 9 Iron up through Driver (plus 2/3/4 Hybrid). For wedges, use the Wedge
           Matrix instead.
         </div>
@@ -13549,7 +13258,7 @@ function GappingManualClubsScreen({ selectedClubs, onToggleClub, customClubs, on
           onAddCustomClub={onAddCustomClub}
           onRemoveCustomClub={onRemoveCustomClub}
         />
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: COLORS.creamDim, marginTop: 6 }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 9, color: COLORS.creamDim, marginTop: 6 }}>
           A custom club is added wherever it lands in the list above — position doesn't matter, only
           the yardage does.
         </div>
@@ -13566,7 +13275,7 @@ function GappingManualClubsScreen({ selectedClubs, onToggleClub, customClubs, on
           border: "none",
           background: !canContinue ? `${COLORS.fairway}66` : COLORS.flag,
           color: COLORS.cream,
-          fontFamily: "'Bebas Neue', sans-serif",
+          fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
           fontSize: 22,
           letterSpacing: 2,
           cursor: !canContinue ? "not-allowed" : "pointer",
@@ -13575,7 +13284,7 @@ function GappingManualClubsScreen({ selectedClubs, onToggleClub, customClubs, on
         CONTINUE
       </button>
       {!canContinue && (
-        <div style={{ color: COLORS.creamDim, fontSize: 11, marginTop: 8, fontFamily: "'JetBrains Mono', monospace", textAlign: "center" }}>
+        <div style={{ color: COLORS.creamDim, fontSize: 11, marginTop: 8, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", textAlign: "center" }}>
           Select at least one club.
         </div>
       )}
@@ -13597,13 +13306,13 @@ function GappingManualEntryScreen({ sequence, values, onChangeValue, onSave, onE
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim }}>
           {sequence.length} CLUB{sequence.length === 1 ? "" : "S"}
         </div>
         <div
           onClick={onExit}
           style={{
-            fontFamily: "'JetBrains Mono', monospace",
+            fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
             fontSize: 10,
             color: COLORS.creamDim,
             cursor: "pointer",
@@ -13616,8 +13325,8 @@ function GappingManualEntryScreen({ sequence, values, onChangeValue, onSave, onE
       </div>
 
       <div style={{ marginBottom: 12 }}>
-        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 24, letterSpacing: 1, lineHeight: 1 }}>TYPE IN YOUR YARDAGES</div>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 24, letterSpacing: 1, lineHeight: 1 }}>TYPE IN YOUR YARDAGES</div>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
           Enter a carry distance for each club — leave any blank to skip it
         </div>
       </div>
@@ -13633,7 +13342,7 @@ function GappingManualEntryScreen({ sequence, values, onChangeValue, onSave, onE
               padding: "10px 14px",
             }}
           >
-            <div style={{ flex: 1, fontFamily: "'Bebas Neue', sans-serif", fontSize: 16, color: COLORS.cream }}>{c.clubLabel}</div>
+            <div style={{ flex: 1, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 16, color: COLORS.cream }}>{c.clubLabel}</div>
             <input
               type="number"
               inputMode="decimal"
@@ -13646,7 +13355,7 @@ function GappingManualEntryScreen({ sequence, values, onChangeValue, onSave, onE
                 border: `1px solid ${COLORS.creamDim}33`,
                 borderRadius: 8,
                 color: COLORS.cream,
-                fontFamily: "'Bebas Neue', sans-serif",
+                fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                 fontSize: 16,
                 padding: "8px 10px",
                 textAlign: "right",
@@ -13668,7 +13377,7 @@ function GappingManualEntryScreen({ sequence, values, onChangeValue, onSave, onE
           border: "none",
           background: filledCount === 0 ? `${COLORS.fairway}66` : COLORS.flag,
           color: COLORS.cream,
-          fontFamily: "'Bebas Neue', sans-serif",
+          fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
           fontSize: 20,
           letterSpacing: 1,
           cursor: filledCount === 0 ? "not-allowed" : "pointer",
@@ -13676,7 +13385,7 @@ function GappingManualEntryScreen({ sequence, values, onChangeValue, onSave, onE
       >
         SAVE CHART
       </button>
-      <div style={{ color: COLORS.creamDim, fontSize: 11, marginTop: 8, fontFamily: "'JetBrains Mono', monospace", textAlign: "center" }}>
+      <div style={{ color: COLORS.creamDim, fontSize: 11, marginTop: 8, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", textAlign: "center" }}>
         {filledCount === 0 ? "Enter a distance for at least one club." : `${filledCount} of ${sequence.length} clubs filled in`}
       </div>
     </div>
@@ -13712,8 +13421,8 @@ function CompeteSetupScreen({
   return (
     <div>
       <div style={{ marginBottom: 12 }}>
-        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 24, letterSpacing: 1, lineHeight: 1 }}>COMPETE</div>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 24, letterSpacing: 1, lineHeight: 1 }}>COMPETE</div>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
           Head-to-head range challenge — 2 to 4 players
         </div>
       </div>
@@ -13761,7 +13470,7 @@ function CompeteSetupScreen({
           <div
             onClick={onAddPlayer}
             style={{
-              fontFamily: "'JetBrains Mono', monospace",
+              fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
               fontSize: 11,
               color: COLORS.sand,
               cursor: "pointer",
@@ -13791,7 +13500,7 @@ function CompeteSetupScreen({
             value={ydsToUnitRound(minDist, units)}
             onChange={(v) => setMinDist(unitToYdsRound(v, units))}
           />
-          <div style={{ color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", paddingTop: 12 }}>—</div>
+          <div style={{ color: COLORS.creamDim, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", paddingTop: 12 }}>—</div>
           <NumberField
             label="MAX"
             value={ydsToUnitRound(maxDist, units)}
@@ -13799,7 +13508,7 @@ function CompeteSetupScreen({
           />
         </div>
         {invalidRange && (
-          <div style={{ color: COLORS.flag, fontSize: 11, marginTop: 8, fontFamily: "'JetBrains Mono', monospace" }}>
+          <div style={{ color: COLORS.flag, fontSize: 11, marginTop: 8, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" }}>
             Max needs to be greater than min.
           </div>
         )}
@@ -13818,10 +13527,10 @@ function CompeteSetupScreen({
               cursor: "pointer",
             }}
           >
-            <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 16, color: COLORS.cream, letterSpacing: 0.5 }}>
+            <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 16, color: COLORS.cream, letterSpacing: 0.5 }}>
               ENTER DISTANCES
             </div>
-            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginTop: 2 }}>
+            <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.creamDim, marginTop: 2 }}>
               Each player's actual distance is logged — full ranking, points scale with player count
               (e.g. 3 players: 2/1/0pts).
             </div>
@@ -13836,10 +13545,10 @@ function CompeteSetupScreen({
               cursor: "pointer",
             }}
           >
-            <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 16, color: COLORS.cream, letterSpacing: 0.5 }}>
+            <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 16, color: COLORS.cream, letterSpacing: 0.5 }}>
               JUST PICK CLOSEST
             </div>
-            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginTop: 2 }}>
+            <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.creamDim, marginTop: 2 }}>
               No distances needed — just tap whoever was closest each round. Flat 1pt to the winner,
               0 to everyone else.
             </div>
@@ -13858,7 +13567,7 @@ function CompeteSetupScreen({
           border: "none",
           background: !canStart ? `${COLORS.fairway}66` : COLORS.flag,
           color: COLORS.cream,
-          fontFamily: "'Bebas Neue', sans-serif",
+          fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
           fontSize: 22,
           letterSpacing: 2,
           cursor: !canStart ? "not-allowed" : "pointer",
@@ -13867,7 +13576,7 @@ function CompeteSetupScreen({
         START COMPETITION
       </button>
       {validCount < 2 && (
-        <div style={{ color: COLORS.creamDim, fontSize: 11, marginTop: 8, fontFamily: "'JetBrains Mono', monospace", textAlign: "center" }}>
+        <div style={{ color: COLORS.creamDim, fontSize: 11, marginTop: 8, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", textAlign: "center" }}>
           Enter at least 2 player names to begin.
         </div>
       )}
@@ -13880,12 +13589,12 @@ function CompeteSetupScreen({
             return (
               <SwipeToDelete key={s.id} onDelete={() => onDeleteSession(s.id)}>
                 <Card style={{ marginBottom: 12 }}>
-                  <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, paddingRight: 20 }}>
+                  <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, paddingRight: 20 }}>
                     {new Date(s.date).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
                     {"  ·  "}
                     {s.players.join(", ")} · {s.rounds.length} rounds
                   </div>
-                  <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 18, marginTop: 6, color: COLORS.sand }}>
+                  <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 18, marginTop: 6, color: COLORS.sand }}>
                     ★ {winner ? winner[0] : "—"} won
                   </div>
                 </Card>
@@ -13928,13 +13637,13 @@ function CompetePlayScreen({
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim }}>
           ROUND {Math.min(roundNumber, totalRounds)} OF {totalRounds}
         </div>
         <div
           onClick={onExitEarly}
           style={{
-            fontFamily: "'JetBrains Mono', monospace",
+            fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
             fontSize: 10,
             color: COLORS.creamDim,
             cursor: "pointer",
@@ -13964,7 +13673,7 @@ function CompetePlayScreen({
               borderRadius: 8,
               background: i === 0 ? `${COLORS.fairway}88` : COLORS.turf,
               border: `1px solid ${COLORS.creamDim}22`,
-              fontFamily: "'JetBrains Mono', monospace",
+              fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
               fontSize: 11,
               color: COLORS.cream,
               whiteSpace: "nowrap",
@@ -13979,10 +13688,10 @@ function CompetePlayScreen({
       {!roundComplete ? (
         <Card>
           <div style={{ textAlign: "center" }}>
-            <div style={{ fontSize: 12, color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", letterSpacing: 2 }}>
+            <div style={{ fontSize: 12, color: COLORS.creamDim, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", letterSpacing: 2 }}>
               TARGET
             </div>
-            <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 56, lineHeight: 1, color: COLORS.flag }}>
+            <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 56, lineHeight: 1, color: COLORS.flag }}>
               {ydsToUnitRound(target, units)}
               <span style={{ fontSize: 20, marginLeft: 6, color: COLORS.creamDim }}>{unitLabel}</span>
             </div>
@@ -13990,7 +13699,7 @@ function CompetePlayScreen({
 
           {mode === "distance" ? (
             <div style={{ marginTop: 14 }}>
-              <div style={{ fontSize: 12, color: COLORS.sand, fontFamily: "'JetBrains Mono', monospace", letterSpacing: 1, marginBottom: 6 }}>
+              <div style={{ fontSize: 12, color: COLORS.sand, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", letterSpacing: 1, marginBottom: 6 }}>
                 NOW HITTING: {players[currentPlayerIdx]?.toUpperCase()}
               </div>
               <div style={{ display: "flex", gap: 8 }}>
@@ -14008,7 +13717,7 @@ function CompetePlayScreen({
                     border: `1px solid ${COLORS.creamDim}33`,
                     borderRadius: 8,
                     color: COLORS.cream,
-                    fontFamily: "'Bebas Neue', sans-serif",
+                    fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                     fontSize: 24,
                     padding: "7px 12px",
                     boxSizing: "border-box",
@@ -14023,7 +13732,7 @@ function CompetePlayScreen({
                     border: "none",
                     background: distanceInput === "" ? `${COLORS.fairway}66` : COLORS.fairway,
                     color: COLORS.cream,
-                    fontFamily: "'Bebas Neue', sans-serif",
+                    fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                     fontSize: 16,
                     letterSpacing: 1,
                     cursor: distanceInput === "" ? "not-allowed" : "pointer",
@@ -14032,13 +13741,13 @@ function CompetePlayScreen({
                   LOG
                 </button>
               </div>
-              <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginTop: 8 }}>
+              <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.creamDim, marginTop: 8 }}>
                 Player {currentPlayerIdx + 1} of {players.length} this round
               </div>
             </div>
           ) : (
             <div style={{ marginTop: 14 }}>
-              <div style={{ fontSize: 10, color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", marginBottom: 8 }}>
+              <div style={{ fontSize: 10, color: COLORS.creamDim, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", marginBottom: 8 }}>
                 WHO WAS CLOSEST?
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -14052,7 +13761,7 @@ function CompetePlayScreen({
                       border: `1px solid ${COLORS.creamDim}33`,
                       background: "transparent",
                       color: COLORS.cream,
-                      fontFamily: "'Bebas Neue', sans-serif",
+                      fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                       fontSize: 18,
                       letterSpacing: 0.5,
                       cursor: "pointer",
@@ -14068,10 +13777,10 @@ function CompetePlayScreen({
       ) : (
         <Card>
           <div style={{ textAlign: "center" }}>
-            <div style={{ fontSize: 11, color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", letterSpacing: 2 }}>
+            <div style={{ fontSize: 11, color: COLORS.creamDim, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", letterSpacing: 2 }}>
               ROUND {Math.min(roundNumber, totalRounds)} COMPLETE
             </div>
-            <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 26, color: COLORS.sand, marginTop: 4 }}>
+            <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 26, color: COLORS.sand, marginTop: 4 }}>
               ★ {roundStandings.find((s) => s.rank === 1)?.player}
             </div>
           </div>
@@ -14087,7 +13796,7 @@ function CompetePlayScreen({
                     justifyContent: "space-between",
                     padding: "7px 0",
                     borderTop: i > 0 ? `1px solid ${COLORS.creamDim}15` : "none",
-                    fontFamily: "'JetBrains Mono', monospace",
+                    fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                     fontSize: 13,
                     color: COLORS.cream,
                   }}
@@ -14113,7 +13822,7 @@ function CompetePlayScreen({
               border: "none",
               background: COLORS.flag,
               color: COLORS.cream,
-              fontFamily: "'Bebas Neue', sans-serif",
+              fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
               fontSize: 18,
               letterSpacing: 1,
               cursor: "pointer",
@@ -14126,7 +13835,7 @@ function CompetePlayScreen({
 
       {roundResults.length > 0 && (
         <div style={{ marginTop: 14 }}>
-          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, letterSpacing: 1, marginBottom: 6 }}>
+          <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.creamDim, letterSpacing: 1, marginBottom: 6 }}>
             PAST ROUNDS — TAP TO AMEND
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -14145,11 +13854,11 @@ function CompetePlayScreen({
                   cursor: "pointer",
                 }}
               >
-                <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.cream }}>
+                <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.cream }}>
                   Round {i + 1} · {ydsToUnitRound(r.target, units)}
                   {unitLabel} · ★ {r.standings?.find((s) => s.rank === 1)?.player}
                 </div>
-                <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.sand }}>EDIT</div>
+                <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.sand }}>EDIT</div>
               </div>
             ))}
           </div>
@@ -14206,7 +13915,7 @@ function CompeteSummaryScreen({
     <div>
       <Card>
         <div style={{ textAlign: "center", marginBottom: 8 }}>
-          <div style={{ fontSize: 11, color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", letterSpacing: 2 }}>
+          <div style={{ fontSize: 11, color: COLORS.creamDim, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", letterSpacing: 2 }}>
             COMPETITION COMPLETE — {roundResults.length} ROUNDS
           </div>
         </div>
@@ -14222,17 +13931,17 @@ function CompeteSummaryScreen({
             }}
           >
             <div>
-              <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 20, color: i === 0 && topScore > 0 ? COLORS.sand : COLORS.cream }}>
+              <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 20, color: i === 0 && topScore > 0 ? COLORS.sand : COLORS.cream }}>
                 {i === 0 && topScore > 0 ? "★ " : ""}
                 {p}
               </div>
               {mode === "distance" && distanceStats[p] != null && (
-                <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim }}>
+                <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.creamDim }}>
                   avg {fmt1(ydsToUnit(distanceStats[p], units))}{unitLabel} off target
                 </div>
               )}
             </div>
-            <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 22, color: COLORS.cream }}>{totals[p] || 0}pt</div>
+            <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 22, color: COLORS.cream }}>{totals[p] || 0}pt</div>
           </div>
         ))}
       </Card>
@@ -14240,7 +13949,7 @@ function CompeteSummaryScreen({
       <CollapsibleSection title="Round by round — tap a round to amend" count={roundResults.length}>
         {roundResults.map((r, i) => (
           <Card key={i} style={{ marginBottom: 10, cursor: "pointer" }} onClick={() => onStartEdit(i)}>
-            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim }}>
+            <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim }}>
               ROUND {i + 1} · TARGET {ydsToUnitRound(r.target, units)}
               {unitLabel}
             </div>
@@ -14253,7 +13962,7 @@ function CompeteSummaryScreen({
                     display: "flex",
                     justifyContent: "space-between",
                     padding: "4px 0",
-                    fontFamily: "'JetBrains Mono', monospace",
+                    fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                     fontSize: 12,
                     color: COLORS.cream,
                   }}
@@ -14300,7 +14009,7 @@ function CompeteSummaryScreen({
           border: "none",
           background: COLORS.flag,
           color: COLORS.cream,
-          fontFamily: "'Bebas Neue', sans-serif",
+          fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
           fontSize: 20,
           letterSpacing: 2,
           cursor: "pointer",
@@ -14332,8 +14041,8 @@ function RangeChooseScreen({ onNavigate }) {
   return (
     <div>
       <div style={{ marginBottom: 14 }}>
-        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 24, letterSpacing: 1, lineHeight: 1 }}>THE RANGE</div>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 24, letterSpacing: 1, lineHeight: 1 }}>THE RANGE</div>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
           Choose what you're working on
         </div>
       </div>
@@ -14362,7 +14071,7 @@ function RangeChooseScreen({ onNavigate }) {
             <div style={{ position: "absolute", left: 12, bottom: 10, right: 12 }}>
               <div
                 style={{
-                  fontFamily: "'Bebas Neue', sans-serif",
+                  fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                   fontSize: 22,
                   letterSpacing: 0.5,
                   lineHeight: 1.05,
@@ -14372,7 +14081,7 @@ function RangeChooseScreen({ onNavigate }) {
               >
                 {o.label}
               </div>
-              <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginTop: 2 }}>
+              <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.creamDim, marginTop: 2 }}>
                 {o.subtitle}
               </div>
             </div>
@@ -14413,8 +14122,8 @@ function YardagesChooseScreen({ onNavigate }) {
   return (
     <div>
       <div style={{ marginBottom: 14 }}>
-        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 24, letterSpacing: 1, lineHeight: 1 }}>YARDAGES</div>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 24, letterSpacing: 1, lineHeight: 1 }}>YARDAGES</div>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
           Choose what you're working on
         </div>
       </div>
@@ -14451,7 +14160,7 @@ function YardagesChooseScreen({ onNavigate }) {
                   border: `1px solid ${COLORS.creamDim}44`,
                   borderRadius: 5,
                   padding: "2px 6px",
-                  fontFamily: "'JetBrains Mono', monospace",
+                  fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                   fontSize: 8,
                   color: COLORS.creamDim,
                   letterSpacing: 0.5,
@@ -14463,7 +14172,7 @@ function YardagesChooseScreen({ onNavigate }) {
             <div style={{ position: "absolute", left: 12, bottom: 10, right: 12 }}>
               <div
                 style={{
-                  fontFamily: "'Bebas Neue', sans-serif",
+                  fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                   fontSize: 22,
                   letterSpacing: 0.5,
                   lineHeight: 1.05,
@@ -14473,7 +14182,7 @@ function YardagesChooseScreen({ onNavigate }) {
               >
                 {o.label}
               </div>
-              <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginTop: 2 }}>
+              <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.creamDim, marginTop: 2 }}>
                 {o.subtitle}
               </div>
             </div>
@@ -14518,8 +14227,8 @@ function CompeteChooseScreen({ onNavigate }) {
   return (
     <div>
       <div style={{ marginBottom: 14 }}>
-        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 24, letterSpacing: 1, lineHeight: 1 }}>COMPETE</div>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 24, letterSpacing: 1, lineHeight: 1 }}>COMPETE</div>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
           Choose what you're playing
         </div>
         <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 13, color: COLORS.cream, marginTop: 8, lineHeight: 1.5 }}>
@@ -14553,7 +14262,7 @@ function CompeteChooseScreen({ onNavigate }) {
             <div style={{ position: "absolute", left: 12, bottom: 10, right: 12 }}>
               <div
                 style={{
-                  fontFamily: "'Bebas Neue', sans-serif",
+                  fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                   fontSize: 22,
                   letterSpacing: 0.5,
                   lineHeight: 1.05,
@@ -14563,7 +14272,7 @@ function CompeteChooseScreen({ onNavigate }) {
               >
                 {o.label}
               </div>
-              <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginTop: 2 }}>
+              <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.creamDim, marginTop: 2 }}>
                 {o.subtitle}
               </div>
             </div>
@@ -14599,8 +14308,8 @@ function FriendRequestCard({ link, onAccept, onDecline, busy }) {
   return (
     <Card style={{ marginBottom: 8, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
       <div>
-        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 18, color: COLORS.cream }}>{link.friendName}</div>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginTop: 2 }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 18, color: COLORS.cream }}>{link.friendName}</div>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.creamDim, marginTop: 2 }}>
           Wants to compare stats with you
         </div>
       </div>
@@ -14614,7 +14323,7 @@ function FriendRequestCard({ link, onAccept, onDecline, busy }) {
             border: `1px solid ${COLORS.creamDim}44`,
             background: "transparent",
             color: COLORS.creamDim,
-            fontFamily: "'Bebas Neue', sans-serif",
+            fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
             fontSize: 14,
             letterSpacing: 0.5,
             cursor: busy ? "not-allowed" : "pointer",
@@ -14631,7 +14340,7 @@ function FriendRequestCard({ link, onAccept, onDecline, busy }) {
             border: "none",
             background: COLORS.fairway,
             color: COLORS.cream,
-            fontFamily: "'Bebas Neue', sans-serif",
+            fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
             fontSize: 14,
             letterSpacing: 0.5,
             cursor: busy ? "not-allowed" : "pointer",
@@ -14664,7 +14373,7 @@ function FriendBlock({ friend, selectMode, selected, atCap, onClick }) {
         textAlign: "center",
       }}
     >
-      <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 15, lineHeight: 1.15, color: COLORS.cream }}>
+      <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 15, lineHeight: 1.15, color: COLORS.cream }}>
         {friend.friendName}
       </div>
       {selected && (
@@ -14679,7 +14388,7 @@ function FriendBlock({ friend, selectMode, selected, atCap, onClick }) {
             background: COLORS.fairwayLight,
             color: COLORS.turfDark,
             fontSize: 12,
-            fontFamily: "'JetBrains Mono', monospace",
+            fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -14750,18 +14459,18 @@ function CompareFriendsScreen({ profileId, profileName, myFriendLinks, onOpenAdd
     <div>
       <div style={{ marginBottom: 16 }}>
         <SectionLabel>COMPETE · COMPARE</SectionLabel>
-        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 24, marginTop: 2 }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 24, marginTop: 2 }}>
           {selectMode ? `Select up to ${MAX_COMPARE - 1} friends` : "Friends"}
         </div>
       </div>
 
       {error && (
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: COLORS.flag, marginBottom: 12 }}>{error}</div>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 12, color: COLORS.flag, marginBottom: 12 }}>{error}</div>
       )}
 
       {!selectMode && received.length > 0 && (
         <>
-          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, letterSpacing: 1, marginBottom: 6 }}>
+          <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.creamDim, letterSpacing: 1, marginBottom: 6 }}>
             REQUESTS
           </div>
           {received.map((link) => (
@@ -14772,12 +14481,12 @@ function CompareFriendsScreen({ profileId, profileName, myFriendLinks, onOpenAdd
 
       {!selectMode && sent.length > 0 && (
         <>
-          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, letterSpacing: 1, marginTop: 10, marginBottom: 6 }}>
+          <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.creamDim, letterSpacing: 1, marginTop: 10, marginBottom: 6 }}>
             SENT — AWAITING RESPONSE
           </div>
           {sent.map((link) => (
             <Card key={link.id} style={{ marginBottom: 8, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 16, color: COLORS.cream }}>{link.friendName}</div>
+              <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 16, color: COLORS.cream }}>{link.friendName}</div>
               <button
                 onClick={() => handleWithdraw(link)}
                 disabled={busyId === link.id}
@@ -14787,7 +14496,7 @@ function CompareFriendsScreen({ profileId, profileName, myFriendLinks, onOpenAdd
                   border: `1px solid ${COLORS.creamDim}44`,
                   background: "transparent",
                   color: COLORS.creamDim,
-                  fontFamily: "'JetBrains Mono', monospace",
+                  fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                   fontSize: 11,
                   cursor: busyId === link.id ? "not-allowed" : "pointer",
                 }}
@@ -14799,12 +14508,12 @@ function CompareFriendsScreen({ profileId, profileName, myFriendLinks, onOpenAdd
         </>
       )}
 
-      <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, letterSpacing: 1, marginTop: 10, marginBottom: 8 }}>
+      <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.creamDim, letterSpacing: 1, marginTop: 10, marginBottom: 8 }}>
         {friends.length > 0 ? "YOUR FRIENDS" : ""}
       </div>
 
       {friends.length === 0 ? (
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, opacity: 0.75, lineHeight: 1.5, marginBottom: 16 }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, opacity: 0.75, lineHeight: 1.5, marginBottom: 16 }}>
           Add a friend to start comparing your practice stats — Range, Tee Accuracy, Short Game
           and Putting, side by side.
         </div>
@@ -14834,7 +14543,7 @@ function CompareFriendsScreen({ profileId, profileName, myFriendLinks, onOpenAdd
               border: `1px solid ${COLORS.fairwayLight}`,
               background: "transparent",
               color: COLORS.fairwayLight,
-              fontFamily: "'Bebas Neue', sans-serif",
+              fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
               fontSize: 18,
               letterSpacing: 1,
               cursor: "pointer",
@@ -14853,7 +14562,7 @@ function CompareFriendsScreen({ profileId, profileName, myFriendLinks, onOpenAdd
               border: "none",
               background: friends.length < 1 ? `${COLORS.flag}66` : COLORS.flag,
               color: COLORS.cream,
-              fontFamily: "'Bebas Neue', sans-serif",
+              fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
               fontSize: 18,
               letterSpacing: 1,
               cursor: friends.length < 1 ? "not-allowed" : "pointer",
@@ -14876,7 +14585,7 @@ function CompareFriendsScreen({ profileId, profileName, myFriendLinks, onOpenAdd
               border: `1px solid ${COLORS.creamDim}55`,
               background: "transparent",
               color: COLORS.creamDim,
-              fontFamily: "'Bebas Neue', sans-serif",
+              fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
               fontSize: 16,
               letterSpacing: 1,
               cursor: "pointer",
@@ -14902,7 +14611,7 @@ function CompareFriendsScreen({ profileId, profileName, myFriendLinks, onOpenAdd
               border: "none",
               background: selected.length < 1 ? `${COLORS.flag}66` : COLORS.flag,
               color: COLORS.cream,
-              fontFamily: "'Bebas Neue', sans-serif",
+              fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
               fontSize: 16,
               letterSpacing: 1,
               cursor: selected.length < 1 ? "not-allowed" : "pointer",
@@ -14956,7 +14665,7 @@ function AddFriendScreen({ profileId, profileName, myFriendLinks, onBack }) {
     <div>
       <div style={{ marginBottom: 16 }}>
         <SectionLabel>COMPETE · COMPARE</SectionLabel>
-        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 24, marginTop: 2 }}>Add a friend</div>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 24, marginTop: 2 }}>Add a friend</div>
       </div>
 
       <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
@@ -14987,7 +14696,7 @@ function AddFriendScreen({ profileId, profileName, myFriendLinks, onBack }) {
             border: "none",
             background: COLORS.fairway,
             color: COLORS.cream,
-            fontFamily: "'Bebas Neue', sans-serif",
+            fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
             fontSize: 14,
             letterSpacing: 0.5,
             cursor: "pointer",
@@ -14998,22 +14707,22 @@ function AddFriendScreen({ profileId, profileName, myFriendLinks, onBack }) {
       </div>
 
       {error && (
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: COLORS.flag, marginBottom: 12 }}>{error}</div>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 12, color: COLORS.flag, marginBottom: 12 }}>{error}</div>
       )}
 
       {results === null && !loading && (
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, opacity: 0.75, lineHeight: 1.5 }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, opacity: 0.75, lineHeight: 1.5 }}>
           Search for a friend by name or email — unlike coaches, this doesn't browse every player
           on the app, so you'll need at least a partial name or their email.
         </div>
       )}
 
       {loading && (
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim }}>Searching…</div>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim }}>Searching…</div>
       )}
 
       {results !== null && !loading && results.length === 0 && (
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, opacity: 0.75 }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, opacity: 0.75 }}>
           No players found for that search.
         </div>
       )}
@@ -15025,20 +14734,20 @@ function AddFriendScreen({ profileId, profileName, myFriendLinks, onBack }) {
           const status = link ? link.status : null;
           return (
             <Card key={player.id} style={{ marginBottom: 8 }}>
-              <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 18, color: COLORS.cream }}>{player.name}</div>
+              <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 18, color: COLORS.cream }}>{player.name}</div>
               {player.email && (
-                <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
+                <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
                   {player.email}
                 </div>
               )}
               <div style={{ marginTop: 10 }}>
                 {status === "approved" && (
-                  <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.fairwayLight }}>
+                  <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.fairwayLight }}>
                     Already friends
                   </div>
                 )}
                 {status === "pending" && (
-                  <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.sand }}>
+                  <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.sand }}>
                     {link.direction === "sent" ? "Request sent" : "They've requested you — check Requests"}
                   </div>
                 )}
@@ -15053,7 +14762,7 @@ function AddFriendScreen({ profileId, profileName, myFriendLinks, onBack }) {
                       border: `1px solid ${COLORS.fairwayLight}66`,
                       background: "transparent",
                       color: COLORS.fairwayLight,
-                      fontFamily: "'Bebas Neue', sans-serif",
+                      fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                       fontSize: 14,
                       letterSpacing: 0.5,
                       cursor: sendingId === player.id ? "not-allowed" : "pointer",
@@ -15077,7 +14786,7 @@ function AddFriendScreen({ profileId, profileName, myFriendLinks, onBack }) {
           border: `1px solid ${COLORS.creamDim}44`,
           background: "transparent",
           color: COLORS.creamDim,
-          fontFamily: "'Bebas Neue', sans-serif",
+          fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
           fontSize: 16,
           letterSpacing: 1,
           cursor: "pointer",
@@ -15099,7 +14808,7 @@ function CompareTooltip({ active, payload, isPct }) {
         border: `1px solid ${COLORS.creamDim}33`,
         borderRadius: 8,
         padding: "6px 10px",
-        fontFamily: "'JetBrains Mono', monospace",
+        fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
         fontSize: 11,
         color: COLORS.cream,
       }}
@@ -15110,58 +14819,39 @@ function CompareTooltip({ active, payload, isPct }) {
 }
 
 function CompareBarChart({ title, subtitle, data, isPct }) {
-  // Strokes gained is signed, so its axis must ALWAYS include 0 (bars grow up from it when positive,
-  // down from it when negative) — a padded min/max axis can cut zero out and make a negative
-  // player's bar look like a positive one. Hit % keeps its fixed 0-100 axis.
-  const vals = data.map((d) => d.value);
-  // Axis: always spans 0, padded a little so bar labels have room, rounded to a clean step, and the
-  // ticks are generated explicitly so 0 is always one of them (auto ticks can straddle it).
-  const rawLo = Math.min(0, Math.min(...vals) - 0.08);
-  const rawHi = Math.max(0, Math.max(...vals) + 0.08);
-  const step = [0.05, 0.1, 0.2, 0.25, 0.5, 1, 2].find((st) => (rawHi - rawLo) / st <= 6) || 5;
-  const lo = Math.floor(rawLo / step + 1e-9) * step;
-  const hi = Math.ceil(rawHi / step - 1e-9) * step;
-  const sgDomain = [Number(lo.toFixed(2)), Number(hi.toFixed(2))];
-  const sgTicks = [];
-  for (let v = lo; v <= hi + 1e-9; v += step) sgTicks.push(Number(v.toFixed(2)));
   return (
     <Card style={{ marginBottom: 14 }}>
       <SectionLabel>{title}</SectionLabel>
-      <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginTop: 2 }}>{subtitle}</div>
+      <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.creamDim, marginTop: 2 }}>{subtitle}</div>
       <div style={{ marginTop: 10, height: 180 }}>
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={data} margin={{ top: 18, right: 4, left: -8, bottom: 0 }}>
             <CartesianGrid vertical={false} stroke={`${COLORS.creamDim}22`} />
             <XAxis
               dataKey="name"
-              tick={{ fill: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", fontSize: 10 }}
+              tick={{ fill: COLORS.creamDim, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10 }}
               axisLine={{ stroke: `${COLORS.creamDim}33` }}
               tickLine={false}
             />
             <YAxis
-              domain={isPct ? [0, 100] : sgDomain}
-              ticks={isPct ? undefined : sgTicks}
+              domain={isPct ? [0, 100] : ["dataMin - 0.05", "dataMax + 0.05"]}
               tickFormatter={(v) => (isPct ? `${v}%` : v.toFixed(2))}
-              tick={{ fill: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", fontSize: 10 }}
+              tick={{ fill: COLORS.creamDim, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10 }}
               axisLine={false}
               tickLine={false}
               width={44}
             />
-            {!isPct && <ReferenceLine y={0} stroke={COLORS.creamDim} strokeOpacity={0.6} />}
             <Tooltip content={<CompareTooltip isPct={isPct} />} cursor={{ fill: `${COLORS.creamDim}11` }} />
             <Bar dataKey="value" radius={[4, 4, 0, 0]}>
               <LabelList
                 dataKey="value"
                 position="top"
                 formatter={(v) => (isPct ? `${v}%` : formatSG(v))}
-                style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, fill: COLORS.cream }}
+                style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, fill: COLORS.cream }}
               />
-              {data.map((d, i) =>
-                // SG: green if positive, red if negative — deliberately NOT the player's own colour (two of
-                // the player colours are themselves red/green, which would read as a wrong sign). Players are
-                // named under each bar. Hit %: unchanged, filled in the player's colour.
-                <Cell key={i} fill={isPct ? d.color : sgBarColor(d.value)} />
-              )}
+              {data.map((d, i) => (
+                <Cell key={i} fill={d.color} />
+              ))}
             </Bar>
           </BarChart>
         </ResponsiveContainer>
@@ -15245,26 +14935,26 @@ function CompareResultsScreen({ profileId, profileName, entries, myHistories, on
     <div>
       <div style={{ marginBottom: 16 }}>
         <SectionLabel>COMPETE · COMPARE</SectionLabel>
-        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 24, marginTop: 2 }}>{compareEntries.length} players</div>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 24, marginTop: 2 }}>{compareEntries.length} players</div>
       </div>
 
       <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginBottom: 16 }}>
         {compareEntries.map((e) => (
           <div key={e.entry.id} style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <div style={{ width: 10, height: 10, borderRadius: 3, background: e.color, flexShrink: 0 }} />
-            <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim }}>{e.entry.name}</span>
+            <span style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim }}>{e.entry.name}</span>
           </div>
         ))}
       </div>
 
       {stillLoading && (
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginBottom: 14 }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, marginBottom: 14 }}>
           Loading real stats…
         </div>
       )}
 
       {fetchErrorIds.length > 0 && (
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.flag, marginBottom: 14, lineHeight: 1.5 }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.flag, marginBottom: 14, lineHeight: 1.5 }}>
           Couldn't load stats for {compareEntries.filter((e) => fetchErrorIds.includes(e.entry.id)).map((e) => e.entry.name).join(", ")}
           — they may need to be an approved friend still.
         </div>
@@ -15275,8 +14965,7 @@ function CompareResultsScreen({ profileId, profileName, entries, myHistories, on
         <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 12.5, color: COLORS.creamDim, marginTop: 6, lineHeight: 1.5 }}>
           Each person's strokes gained reflects whichever baseline they had set when they logged
           each session — these are everyone's real numbers as originally recorded, not
-          recalculated against a single shared baseline. On strokes-gained charts a bar is green when
-          it's positive and red when it's negative, with each player named under their bar.
+          recalculated against a single shared baseline.
         </div>
       </Card>
 
@@ -15288,20 +14977,20 @@ function CompareResultsScreen({ profileId, profileName, entries, myHistories, on
             {data.length > 0 ? (
               <CompareBarChart
                 title={s.label}
-                subtitle={s.metricType === "pct" ? "% fairways hit" : "Avg strokes gained per shot · green = positive, red = negative"}
+                subtitle={s.metricType === "pct" ? "% fairways hit" : "Avg strokes gained per shot"}
                 data={data}
                 isPct={s.metricType === "pct"}
               />
             ) : (
               <Card style={{ marginBottom: 14 }}>
                 <SectionLabel>{s.label}</SectionLabel>
-                <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 6 }}>
+                <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, marginTop: 6 }}>
                   No one here has logged {s.label} sessions yet.
                 </div>
               </Card>
             )}
             {missing.length > 0 && data.length > 0 && (
-              <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginTop: -10, marginBottom: 14 }}>
+              <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.creamDim, marginTop: -10, marginBottom: 14 }}>
                 No {s.label} data yet for {missing.join(", ")}
               </div>
             )}
@@ -15319,7 +15008,7 @@ function CompareResultsScreen({ profileId, profileName, entries, myHistories, on
           border: `1px solid ${COLORS.creamDim}44`,
           background: "transparent",
           color: COLORS.creamDim,
-          fontFamily: "'Bebas Neue', sans-serif",
+          fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
           fontSize: 16,
           letterSpacing: 1,
           cursor: "pointer",
@@ -15362,8 +15051,8 @@ function ShortGameCompeteSetupScreen({
   return (
     <div>
       <div style={{ marginBottom: 12 }}>
-        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 24, letterSpacing: 1, lineHeight: 1 }}>COMPETE — SHORT GAME</div>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 24, letterSpacing: 1, lineHeight: 1 }}>COMPETE — SHORT GAME</div>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
           2 to 4 players, closest to the hole
         </div>
       </div>
@@ -15403,7 +15092,7 @@ function ShortGameCompeteSetupScreen({
         {players.length < 4 && (
           <div
             onClick={onAddPlayer}
-            style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.sand, cursor: "pointer", textDecoration: "underline", textUnderlineOffset: 3 }}
+            style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.sand, cursor: "pointer", textDecoration: "underline", textUnderlineOffset: 3 }}
           >
             + ADD PLAYER
           </div>
@@ -15425,11 +15114,11 @@ function ShortGameCompeteSetupScreen({
         </SectionLabel>
         <div style={{ display: "flex", gap: 10, marginTop: 8, alignItems: "center" }}>
           <NumberField label="MIN" value={ydsToUnitRound(minYds, units)} onChange={(v) => setMinYds(unitToYdsRound(v, units))} />
-          <div style={{ color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", paddingTop: 12 }}>—</div>
+          <div style={{ color: COLORS.creamDim, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", paddingTop: 12 }}>—</div>
           <NumberField label="MAX" value={ydsToUnitRound(maxYds, units)} onChange={(v) => setMaxYds(unitToYdsRound(v, units))} />
         </div>
         {(minYds < 5 || maxYds > 40 || minYds >= maxYds) && (
-          <div style={{ color: COLORS.flag, fontSize: 11, marginTop: 8, fontFamily: "'JetBrains Mono', monospace" }}>
+          <div style={{ color: COLORS.flag, fontSize: 11, marginTop: 8, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" }}>
             Keep it between {ydsToUnitRound(5, units)} and {ydsToUnitRound(40, units)}
             {unitLabel}, with max greater than min.
           </div>
@@ -15444,7 +15133,7 @@ function ShortGameCompeteSetupScreen({
           <LieToggle lie="bunker" active={lies.includes("bunker")} onClick={() => onToggleLie("bunker")} />
         </div>
         {lies.length === 0 && (
-          <div style={{ color: COLORS.flag, fontSize: 11, marginTop: 8, fontFamily: "'JetBrains Mono', monospace" }}>
+          <div style={{ color: COLORS.flag, fontSize: 11, marginTop: 8, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" }}>
             Select at least one lie.
           </div>
         )}
@@ -15463,8 +15152,8 @@ function ShortGameCompeteSetupScreen({
               cursor: "pointer",
             }}
           >
-            <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 16, color: COLORS.cream, letterSpacing: 0.5 }}>ENTER DISTANCES</div>
-            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginTop: 2 }}>
+            <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 16, color: COLORS.cream, letterSpacing: 0.5 }}>ENTER DISTANCES</div>
+            <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.creamDim, marginTop: 2 }}>
               Each player's finishing distance from the hole is logged — full ranking, points scale with player count.
             </div>
           </div>
@@ -15478,8 +15167,8 @@ function ShortGameCompeteSetupScreen({
               cursor: "pointer",
             }}
           >
-            <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 16, color: COLORS.cream, letterSpacing: 0.5 }}>JUST PICK CLOSEST</div>
-            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginTop: 2 }}>
+            <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 16, color: COLORS.cream, letterSpacing: 0.5 }}>JUST PICK CLOSEST</div>
+            <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.creamDim, marginTop: 2 }}>
               No distances needed — tap whoever finished closest. Flat 1pt to the winner, 0 to everyone else.
             </div>
           </div>
@@ -15497,7 +15186,7 @@ function ShortGameCompeteSetupScreen({
           border: "none",
           background: !canStart ? `${COLORS.fairway}66` : COLORS.flag,
           color: COLORS.cream,
-          fontFamily: "'Bebas Neue', sans-serif",
+          fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
           fontSize: 22,
           letterSpacing: 2,
           cursor: !canStart ? "not-allowed" : "pointer",
@@ -15514,12 +15203,12 @@ function ShortGameCompeteSetupScreen({
             return (
               <SwipeToDelete key={s.id} onDelete={() => onDeleteSession(s.id)}>
                 <Card style={{ marginBottom: 12 }}>
-                  <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, paddingRight: 20 }}>
+                  <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, paddingRight: 20 }}>
                     {new Date(s.date).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
                     {"  ·  "}
                     {s.players.join(", ")} · {s.rounds.length} rounds
                   </div>
-                  <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 18, marginTop: 6, color: COLORS.sand }}>
+                  <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 18, marginTop: 6, color: COLORS.sand }}>
                     ★ {winner ? winner[0] : "—"} won
                   </div>
                 </Card>
@@ -15563,12 +15252,12 @@ function ShortGameCompetePlayScreen({
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim }}>
           ROUND {Math.min(roundNumber, totalRounds)} OF {totalRounds}
         </div>
         <div
           onClick={onExitEarly}
-          style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, cursor: "pointer", textDecoration: "underline", textUnderlineOffset: 3 }}
+          style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.creamDim, cursor: "pointer", textDecoration: "underline", textUnderlineOffset: 3 }}
         >
           END COMPETITION
         </div>
@@ -15584,7 +15273,7 @@ function ShortGameCompetePlayScreen({
               borderRadius: 8,
               background: i === 0 ? `${COLORS.fairway}88` : COLORS.turf,
               border: `1px solid ${COLORS.creamDim}22`,
-              fontFamily: "'JetBrains Mono', monospace",
+              fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
               fontSize: 11,
               color: COLORS.cream,
               whiteSpace: "nowrap",
@@ -15599,10 +15288,10 @@ function ShortGameCompetePlayScreen({
       {!roundComplete ? (
         <Card>
           <div style={{ textAlign: "center" }}>
-            <div style={{ fontSize: 12, color: COLORS.sand, fontFamily: "'JetBrains Mono', monospace", letterSpacing: 2 }}>
+            <div style={{ fontSize: 12, color: COLORS.sand, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", letterSpacing: 2 }}>
               {LIE_LABELS[currentShot.lie]}
             </div>
-            <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 56, lineHeight: 1, color: COLORS.flag, marginTop: 2 }}>
+            <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 56, lineHeight: 1, color: COLORS.flag, marginTop: 2 }}>
               {ydsToUnitRound(currentShot.target, units)}
               <span style={{ fontSize: 20, marginLeft: 6, color: COLORS.creamDim }}>{yLabel}</span>
             </div>
@@ -15610,7 +15299,7 @@ function ShortGameCompetePlayScreen({
 
           {mode === "distance" ? (
             <div style={{ marginTop: 14 }}>
-              <div style={{ fontSize: 12, color: COLORS.sand, fontFamily: "'JetBrains Mono', monospace", letterSpacing: 1, marginBottom: 6 }}>
+              <div style={{ fontSize: 12, color: COLORS.sand, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", letterSpacing: 1, marginBottom: 6 }}>
                 NOW HITTING: {players[currentPlayerIdx]?.toUpperCase()}
               </div>
               <div style={{ display: "flex", gap: 8 }}>
@@ -15628,7 +15317,7 @@ function ShortGameCompetePlayScreen({
                     border: `1px solid ${COLORS.creamDim}33`,
                     borderRadius: 8,
                     color: COLORS.cream,
-                    fontFamily: "'Bebas Neue', sans-serif",
+                    fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                     fontSize: 24,
                     padding: "7px 12px",
                     boxSizing: "border-box",
@@ -15643,7 +15332,7 @@ function ShortGameCompetePlayScreen({
                     border: "none",
                     background: resultInput === "" ? `${COLORS.fairway}66` : COLORS.fairway,
                     color: COLORS.cream,
-                    fontFamily: "'Bebas Neue', sans-serif",
+                    fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                     fontSize: 16,
                     letterSpacing: 1,
                     cursor: resultInput === "" ? "not-allowed" : "pointer",
@@ -15652,13 +15341,13 @@ function ShortGameCompetePlayScreen({
                   LOG
                 </button>
               </div>
-              <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginTop: 8 }}>
+              <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.creamDim, marginTop: 8 }}>
                 Result in {shortLabel} from hole · Player {currentPlayerIdx + 1} of {players.length} this round
               </div>
             </div>
           ) : (
             <div style={{ marginTop: 14 }}>
-              <div style={{ fontSize: 10, color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", marginBottom: 8 }}>
+              <div style={{ fontSize: 10, color: COLORS.creamDim, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", marginBottom: 8 }}>
                 WHO WAS CLOSEST?
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -15672,7 +15361,7 @@ function ShortGameCompetePlayScreen({
                       border: `1px solid ${COLORS.creamDim}33`,
                       background: "transparent",
                       color: COLORS.cream,
-                      fontFamily: "'Bebas Neue', sans-serif",
+                      fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                       fontSize: 18,
                       letterSpacing: 0.5,
                       cursor: "pointer",
@@ -15688,10 +15377,10 @@ function ShortGameCompetePlayScreen({
       ) : (
         <Card>
           <div style={{ textAlign: "center" }}>
-            <div style={{ fontSize: 11, color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", letterSpacing: 2 }}>
+            <div style={{ fontSize: 11, color: COLORS.creamDim, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", letterSpacing: 2 }}>
               ROUND {Math.min(roundNumber, totalRounds)} COMPLETE
             </div>
-            <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 26, color: COLORS.sand, marginTop: 4 }}>
+            <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 26, color: COLORS.sand, marginTop: 4 }}>
               ★ {roundStandings.find((s) => s.rank === 1)?.player}
             </div>
           </div>
@@ -15706,7 +15395,7 @@ function ShortGameCompetePlayScreen({
                     justifyContent: "space-between",
                     padding: "7px 0",
                     borderTop: i > 0 ? `1px solid ${COLORS.creamDim}15` : "none",
-                    fontFamily: "'JetBrains Mono', monospace",
+                    fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                     fontSize: 13,
                     color: COLORS.cream,
                   }}
@@ -15731,7 +15420,7 @@ function ShortGameCompetePlayScreen({
               border: "none",
               background: COLORS.flag,
               color: COLORS.cream,
-              fontFamily: "'Bebas Neue', sans-serif",
+              fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
               fontSize: 18,
               letterSpacing: 1,
               cursor: "pointer",
@@ -15744,7 +15433,7 @@ function ShortGameCompetePlayScreen({
 
       {roundResults.length > 0 && (
         <div style={{ marginTop: 14 }}>
-          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, letterSpacing: 1, marginBottom: 6 }}>
+          <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.creamDim, letterSpacing: 1, marginBottom: 6 }}>
             PAST ROUNDS — TAP TO AMEND
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -15763,10 +15452,10 @@ function ShortGameCompetePlayScreen({
                   cursor: "pointer",
                 }}
               >
-                <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.cream }}>
+                <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.cream }}>
                   Round {i + 1} · {LIE_LABELS[r.lie]} · ★ {r.standings?.find((s) => s.rank === 1)?.player}
                 </div>
-                <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.sand }}>EDIT</div>
+                <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.sand }}>EDIT</div>
               </div>
             ))}
           </div>
@@ -15820,24 +15509,24 @@ function ShortGameCompeteSummaryScreen({
     <div>
       <Card>
         <div style={{ textAlign: "center", marginBottom: 8 }}>
-          <div style={{ fontSize: 11, color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", letterSpacing: 2 }}>
+          <div style={{ fontSize: 11, color: COLORS.creamDim, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", letterSpacing: 2 }}>
             COMPETITION COMPLETE — {roundResults.length} ROUNDS
           </div>
         </div>
         {leaderboard.map((p, i) => (
           <div key={p} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderTop: i > 0 ? `1px solid ${COLORS.creamDim}15` : "none" }}>
             <div>
-              <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 20, color: i === 0 && topScore > 0 ? COLORS.sand : COLORS.cream }}>
+              <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 20, color: i === 0 && topScore > 0 ? COLORS.sand : COLORS.cream }}>
                 {i === 0 && topScore > 0 ? "★ " : ""}
                 {p}
               </div>
               {mode === "distance" && proximityStats[p] != null && (
-                <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim }}>
+                <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.creamDim }}>
                   avg {fmt1(ftToUnit(proximityStats[p], units))}{shortLabel} from hole
                 </div>
               )}
             </div>
-            <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 22, color: COLORS.cream }}>{totals[p] || 0}pt</div>
+            <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 22, color: COLORS.cream }}>{totals[p] || 0}pt</div>
           </div>
         ))}
       </Card>
@@ -15845,14 +15534,14 @@ function ShortGameCompeteSummaryScreen({
       <CollapsibleSection title="Round by round — tap a round to amend" count={roundResults.length}>
         {roundResults.map((r, i) => (
           <Card key={i} style={{ marginBottom: 10, cursor: "pointer" }} onClick={() => onStartEdit(i)}>
-            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim }}>
+            <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim }}>
               ROUND {i + 1} · {LIE_LABELS[r.lie]} · {ydsToUnitRound(r.target, units)}
               {longUnitLabel(units)}
             </div>
             {[...r.standings]
               .sort((a, b) => (a.rank || 99) - (b.rank || 99))
               .map((s) => (
-                <div key={s.player} style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: COLORS.cream }}>
+                <div key={s.player} style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 12, color: COLORS.cream }}>
                   <div>
                     {s.rank ? `${s.rank}.` : ""} {s.player}
                   </div>
@@ -15895,7 +15584,7 @@ function ShortGameCompeteSummaryScreen({
           border: "none",
           background: COLORS.flag,
           color: COLORS.cream,
-          fontFamily: "'Bebas Neue', sans-serif",
+          fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
           fontSize: 20,
           letterSpacing: 2,
           cursor: "pointer",
@@ -15934,8 +15623,8 @@ function PuttingCompeteSetupScreen({
   return (
     <div>
       <div style={{ marginBottom: 12 }}>
-        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 24, letterSpacing: 1, lineHeight: 1 }}>COMPETE — PUTTING</div>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 24, letterSpacing: 1, lineHeight: 1 }}>COMPETE — PUTTING</div>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
           2 to 4 players, fewest putts wins
         </div>
       </div>
@@ -15975,7 +15664,7 @@ function PuttingCompeteSetupScreen({
         {players.length < 4 && (
           <div
             onClick={onAddPlayer}
-            style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.sand, cursor: "pointer", textDecoration: "underline", textUnderlineOffset: 3 }}
+            style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.sand, cursor: "pointer", textDecoration: "underline", textUnderlineOffset: 3 }}
           >
             + ADD PLAYER
           </div>
@@ -15998,18 +15687,18 @@ function PuttingCompeteSetupScreen({
         </SectionLabel>
         <div style={{ display: "flex", gap: 10, marginTop: 8, alignItems: "center" }}>
           <NumberField label="MIN" value={ftToUnitRound(minFt, units)} onChange={(v) => setMinFt(unitToFtRound(v, units))} />
-          <div style={{ color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", paddingTop: 12 }}>—</div>
+          <div style={{ color: COLORS.creamDim, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", paddingTop: 12 }}>—</div>
           <NumberField label="MAX" value={ftToUnitRound(maxFt, units)} onChange={(v) => setMaxFt(unitToFtRound(v, units))} />
         </div>
         {invalidRange && (
-          <div style={{ color: COLORS.flag, fontSize: 11, marginTop: 8, fontFamily: "'JetBrains Mono', monospace" }}>
+          <div style={{ color: COLORS.flag, fontSize: 11, marginTop: 8, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" }}>
             Min can't go below {ftToUnitRound(3, units)}
             {unitLabel}, and max must be greater than min.
           </div>
         )}
       </Card>
 
-      <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 10, lineHeight: 1.5 }}>
+      <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, marginTop: 10, lineHeight: 1.5 }}>
         Same target distance for everyone each hole. Enter how many putts each player took — fewest
         total putts across all holes wins. Strokes gained (vs PGA Tour) for each player shows up at
         the end.
@@ -16026,7 +15715,7 @@ function PuttingCompeteSetupScreen({
           border: "none",
           background: !canStart ? `${COLORS.fairway}66` : COLORS.flag,
           color: COLORS.cream,
-          fontFamily: "'Bebas Neue', sans-serif",
+          fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
           fontSize: 22,
           letterSpacing: 2,
           cursor: !canStart ? "not-allowed" : "pointer",
@@ -16043,12 +15732,12 @@ function PuttingCompeteSetupScreen({
             return (
               <SwipeToDelete key={s.id} onDelete={() => onDeleteSession(s.id)}>
                 <Card style={{ marginBottom: 12 }}>
-                  <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, paddingRight: 20 }}>
+                  <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, paddingRight: 20 }}>
                     {new Date(s.date).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
                     {"  ·  "}
                     {s.players.join(", ")} · {s.holes.length} holes
                   </div>
-                  <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 18, marginTop: 6, color: COLORS.sand }}>
+                  <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 18, marginTop: 6, color: COLORS.sand }}>
                     ★ {winner ? winner[0] : "—"} won ({winner ? winner[1] : "—"} putts)
                   </div>
                 </Card>
@@ -16087,12 +15776,12 @@ function PuttingCompetePlayScreen({
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim }}>
           HOLE {Math.min(holeNumber, totalHoles)} OF {totalHoles}
         </div>
         <div
           onClick={onExitEarly}
-          style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, cursor: "pointer", textDecoration: "underline", textUnderlineOffset: 3 }}
+          style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.creamDim, cursor: "pointer", textDecoration: "underline", textUnderlineOffset: 3 }}
         >
           END COMPETITION
         </div>
@@ -16108,7 +15797,7 @@ function PuttingCompetePlayScreen({
               borderRadius: 8,
               background: i === 0 && holeResults.length > 0 ? `${COLORS.fairway}88` : COLORS.turf,
               border: `1px solid ${COLORS.creamDim}22`,
-              fontFamily: "'JetBrains Mono', monospace",
+              fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
               fontSize: 11,
               color: COLORS.cream,
               whiteSpace: "nowrap",
@@ -16123,19 +15812,19 @@ function PuttingCompetePlayScreen({
       {!holeComplete ? (
         <Card>
           <div style={{ textAlign: "center" }}>
-            <div style={{ fontSize: 12, color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", letterSpacing: 2 }}>
+            <div style={{ fontSize: 12, color: COLORS.creamDim, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", letterSpacing: 2 }}>
               DISTANCE
             </div>
-            <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 56, lineHeight: 1, color: COLORS.flag }}>
+            <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 56, lineHeight: 1, color: COLORS.flag }}>
               {ftToUnitRound(target, units)}
               <span style={{ fontSize: 20, marginLeft: 6, color: COLORS.creamDim }}>{unitLabel}</span>
             </div>
           </div>
           <div style={{ marginTop: 14 }}>
-            <div style={{ fontSize: 12, color: COLORS.sand, fontFamily: "'JetBrains Mono', monospace", letterSpacing: 1, marginBottom: 8 }}>
+            <div style={{ fontSize: 12, color: COLORS.sand, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", letterSpacing: 1, marginBottom: 8 }}>
               NOW PUTTING: {players[currentPlayerIdx]?.toUpperCase()}
             </div>
-            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginBottom: 6 }}>
+            <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.creamDim, marginBottom: 6 }}>
               PUTTS TAKEN
             </div>
             <div style={{ display: "flex", gap: 8 }}>
@@ -16150,7 +15839,7 @@ function PuttingCompetePlayScreen({
                     border: `2px solid ${ragColor(ragStatusForPutts(n))}`,
                     background: "transparent",
                     color: COLORS.cream,
-                    fontFamily: "'Bebas Neue', sans-serif",
+                    fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                     fontSize: 22,
                     cursor: "pointer",
                   }}
@@ -16159,7 +15848,7 @@ function PuttingCompetePlayScreen({
                 </button>
               ))}
             </div>
-            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginTop: 8 }}>
+            <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.creamDim, marginTop: 8 }}>
               Player {currentPlayerIdx + 1} of {players.length} this hole
             </div>
           </div>
@@ -16167,7 +15856,7 @@ function PuttingCompetePlayScreen({
       ) : (
         <Card>
           <div style={{ textAlign: "center" }}>
-            <div style={{ fontSize: 11, color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", letterSpacing: 2 }}>
+            <div style={{ fontSize: 11, color: COLORS.creamDim, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", letterSpacing: 2 }}>
               HOLE {Math.min(holeNumber, totalHoles)} COMPLETE
             </div>
           </div>
@@ -16183,7 +15872,7 @@ function PuttingCompetePlayScreen({
                       justifyContent: "space-between",
                       padding: "7px 0",
                       borderTop: i > 0 ? `1px solid ${COLORS.creamDim}15` : "none",
-                      fontFamily: "'JetBrains Mono', monospace",
+                      fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                       fontSize: 13,
                       color: COLORS.cream,
                     }}
@@ -16203,7 +15892,7 @@ function PuttingCompetePlayScreen({
               border: "none",
               background: COLORS.flag,
               color: COLORS.cream,
-              fontFamily: "'Bebas Neue', sans-serif",
+              fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
               fontSize: 18,
               letterSpacing: 1,
               cursor: "pointer",
@@ -16216,7 +15905,7 @@ function PuttingCompetePlayScreen({
 
       {holeResults.length > 0 && (
         <div style={{ marginTop: 14 }}>
-          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, letterSpacing: 1, marginBottom: 6 }}>
+          <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.creamDim, letterSpacing: 1, marginBottom: 6 }}>
             PAST HOLES — TAP TO AMEND
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -16235,12 +15924,12 @@ function PuttingCompetePlayScreen({
                   cursor: "pointer",
                 }}
               >
-                <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.cream }}>
+                <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.cream }}>
                   Hole {i + 1} · {ftToUnitRound(h.target, units)}
                   {unitLabel} ·{" "}
                   {h.putts.map((e) => `${e.player} ${e.strokes}`).join(", ")}
                 </div>
-                <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.sand }}>EDIT</div>
+                <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.sand }}>EDIT</div>
               </div>
             ))}
           </div>
@@ -16295,27 +15984,27 @@ function PuttingCompeteSummaryScreen({
     <div>
       <Card>
         <div style={{ textAlign: "center", marginBottom: 8 }}>
-          <div style={{ fontSize: 11, color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", letterSpacing: 2 }}>
+          <div style={{ fontSize: 11, color: COLORS.creamDim, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", letterSpacing: 2 }}>
             COMPETITION COMPLETE — {holeResults.length} HOLES
           </div>
-          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginTop: 2 }}>
+          <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.creamDim, marginTop: 2 }}>
             Strokes gained vs PGA Tour baseline
           </div>
         </div>
         {leaderboard.map((p, i) => (
           <div key={p} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderTop: i > 0 ? `1px solid ${COLORS.creamDim}15` : "none" }}>
             <div>
-              <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 20, color: i === 0 ? COLORS.sand : COLORS.cream }}>
+              <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 20, color: i === 0 ? COLORS.sand : COLORS.cream }}>
                 {i === 0 ? "★ " : ""}
                 {p}
               </div>
               {sgStats[p] && (
-                <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim }}>
+                <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.creamDim }}>
                   {formatSG(sgStats[p].total)} total SG · {formatSG(sgStats[p].avg)}/putt
                 </div>
               )}
             </div>
-            <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 22, color: COLORS.cream }}>{tallies[p] || 0} putts</div>
+            <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 22, color: COLORS.cream }}>{tallies[p] || 0} putts</div>
           </div>
         ))}
       </Card>
@@ -16323,14 +16012,14 @@ function PuttingCompeteSummaryScreen({
       <CollapsibleSection title="Hole by hole — tap a hole to amend" count={holeResults.length}>
         {holeResults.map((h, i) => (
           <Card key={i} style={{ marginBottom: 10, cursor: "pointer" }} onClick={() => onStartEdit(i)}>
-            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim }}>
+            <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim }}>
               HOLE {i + 1} · {ftToUnitRound(h.target, units)}
               {unitLabel}
             </div>
             {[...h.putts]
               .sort((a, b) => a.strokes - b.strokes)
               .map((e) => (
-                <div key={e.player} style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: COLORS.cream }}>
+                <div key={e.player} style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 12, color: COLORS.cream }}>
                   <div>{e.player}</div>
                   <div>{e.strokes}</div>
                 </div>
@@ -16369,7 +16058,7 @@ function PuttingCompeteSummaryScreen({
           border: "none",
           background: COLORS.flag,
           color: COLORS.cream,
-          fontFamily: "'Bebas Neue', sans-serif",
+          fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
           fontSize: 20,
           letterSpacing: 2,
           cursor: "pointer",
@@ -16392,7 +16081,7 @@ function ShortGameLog({ shots, units, onEditShot }) {
         border: `1px solid ${COLORS.creamDim}22`,
         borderRadius: 10,
         overflow: "hidden",
-        fontFamily: "'JetBrains Mono', monospace",
+        fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
         fontSize: 12,
       }}
     >
@@ -16455,7 +16144,7 @@ function LieToggle({ lie, active, onClick }) {
         border: active ? `2px solid ${COLORS.fairwayLight}` : `1px solid ${COLORS.creamDim}33`,
         background: active ? COLORS.fairway : "transparent",
         color: active ? COLORS.cream : COLORS.creamDim,
-        fontFamily: "'Bebas Neue', sans-serif",
+        fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
         fontSize: 14,
         letterSpacing: 1,
         cursor: "pointer",
@@ -16477,7 +16166,7 @@ function ClubToggle({ club, active, onClick }) {
         border: active ? `2px solid ${COLORS.fairwayLight}` : `1px solid ${COLORS.creamDim}33`,
         background: active ? COLORS.fairway : "transparent",
         color: active ? COLORS.cream : COLORS.creamDim,
-        fontFamily: "'Bebas Neue', sans-serif",
+        fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
         fontSize: 11,
         letterSpacing: 0.3,
         cursor: "pointer",
@@ -16513,8 +16202,8 @@ function ShortGameSetupScreen({
   return (
     <div>
       <div style={{ marginBottom: 12 }}>
-        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 24, letterSpacing: 1, lineHeight: 1 }}>SHORT GAME</div>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 24, letterSpacing: 1, lineHeight: 1 }}>SHORT GAME</div>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
           Chipping & pitching
         </div>
       </div>
@@ -16522,10 +16211,10 @@ function ShortGameSetupScreen({
       {activeSaved && (
         <Card style={{ marginBottom: 10, border: `1px solid ${COLORS.sand}66` }}>
           <SectionLabel>Session in progress</SectionLabel>
-          <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 22, marginTop: 3 }}>
+          <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 22, marginTop: 3 }}>
             Shot {activeSaved.shortShots.length + 1} of {activeSaved.shortShotCount}
           </div>
-          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
+          <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
             {ydsToUnitRound(activeSaved.shortMinYds, units)}-{ydsToUnitRound(activeSaved.shortMaxYds, units)}
             {unitLabel} window
           </div>
@@ -16539,7 +16228,7 @@ function ShortGameSetupScreen({
                 border: "none",
                 background: COLORS.sand,
                 color: COLORS.turfDark,
-                fontFamily: "'Bebas Neue', sans-serif",
+                fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                 fontSize: 16,
                 letterSpacing: 1,
                 cursor: "pointer",
@@ -16555,7 +16244,7 @@ function ShortGameSetupScreen({
                 border: `1px solid ${COLORS.creamDim}33`,
                 background: "transparent",
                 color: COLORS.creamDim,
-                fontFamily: "'JetBrains Mono', monospace",
+                fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                 fontSize: 11,
                 cursor: "pointer",
               }}
@@ -16585,7 +16274,7 @@ function ShortGameSetupScreen({
             value={ydsToUnitRound(shortMinYds, units)}
             onChange={(v) => setShortMinYds(unitToYdsRound(v, units))}
           />
-          <div style={{ color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", paddingTop: 12 }}>—</div>
+          <div style={{ color: COLORS.creamDim, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", paddingTop: 12 }}>—</div>
           <NumberField
             label="MAX"
             value={ydsToUnitRound(shortMaxYds, units)}
@@ -16593,7 +16282,7 @@ function ShortGameSetupScreen({
           />
         </div>
         {(shortMinYds < 5 || shortMaxYds > 40 || shortMinYds >= shortMaxYds) && (
-          <div style={{ color: COLORS.flag, fontSize: 11, marginTop: 8, fontFamily: "'JetBrains Mono', monospace" }}>
+          <div style={{ color: COLORS.flag, fontSize: 11, marginTop: 8, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" }}>
             Keep it between {ydsToUnitRound(5, units)} and {ydsToUnitRound(40, units)}
             {unitLabel}, with max greater than min.
           </div>
@@ -16608,7 +16297,7 @@ function ShortGameSetupScreen({
           <LieToggle lie="bunker" active={shortLies.includes("bunker")} onClick={() => onToggleLie("bunker")} />
         </div>
         {shortLies.length === 0 && (
-          <div style={{ color: COLORS.flag, fontSize: 11, marginTop: 8, fontFamily: "'JetBrains Mono', monospace" }}>
+          <div style={{ color: COLORS.flag, fontSize: 11, marginTop: 8, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" }}>
             Select at least one lie.
           </div>
         )}
@@ -16625,7 +16314,7 @@ function ShortGameSetupScreen({
           border: "none",
           background: invalidRange ? `${COLORS.fairway}66` : COLORS.flag,
           color: COLORS.cream,
-          fontFamily: "'Bebas Neue', sans-serif",
+          fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
           fontSize: 22,
           letterSpacing: 2,
           cursor: invalidRange ? "not-allowed" : "pointer",
@@ -16640,7 +16329,7 @@ function ShortGameSetupScreen({
           textAlign: "center",
           marginTop: 12,
           color: COLORS.creamDim,
-          fontFamily: "'JetBrains Mono', monospace",
+          fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
           fontSize: 11,
           cursor: "pointer",
           textDecoration: "underline",
@@ -16678,13 +16367,13 @@ function ShortGamePracticeScreen({
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 5 }}>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim }}>
           SHOT {shotNum} OF {shotCount}
         </div>
         <div
           onClick={onExit}
           style={{
-            fontFamily: "'JetBrains Mono', monospace",
+            fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
             fontSize: 10,
             color: COLORS.creamDim,
             cursor: "pointer",
@@ -16698,10 +16387,10 @@ function ShortGamePracticeScreen({
 
       <Card>
         <div style={{ textAlign: "center" }}>
-          <div style={{ fontSize: 12, color: COLORS.sand, fontFamily: "'JetBrains Mono', monospace", letterSpacing: 2 }}>
+          <div style={{ fontSize: 12, color: COLORS.sand, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", letterSpacing: 2 }}>
             {LIE_LABELS[currentShot.lie]}
           </div>
-          <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 56, lineHeight: 1, color: COLORS.flag, marginTop: 2 }}>
+          <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 56, lineHeight: 1, color: COLORS.flag, marginTop: 2 }}>
             {ydsToUnitRound(currentShot.target, units)}
             <span style={{ fontSize: 20, marginLeft: 6, color: COLORS.creamDim }}>{yLabel}</span>
           </div>
@@ -16713,7 +16402,7 @@ function ShortGamePracticeScreen({
             textAlign: "center",
             marginTop: 8,
             color: COLORS.creamDim,
-            fontFamily: "'JetBrains Mono', monospace",
+            fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
             fontSize: 10,
             cursor: "pointer",
             textDecoration: "underline",
@@ -16724,7 +16413,7 @@ function ShortGamePracticeScreen({
         </div>
 
         <div style={{ marginTop: 14 }}>
-          <div style={{ fontSize: 10, color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", marginBottom: 5 }}>
+          <div style={{ fontSize: 10, color: COLORS.creamDim, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", marginBottom: 5 }}>
             RESULT — {shortLabel.toUpperCase()} FROM HOLE
           </div>
           <div style={{ display: "flex", gap: 8 }}>
@@ -16741,7 +16430,7 @@ function ShortGamePracticeScreen({
                 border: `1px solid ${COLORS.creamDim}33`,
                 borderRadius: 8,
                 color: COLORS.cream,
-                fontFamily: "'Bebas Neue', sans-serif",
+                fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                 fontSize: 24,
                 padding: "7px 12px",
                 boxSizing: "border-box",
@@ -16761,7 +16450,7 @@ function ShortGamePracticeScreen({
                 border: "none",
                 background: resultInput === "" ? `${COLORS.fairway}66` : COLORS.fairway,
                 color: COLORS.cream,
-                fontFamily: "'Bebas Neue', sans-serif",
+                fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                 fontSize: 16,
                 letterSpacing: 1,
                 cursor: resultInput === "" ? "not-allowed" : "pointer",
@@ -16775,7 +16464,7 @@ function ShortGamePracticeScreen({
             style={{
               textAlign: "center",
               marginTop: 10,
-              fontFamily: "'JetBrains Mono', monospace",
+              fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
               fontSize: 10,
               color: COLORS.creamDim,
               cursor: "pointer",
@@ -16801,7 +16490,7 @@ function ShortGamePracticeScreen({
       </div>
 
       <div style={{ display: "flex", alignItems: "center", marginTop: 10 }}>
-        <div style={{ fontSize: 10, color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", letterSpacing: 1 }}>
+        <div style={{ fontSize: 10, color: COLORS.creamDim, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", letterSpacing: 1 }}>
           PAR SCORING
         </div>
         <InlineInfoButton onClick={() => setShowScoreInfo(true)} />
@@ -16894,12 +16583,12 @@ function ShortGameShotEditModal({ shot, units, onSave, onCancel }) {
           width: "100%",
         }}
       >
-        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 20, letterSpacing: 1, color: COLORS.cream }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 20, letterSpacing: 1, color: COLORS.cream }}>
           EDIT SHOT
         </div>
 
         <div style={{ marginTop: 14 }}>
-          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginBottom: 6 }}>
+          <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.creamDim, marginBottom: 6 }}>
             LIE
           </div>
           <div style={{ display: "flex", gap: 6 }}>
@@ -16914,7 +16603,7 @@ function ShortGameShotEditModal({ shot, units, onSave, onCancel }) {
                   border: lie === l ? `2px solid ${COLORS.fairwayLight}` : `1px solid ${COLORS.creamDim}33`,
                   background: lie === l ? COLORS.fairway : "transparent",
                   color: COLORS.cream,
-                  fontFamily: "'Bebas Neue', sans-serif",
+                  fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                   fontSize: 12,
                   cursor: "pointer",
                 }}
@@ -16926,7 +16615,7 @@ function ShortGameShotEditModal({ shot, units, onSave, onCancel }) {
         </div>
 
         <div style={{ marginTop: 14 }}>
-          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginBottom: 6 }}>
+          <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.creamDim, marginBottom: 6 }}>
             TARGET DISTANCE ({yLabel.toUpperCase()})
           </div>
           <input
@@ -16940,7 +16629,7 @@ function ShortGameShotEditModal({ shot, units, onSave, onCancel }) {
               border: `1px solid ${COLORS.creamDim}33`,
               borderRadius: 8,
               color: COLORS.cream,
-              fontFamily: "'Bebas Neue', sans-serif",
+              fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
               fontSize: 20,
               padding: "8px 12px",
               boxSizing: "border-box",
@@ -16949,7 +16638,7 @@ function ShortGameShotEditModal({ shot, units, onSave, onCancel }) {
         </div>
 
         <div style={{ marginTop: 14 }}>
-          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginBottom: 6 }}>
+          <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.creamDim, marginBottom: 6 }}>
             RESULT ({shortLabel.toUpperCase()} FROM HOLE)
           </div>
           <input
@@ -16963,7 +16652,7 @@ function ShortGameShotEditModal({ shot, units, onSave, onCancel }) {
               border: `1px solid ${COLORS.creamDim}33`,
               borderRadius: 8,
               color: COLORS.cream,
-              fontFamily: "'Bebas Neue', sans-serif",
+              fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
               fontSize: 20,
               padding: "8px 12px",
               boxSizing: "border-box",
@@ -16981,7 +16670,7 @@ function ShortGameShotEditModal({ shot, units, onSave, onCancel }) {
               border: `1px solid ${COLORS.creamDim}33`,
               background: "transparent",
               color: COLORS.creamDim,
-              fontFamily: "'Bebas Neue', sans-serif",
+              fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
               fontSize: 15,
               cursor: "pointer",
             }}
@@ -16997,7 +16686,7 @@ function ShortGameShotEditModal({ shot, units, onSave, onCancel }) {
               border: "none",
               background: COLORS.fairway,
               color: COLORS.cream,
-              fontFamily: "'Bebas Neue', sans-serif",
+              fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
               fontSize: 15,
               cursor: "pointer",
             }}
@@ -17048,10 +16737,10 @@ function ShortGameSessionDetailModal({ session, units, onEditShot, onClose }) {
           overflowY: "auto",
         }}
       >
-        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 20, letterSpacing: 1, color: COLORS.cream }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 20, letterSpacing: 1, color: COLORS.cream }}>
           SESSION DETAIL
         </div>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 4 }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, marginTop: 4 }}>
           {new Date(session.date).toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" })}
           {"  ·  "}
           {session.shotCount} shots · {session.minYds}-{session.maxYds}y · {session.lies.map((l) => LIE_LABELS[l]).join("/")}
@@ -17079,7 +16768,7 @@ function ShortGameSessionDetailModal({ session, units, onEditShot, onClose }) {
             border: `1px solid ${COLORS.creamDim}33`,
             background: "transparent",
             color: COLORS.creamDim,
-            fontFamily: "'Bebas Neue', sans-serif",
+            fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
             fontSize: 15,
             cursor: "pointer",
           }}
@@ -17102,8 +16791,7 @@ function ShortGameSessionDetailModal({ session, units, onEditShot, onClose }) {
   );
 }
 
-function ShortGameSummaryScreen({ shots, onNewSession, storageError, units, feedback, history }) {
-  const bestLabels = history && history[0] ? shortGameBestLabels(history[0], history) : [];
+function ShortGameSummaryScreen({ shots, onNewSession, storageError, units, feedback }) {
   const avgResultFt = avg(shots.map((s) => s.resultFt));
   const sgValues = shots.map((s) => ({ ...s, sg: sgForShortGameShot(s.lie, s.target, s.resultFt) }));
   const avgSG = avg(sgValues.map((s) => s.sg));
@@ -17119,7 +16807,7 @@ function ShortGameSummaryScreen({ shots, onNewSession, storageError, units, feed
       <SessionFeedbackBanner feedback={feedback} />
       <Card>
         <div style={{ textAlign: "center", marginBottom: 4 }}>
-          <div style={{ fontSize: 11, color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", letterSpacing: 2 }}>
+          <div style={{ fontSize: 11, color: COLORS.creamDim, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", letterSpacing: 2 }}>
             SESSION COMPLETE — {shots.length} SHOTS
           </div>
         </div>
@@ -17134,7 +16822,7 @@ function ShortGameSummaryScreen({ shots, onNewSession, storageError, units, feed
           />
         </div>
         <div style={{ display: "flex", alignItems: "center", marginTop: 8 }}>
-          <div style={{ fontSize: 10, color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", letterSpacing: 1 }}>
+          <div style={{ fontSize: 10, color: COLORS.creamDim, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", letterSpacing: 1 }}>
             PAR SCORING
           </div>
           <InlineInfoButton onClick={() => setShowScoreInfo(true)} />
@@ -17156,14 +16844,13 @@ function ShortGameSummaryScreen({ shots, onNewSession, storageError, units, feed
       </div>
 
       {storageError && (
-        <div style={{ color: COLORS.flag, fontSize: 11, marginTop: 8, fontFamily: "'JetBrains Mono', monospace" }}>
+        <div style={{ color: COLORS.flag, fontSize: 11, marginTop: 8, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" }}>
           Couldn't save this session to history — it's still shown above.
         </div>
       )}
 
       <ShareResultButton
         badge="SHORT GAME SESSION"
-        bestLabels={bestLabels}
         hero={formatSG(avgSG)}
         heroLabel="AVG STROKES GAINED / SHOT"
         heroGood={avgSG >= 0}
@@ -17190,7 +16877,7 @@ function ShortGameSummaryScreen({ shots, onNewSession, storageError, units, feed
           border: "none",
           background: COLORS.flag,
           color: COLORS.cream,
-          fontFamily: "'Bebas Neue', sans-serif",
+          fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
           fontSize: 20,
           letterSpacing: 2,
           cursor: "pointer",
@@ -17249,8 +16936,8 @@ function PuttingChooseScreen({ onNavigate }) {
   return (
     <div>
       <div style={{ marginBottom: 14 }}>
-        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 24, letterSpacing: 1, lineHeight: 1 }}>PUTTING</div>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 24, letterSpacing: 1, lineHeight: 1 }}>PUTTING</div>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
           Choose what you're working on
         </div>
       </div>
@@ -17279,7 +16966,7 @@ function PuttingChooseScreen({ onNavigate }) {
             <div style={{ position: "absolute", left: 12, bottom: 10, right: 12 }}>
               <div
                 style={{
-                  fontFamily: "'Bebas Neue', sans-serif",
+                  fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                   fontSize: 22,
                   letterSpacing: 0.5,
                   lineHeight: 1.05,
@@ -17289,7 +16976,7 @@ function PuttingChooseScreen({ onNavigate }) {
               >
                 {o.label}
               </div>
-              <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginTop: 2 }}>
+              <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.creamDim, marginTop: 2 }}>
                 {o.subtitle}
               </div>
             </div>
@@ -17323,10 +17010,10 @@ function PuttingRandomSetupScreen({
   return (
     <div>
       <div style={{ marginBottom: 12 }}>
-        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 24, letterSpacing: 1, lineHeight: 1 }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 24, letterSpacing: 1, lineHeight: 1 }}>
           RANDOM PRACTICE
         </div>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
           Putting
         </div>
       </div>
@@ -17334,10 +17021,10 @@ function PuttingRandomSetupScreen({
       {activeSaved && (
         <Card style={{ marginBottom: 10, border: `1px solid ${COLORS.sand}66` }}>
           <SectionLabel>Session in progress</SectionLabel>
-          <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 22, marginTop: 3 }}>
+          <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 22, marginTop: 3 }}>
             Putt {activeSaved.putts.length + 1} of {activeSaved.puttCount}
           </div>
-          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
+          <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
             {ftToUnitRound(activeSaved.puttMinFt, units)}-{ftToUnitRound(activeSaved.puttMaxFt, units)}
             {unitLabel} window
           </div>
@@ -17351,7 +17038,7 @@ function PuttingRandomSetupScreen({
                 border: "none",
                 background: COLORS.sand,
                 color: COLORS.turfDark,
-                fontFamily: "'Bebas Neue', sans-serif",
+                fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                 fontSize: 16,
                 letterSpacing: 1,
                 cursor: "pointer",
@@ -17367,7 +17054,7 @@ function PuttingRandomSetupScreen({
                 border: `1px solid ${COLORS.creamDim}33`,
                 background: "transparent",
                 color: COLORS.creamDim,
-                fontFamily: "'JetBrains Mono', monospace",
+                fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                 fontSize: 11,
                 cursor: "pointer",
               }}
@@ -17395,7 +17082,7 @@ function PuttingRandomSetupScreen({
             value={ftToUnitRound(puttMinFt, units)}
             onChange={(v) => setPuttMinFt(unitToFtRound(v, units))}
           />
-          <div style={{ color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", paddingTop: 12 }}>—</div>
+          <div style={{ color: COLORS.creamDim, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", paddingTop: 12 }}>—</div>
           <NumberField
             label="MAX"
             value={ftToUnitRound(puttMaxFt, units)}
@@ -17403,7 +17090,7 @@ function PuttingRandomSetupScreen({
           />
         </div>
         {invalidRange && (
-          <div style={{ color: COLORS.flag, fontSize: 11, marginTop: 8, fontFamily: "'JetBrains Mono', monospace" }}>
+          <div style={{ color: COLORS.flag, fontSize: 11, marginTop: 8, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" }}>
             Min can't go below {ftToUnitRound(3, units)}{unitLabel}, and max must be greater than min.
           </div>
         )}
@@ -17411,7 +17098,7 @@ function PuttingRandomSetupScreen({
 
       <Card style={{ marginTop: 10 }}>
         <SectionLabel>Include break?</SectionLabel>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 4, lineHeight: 1.5 }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, marginTop: 4, lineHeight: 1.5 }}>
           Log which way each putt breaks — left to right, straight, or right to left — so Analysis
           can show which break direction you're strongest and weakest on.
         </div>
@@ -17432,7 +17119,7 @@ function PuttingRandomSetupScreen({
           border: "none",
           background: invalidRange ? `${COLORS.fairway}66` : COLORS.flag,
           color: COLORS.cream,
-          fontFamily: "'Bebas Neue', sans-serif",
+          fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
           fontSize: 22,
           letterSpacing: 2,
           cursor: invalidRange ? "not-allowed" : "pointer",
@@ -17447,7 +17134,7 @@ function PuttingRandomSetupScreen({
           textAlign: "center",
           marginTop: 12,
           color: COLORS.creamDim,
-          fontFamily: "'JetBrains Mono', monospace",
+          fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
           fontSize: 11,
           cursor: "pointer",
           textDecoration: "underline",
@@ -17463,7 +17150,6 @@ function PuttingRandomSetupScreen({
 function PuttingCourseSetupScreen({
   onCourseHoles,
   onUpdateCourseHole,
-  onSetCourseHole,
   onFinishOnCourse,
   onClearOnCourse,
   onLoadTestCourseData,
@@ -17486,42 +17172,6 @@ function PuttingCourseSetupScreen({
   const courseCurrentIndex = onCourseHoles.findIndex((h) => !isHoleComplete(h));
   const lastTouchedIndex = onCourseHoles.reduce((acc, h, i) => (h.putts.length > 0 || h.noPutt ? i : acc), -1);
   const unitLabel = shortUnitLabel(units);
-
-  // ----- Hole-by-hole check: all 18 holes at a glance, any of them tappable to fix or fill in -----
-  const [editingHoleIndex, setEditingHoleIndex] = useState(null);
-  const [showGapWarning, setShowGapWarning] = useState(false);
-  const liveCells = onCourseHoles.map((h, i) => {
-    let status = "empty";
-    if (h.noPutt) status = "chip";
-    else if (isHoleComplete(h)) status = "putted";
-    else if (h.putts.length > 0) status = "partial";
-    return { hole: i + 1, status, strokes: h.putts.length, current: i === courseCurrentIndex };
-  });
-  const lastCompletedIdx = onCourseHoles.reduce((acc, h, i) => (isHoleComplete(h) ? i : acc), -1);
-  // A hole is a "problem" if it's unfinished, or not logged but sits BEFORE a hole that was logged
-  // (a gap in the middle of the round). Holes after the last logged one are just "not played yet".
-  const problemHoles = liveCells
-    .filter((c) => c.status === "partial" || (c.status === "empty" && c.hole - 1 < lastCompletedIdx))
-    .map((c) => c.hole);
-
-  function handleFinishClick() {
-    if (problemHoles.length > 0 && !showGapWarning) {
-      setShowGapWarning(true);
-      return;
-    }
-    onFinishOnCourse();
-  }
-
-  function liveHoleInitial(h) {
-    if (h.noPutt) return { noPutt: true, strokes: 1, firstFt: null, lastFt: null };
-    if (h.putts.length === 0) return { noPutt: false, strokes: 1, firstFt: null, lastFt: null };
-    return {
-      noPutt: false,
-      strokes: h.putts.length,
-      firstFt: h.putts[0].distanceFt,
-      lastFt: h.putts.length > 1 ? h.putts[h.putts.length - 1].distanceFt : null,
-    };
-  }
 
   function recordPutt(made) {
     const val = unitToFt(parseFloat(courseDistanceInput), units);
@@ -17564,17 +17214,17 @@ function PuttingCourseSetupScreen({
     <div>
       <div style={{ marginBottom: 12, display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
         <div>
-          <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 24, letterSpacing: 1, lineHeight: 1 }}>
+          <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 24, letterSpacing: 1, lineHeight: 1 }}>
             ON COURSE
           </div>
-          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
+          <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
             Putting
           </div>
         </div>
       </div>
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 5 }}>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.creamDim }}>
           {courseCompleted.length} OF 18 HOLES LOGGED
         </div>
         <div style={{ display: "flex", gap: 10 }}>
@@ -17582,7 +17232,7 @@ function PuttingCourseSetupScreen({
             <div
               onClick={undoLastPutt}
               style={{
-                fontFamily: "'JetBrains Mono', monospace",
+                fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                 fontSize: 10,
                 color: COLORS.sand,
                 cursor: "pointer",
@@ -17597,7 +17247,7 @@ function PuttingCourseSetupScreen({
             <div
               onClick={onClearOnCourse}
               style={{
-                fontFamily: "'JetBrains Mono', monospace",
+                fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                 fontSize: 10,
                 color: COLORS.creamDim,
                 cursor: "pointer",
@@ -17629,19 +17279,19 @@ function PuttingCourseSetupScreen({
 
       {courseCurrentIndex === -1 ? (
         <Card style={{ textAlign: "center", padding: "22px 16px" }}>
-          <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 22, letterSpacing: 1 }}>
+          <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 22, letterSpacing: 1 }}>
             ALL 18 HOLES LOGGED
           </div>
-          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 6 }}>
+          <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, marginTop: 6 }}>
             Tap Finish Round below to save.
           </div>
         </Card>
       ) : (
         <Card>
-          <div style={{ fontSize: 11, color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", letterSpacing: 1 }}>
+          <div style={{ fontSize: 11, color: COLORS.creamDim, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", letterSpacing: 1 }}>
             HOLE {courseCurrentIndex + 1} OF 18 · PUTT {onCourseHoles[courseCurrentIndex].putts.length + 1}
           </div>
-          <div style={{ fontSize: 10, color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", marginTop: 8 }}>
+          <div style={{ fontSize: 10, color: COLORS.creamDim, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", marginTop: 8 }}>
             {onCourseHoles[courseCurrentIndex].putts.length === 0 ? "FIRST PUTT DISTANCE" : "NEXT PUTT DISTANCE"} ({unitLabel.toUpperCase()})
           </div>
           <input
@@ -17659,13 +17309,13 @@ function PuttingCourseSetupScreen({
               border: `1px solid ${COLORS.creamDim}33`,
               borderRadius: 8,
               color: COLORS.cream,
-              fontFamily: "'Bebas Neue', sans-serif",
+              fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
               fontSize: 32,
               padding: "8px 14px",
               boxSizing: "border-box",
             }}
           />
-          <div style={{ fontSize: 10, color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", marginTop: 12, marginBottom: 6, textAlign: "center" }}>
+          <div style={{ fontSize: 10, color: COLORS.creamDim, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", marginTop: 12, marginBottom: 6, textAlign: "center" }}>
             DID IT GO IN?
           </div>
           <div style={{ display: "flex", gap: 8 }}>
@@ -17679,7 +17329,7 @@ function PuttingCourseSetupScreen({
                 border: "none",
                 background: courseDistanceInput === "" ? `${COLORS.fairway}66` : COLORS.fairway,
                 color: COLORS.cream,
-                fontFamily: "'Bebas Neue', sans-serif",
+                fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                 fontSize: 20,
                 letterSpacing: 1,
                 cursor: courseDistanceInput === "" ? "not-allowed" : "pointer",
@@ -17697,7 +17347,7 @@ function PuttingCourseSetupScreen({
                 border: `2px solid ${courseDistanceInput === "" ? COLORS.creamDim + "55" : COLORS.flag}`,
                 background: "transparent",
                 color: courseDistanceInput === "" ? COLORS.creamDim : COLORS.cream,
-                fontFamily: "'Bebas Neue', sans-serif",
+                fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                 fontSize: 20,
                 letterSpacing: 1,
                 cursor: courseDistanceInput === "" ? "not-allowed" : "pointer",
@@ -17712,7 +17362,7 @@ function PuttingCourseSetupScreen({
               style={{
                 textAlign: "center",
                 marginTop: 10,
-                fontFamily: "'JetBrains Mono', monospace",
+                fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                 fontSize: 10,
                 color: COLORS.creamDim,
                 cursor: "pointer",
@@ -17726,59 +17376,8 @@ function PuttingCourseSetupScreen({
         </Card>
       )}
 
-      <Card style={{ marginTop: 10 }}>
-        <SectionLabel>Check every hole</SectionLabel>
-        <div style={{ marginTop: 8 }}>
-          <CourseHoleGrid cells={liveCells} onTapHole={(n) => setEditingHoleIndex(n - 1)} />
-        </div>
-      </Card>
-
-      {showGapWarning && problemHoles.length > 0 && (
-        <Card style={{ marginTop: 10, border: `1px solid ${COLORS.sand}` }}>
-          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.sand, lineHeight: 1.5 }}>
-            {problemHoles.length === 1 ? "Hole" : "Holes"} {formatHoleRanges(problemHoles)}{" "}
-            {problemHoles.length === 1 ? "isn't" : "aren't"} logged or finished. Finishing now saves the round without{" "}
-            {problemHoles.length === 1 ? "it" : "them"}.
-          </div>
-          <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-            <button
-              onClick={() => setEditingHoleIndex(problemHoles[0] - 1)}
-              style={{
-                flex: 1,
-                padding: "10px 0",
-                borderRadius: 10,
-                border: "none",
-                background: COLORS.fairway,
-                color: COLORS.cream,
-                fontFamily: "'Bebas Neue', sans-serif",
-                fontSize: 15,
-                cursor: "pointer",
-              }}
-            >
-              FIX HOLE {problemHoles[0]}
-            </button>
-            <button
-              onClick={onFinishOnCourse}
-              style={{
-                flex: 1,
-                padding: "10px 0",
-                borderRadius: 10,
-                border: `1px solid ${COLORS.creamDim}33`,
-                background: "transparent",
-                color: COLORS.creamDim,
-                fontFamily: "'Bebas Neue', sans-serif",
-                fontSize: 15,
-                cursor: "pointer",
-              }}
-            >
-              FINISH ANYWAY
-            </button>
-          </div>
-        </Card>
-      )}
-
       <button
-        onClick={handleFinishClick}
+        onClick={onFinishOnCourse}
         disabled={courseCompleted.length === 0}
         style={{
           width: "100%",
@@ -17788,7 +17387,7 @@ function PuttingCourseSetupScreen({
           border: "none",
           background: courseCompleted.length === 0 ? `${COLORS.fairway}66` : COLORS.flag,
           color: COLORS.cream,
-          fontFamily: "'Bebas Neue', sans-serif",
+          fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
           fontSize: 18,
           letterSpacing: 2,
           cursor: courseCompleted.length === 0 ? "not-allowed" : "pointer",
@@ -17806,7 +17405,7 @@ function PuttingCourseSetupScreen({
               border: `1px solid ${COLORS.creamDim}22`,
               borderRadius: 10,
               overflow: "hidden",
-              fontFamily: "'JetBrains Mono', monospace",
+              fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
               fontSize: 12,
             }}
           >
@@ -17821,9 +17420,7 @@ function PuttingCourseSetupScreen({
                 return (
                   <div
                     key={h.hole}
-                    onClick={() => setEditingHoleIndex(h.hole - 1)}
                     style={{
-                      cursor: "pointer",
                       display: "flex",
                       padding: "7px 12px",
                       borderTop: i > 0 ? `1px solid ${COLORS.creamDim}11` : "none",
@@ -17841,9 +17438,7 @@ function PuttingCourseSetupScreen({
               return (
                 <div
                   key={h.hole}
-                  onClick={() => setEditingHoleIndex(h.hole - 1)}
                   style={{
-                    cursor: "pointer",
                     display: "flex",
                     padding: "7px 12px",
                     borderTop: i > 0 ? `1px solid ${COLORS.creamDim}11` : "none",
@@ -17872,7 +17467,7 @@ function PuttingCourseSetupScreen({
           textAlign: "center",
           marginTop: 12,
           color: COLORS.creamDim,
-          fontFamily: "'JetBrains Mono', monospace",
+          fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
           fontSize: 11,
           cursor: "pointer",
           textDecoration: "underline",
@@ -17881,43 +17476,6 @@ function PuttingCourseSetupScreen({
       >
         View putting analysis
       </div>
-
-      {editingHoleIndex !== null && (
-        <CourseHoleEditModal
-          key={editingHoleIndex}
-          holeNumber={editingHoleIndex + 1}
-          initial={liveHoleInitial(onCourseHoles[editingHoleIndex])}
-          units={units}
-          note={
-            liveCells[editingHoleIndex].status === "partial"
-              ? "This hole is unfinished — saving marks the last putt as the one that went in."
-              : null
-          }
-          onSave={(r) => {
-            if (r.noPutt) {
-              onSetCourseHole(editingHoleIndex, { putts: [], noPutt: true });
-            } else {
-              const n = r.distancesFt.length;
-              onSetCourseHole(editingHoleIndex, {
-                putts: r.distancesFt.map((d, k) => ({ distanceFt: d, made: k === n - 1 })),
-              });
-            }
-            setEditingHoleIndex(null);
-            return true;
-          }}
-          onRemove={
-            liveCells[editingHoleIndex].status === "empty"
-              ? null
-              : () => {
-                  onSetCourseHole(editingHoleIndex, { putts: [] });
-                  setEditingHoleIndex(null);
-                  return true;
-                }
-          }
-          removeLabel="CLEAR HOLE"
-          onCancel={() => setEditingHoleIndex(null)}
-        />
-      )}
     </div>
   );
 }
@@ -17927,16 +17485,16 @@ function PuttingClockIntroScreen({ history, onStart }) {
   return (
     <div>
       <div style={{ marginBottom: 12 }}>
-        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 24, letterSpacing: 1, lineHeight: 1 }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 24, letterSpacing: 1, lineHeight: 1 }}>
           AROUND THE CLOCK
         </div>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
           One putt from every distance, 3-10ft
         </div>
       </div>
 
       <Card>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 13, color: COLORS.cream, lineHeight: 1.6 }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 13, color: COLORS.cream, lineHeight: 1.6 }}>
           8 putts laid out around the hole — one from every distance between 3ft and 10ft. Which
           distance sits where gets reshuffled every round, so it's never the same layout twice.
           Tap a distance, say whether you made it, and work your way around until all 8 are done.
@@ -17960,7 +17518,7 @@ function PuttingClockIntroScreen({ history, onStart }) {
           border: "none",
           background: COLORS.flag,
           color: COLORS.cream,
-          fontFamily: "'Bebas Neue', sans-serif",
+          fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
           fontSize: 22,
           letterSpacing: 2,
           cursor: "pointer",
@@ -18004,13 +17562,13 @@ function PuttingClockPlayScreen({ putts, pendingIndex, onOpenPutt, onRecordResul
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 5 }}>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim }}>
           {answeredCount} OF 8 PUTTS
         </div>
         <div
           onClick={onExit}
           style={{
-            fontFamily: "'JetBrains Mono', monospace",
+            fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
             fontSize: 10,
             color: COLORS.creamDim,
             cursor: "pointer",
@@ -18049,7 +17607,7 @@ function PuttingClockPlayScreen({ putts, pendingIndex, onOpenPutt, onRecordResul
                   x={x}
                   y={y + 5}
                   textAnchor="middle"
-                  fontFamily="'Bebas Neue', sans-serif"
+                  fontFamily="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
                   fontSize="16"
                   fill={COLORS.cream}
                 >
@@ -18100,13 +17658,13 @@ function PuttingClockPlayScreen({ putts, pendingIndex, onOpenPutt, onRecordResul
               textAlign: "center",
             }}
           >
-            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, letterSpacing: 2 }}>
+            <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, letterSpacing: 2 }}>
               PUTT
             </div>
-            <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 48, color: COLORS.cream, lineHeight: 1 }}>
+            <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 48, color: COLORS.cream, lineHeight: 1 }}>
               {pending.targetFt}FT
             </div>
-            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 13, color: COLORS.creamDim, marginTop: 6 }}>
+            <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 13, color: COLORS.creamDim, marginTop: 6 }}>
               Did you make it?
             </div>
             <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
@@ -18119,7 +17677,7 @@ function PuttingClockPlayScreen({ putts, pendingIndex, onOpenPutt, onRecordResul
                   border: "none",
                   background: COLORS.fairway,
                   color: COLORS.cream,
-                  fontFamily: "'Bebas Neue', sans-serif",
+                  fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                   fontSize: 17,
                   letterSpacing: 1,
                   cursor: "pointer",
@@ -18136,7 +17694,7 @@ function PuttingClockPlayScreen({ putts, pendingIndex, onOpenPutt, onRecordResul
                   border: `2px solid ${COLORS.flag}`,
                   background: "transparent",
                   color: COLORS.cream,
-                  fontFamily: "'Bebas Neue', sans-serif",
+                  fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                   fontSize: 17,
                   letterSpacing: 1,
                   cursor: "pointer",
@@ -18152,9 +17710,7 @@ function PuttingClockPlayScreen({ putts, pendingIndex, onOpenPutt, onRecordResul
   );
 }
 
-function PuttingClockSummaryScreen({ session, onPlayAgain, onExit, storageError, units, history }) {
-  const bestLabels = clockBestLabels(session, history || [], units);
-  const clockFtMade = puttsFtMade(session.putts);
+function PuttingClockSummaryScreen({ session, onPlayAgain, onExit, storageError, units }) {
   const perfect = session.made === 8;
   const sgList = session.putts.map((p) => sgForPutt(p.targetFt, p.strokes));
   const avgSG = avg(sgList);
@@ -18164,12 +17720,12 @@ function PuttingClockSummaryScreen({ session, onPlayAgain, onExit, storageError,
     <div>
       <Card>
         <div style={{ textAlign: "center", marginBottom: 4 }}>
-          <div style={{ fontSize: 11, color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", letterSpacing: 2 }}>
+          <div style={{ fontSize: 11, color: COLORS.creamDim, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", letterSpacing: 2 }}>
             {perfect ? "PERFECT ROUND!" : "ROUND COMPLETE"}
           </div>
           <div
             style={{
-              fontFamily: "'Bebas Neue', sans-serif",
+              fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
               fontSize: 56,
               lineHeight: 1,
               color: perfect ? COLORS.fairwayLight : COLORS.cream,
@@ -18180,7 +17736,7 @@ function PuttingClockSummaryScreen({ session, onPlayAgain, onExit, storageError,
             <span style={{ fontSize: 22, color: COLORS.creamDim }}> / 8</span>
           </div>
           {perfect && (
-            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: COLORS.fairwayLight, marginTop: 4 }}>
+            <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 12, color: COLORS.fairwayLight, marginTop: 4 }}>
               ★ Every putt from 3 to 10ft — clean sweep.
             </div>
           )}
@@ -18200,19 +17756,18 @@ function PuttingClockSummaryScreen({ session, onPlayAgain, onExit, storageError,
       </div>
 
       {storageError && (
-        <div style={{ color: COLORS.flag, fontSize: 11, marginTop: 8, fontFamily: "'JetBrains Mono', monospace" }}>
+        <div style={{ color: COLORS.flag, fontSize: 11, marginTop: 8, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" }}>
           Couldn't save this round to history — it's still shown above.
         </div>
       )}
 
       <ShareResultButton
-        badge="AROUND THE CLOCK"
-        bestLabels={bestLabels}
-        hero={shareFtHero(ftToUnit(clockFtMade, units))}
-        heroLabel={`${shortUnitLabel(units).toUpperCase()} MADE`}
-        heroGood
+        badge="PUTTING SESSION"
+        hero={`${session.made}/8`}
+        heroLabel="AROUND THE CLOCK"
+        heroGood={session.made >= 5}
         stats={[
-          ["PUTTS MADE", `${session.made}/8`],
+          ["DRILL", "CLOCK"],
           ["AVG SG/PUTT", formatSG(avgSG)],
           ["TOTAL SG", formatSG(totalSG)],
         ]}
@@ -18236,7 +17791,7 @@ function PuttingClockSummaryScreen({ session, onPlayAgain, onExit, storageError,
           border: "none",
           background: COLORS.flag,
           color: COLORS.cream,
-          fontFamily: "'Bebas Neue', sans-serif",
+          fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
           fontSize: 20,
           letterSpacing: 1,
           cursor: "pointer",
@@ -18251,7 +17806,7 @@ function PuttingClockSummaryScreen({ session, onPlayAgain, onExit, storageError,
           textAlign: "center",
           marginTop: 12,
           color: COLORS.creamDim,
-          fontFamily: "'JetBrains Mono', monospace",
+          fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
           fontSize: 11,
           cursor: "pointer",
           textDecoration: "underline",
@@ -18270,16 +17825,16 @@ function PuttingStartLineIntroScreen({ history, onStart }) {
   return (
     <div>
       <div style={{ marginBottom: 12 }}>
-        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 24, letterSpacing: 1, lineHeight: 1 }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 24, letterSpacing: 1, lineHeight: 1 }}>
           START LINE
         </div>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
           10 putts through a gate
         </div>
       </div>
 
       <Card>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 13, color: COLORS.cream, lineHeight: 1.6 }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 13, color: COLORS.cream, lineHeight: 1.6 }}>
           Set up a gate with 2 tees, the width of your choosing, roughly 15 inches from your ball.
           Hit 10 putts, aiming to roll the ball through the gate
           without touching either side. Play all 10 for real, then come back and enter how many
@@ -18304,7 +17859,7 @@ function PuttingStartLineIntroScreen({ history, onStart }) {
           border: "none",
           background: COLORS.flag,
           color: COLORS.cream,
-          fontFamily: "'Bebas Neue', sans-serif",
+          fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
           fontSize: 22,
           letterSpacing: 2,
           cursor: "pointer",
@@ -18323,13 +17878,13 @@ function PuttingStartLinePlayScreen({ madeInput, setMadeInput, onSubmit, onExit 
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim }}>
           START LINE — 10 PUTTS
         </div>
         <div
           onClick={onExit}
           style={{
-            fontFamily: "'JetBrains Mono', monospace",
+            fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
             fontSize: 10,
             color: COLORS.creamDim,
             cursor: "pointer",
@@ -18343,7 +17898,7 @@ function PuttingStartLinePlayScreen({ madeInput, setMadeInput, onSubmit, onExit 
 
       <Card>
         <div style={{ textAlign: "center" }}>
-          <div style={{ fontSize: 11, color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", letterSpacing: 1.5 }}>
+          <div style={{ fontSize: 11, color: COLORS.creamDim, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", letterSpacing: 1.5 }}>
             GATE — WIDTH YOUR CHOICE, ~15IN AHEAD
           </div>
           <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 13, color: COLORS.creamDim, marginTop: 8, lineHeight: 1.5 }}>
@@ -18356,7 +17911,7 @@ function PuttingStartLinePlayScreen({ madeInput, setMadeInput, onSubmit, onExit 
             style={{
               fontSize: 10,
               color: COLORS.creamDim,
-              fontFamily: "'JetBrains Mono', monospace",
+              fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
               marginBottom: 6,
               textAlign: "center",
               letterSpacing: 1,
@@ -18378,7 +17933,7 @@ function PuttingStartLinePlayScreen({ madeInput, setMadeInput, onSubmit, onExit 
               border: `1px solid ${COLORS.creamDim}33`,
               borderRadius: 10,
               color: COLORS.cream,
-              fontFamily: "'Bebas Neue', sans-serif",
+              fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
               fontSize: 48,
               padding: "10px 12px",
               boxSizing: "border-box",
@@ -18387,7 +17942,7 @@ function PuttingStartLinePlayScreen({ madeInput, setMadeInput, onSubmit, onExit 
           <div
             style={{
               textAlign: "center",
-              fontFamily: "'JetBrains Mono', monospace",
+              fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
               fontSize: 11,
               color: COLORS.creamDim,
               marginTop: 6,
@@ -18408,7 +17963,7 @@ function PuttingStartLinePlayScreen({ madeInput, setMadeInput, onSubmit, onExit 
             border: "none",
             background: !valid ? `${COLORS.fairway}66` : COLORS.flag,
             color: COLORS.cream,
-            fontFamily: "'Bebas Neue', sans-serif",
+            fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
             fontSize: 20,
             letterSpacing: 1,
             cursor: !valid ? "not-allowed" : "pointer",
@@ -18421,8 +17976,7 @@ function PuttingStartLinePlayScreen({ madeInput, setMadeInput, onSubmit, onExit 
   );
 }
 
-function PuttingStartLineSummaryScreen({ session, onPlayAgain, onExit, storageError, history }) {
-  const bestLabels = startLineBestLabels(session, history || []);
+function PuttingStartLineSummaryScreen({ session, onPlayAgain, onExit, storageError }) {
   const perfect = session.made === session.total;
   const pct = Math.round((session.made / session.total) * 100);
 
@@ -18430,12 +17984,12 @@ function PuttingStartLineSummaryScreen({ session, onPlayAgain, onExit, storageEr
     <div>
       <Card>
         <div style={{ textAlign: "center", marginBottom: 4 }}>
-          <div style={{ fontSize: 11, color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", letterSpacing: 2 }}>
+          <div style={{ fontSize: 11, color: COLORS.creamDim, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", letterSpacing: 2 }}>
             {perfect ? "PERFECT SCORE!" : "DRILL COMPLETE"}
           </div>
           <div
             style={{
-              fontFamily: "'Bebas Neue', sans-serif",
+              fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
               fontSize: 56,
               lineHeight: 1,
               color: perfect ? COLORS.fairwayLight : COLORS.cream,
@@ -18445,11 +17999,11 @@ function PuttingStartLineSummaryScreen({ session, onPlayAgain, onExit, storageEr
             {session.made}
             <span style={{ fontSize: 22, color: COLORS.creamDim }}> / {session.total}</span>
           </div>
-          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: COLORS.creamDim, marginTop: 4 }}>
+          <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 12, color: COLORS.creamDim, marginTop: 4 }}>
             {pct}% through the gate
           </div>
           {perfect && (
-            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: COLORS.fairwayLight, marginTop: 4 }}>
+            <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 12, color: COLORS.fairwayLight, marginTop: 4 }}>
               ★ Every putt through clean.
             </div>
           )}
@@ -18457,14 +18011,13 @@ function PuttingStartLineSummaryScreen({ session, onPlayAgain, onExit, storageEr
       </Card>
 
       {storageError && (
-        <div style={{ color: COLORS.flag, fontSize: 11, marginTop: 8, fontFamily: "'JetBrains Mono', monospace" }}>
+        <div style={{ color: COLORS.flag, fontSize: 11, marginTop: 8, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" }}>
           Couldn't save this round to history — it's still shown above.
         </div>
       )}
 
       <ShareResultButton
         badge="PUTTING SESSION"
-        bestLabels={bestLabels}
         hero={`${session.made}/${session.total}`}
         heroLabel="THROUGH THE GATE"
         heroGood={pct >= 70}
@@ -18492,7 +18045,7 @@ function PuttingStartLineSummaryScreen({ session, onPlayAgain, onExit, storageEr
           border: "none",
           background: COLORS.flag,
           color: COLORS.cream,
-          fontFamily: "'Bebas Neue', sans-serif",
+          fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
           fontSize: 20,
           letterSpacing: 1,
           cursor: "pointer",
@@ -18507,7 +18060,7 @@ function PuttingStartLineSummaryScreen({ session, onPlayAgain, onExit, storageEr
           textAlign: "center",
           marginTop: 12,
           color: COLORS.creamDim,
-          fontFamily: "'JetBrains Mono', monospace",
+          fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
           fontSize: 11,
           cursor: "pointer",
           textDecoration: "underline",
@@ -18530,10 +18083,10 @@ function PuttingPaceSetupScreen({ selectedDistances, onToggleDistance, puttsPerD
   return (
     <div>
       <div style={{ marginBottom: 12 }}>
-        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 24, letterSpacing: 1, lineHeight: 1 }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 24, letterSpacing: 1, lineHeight: 1 }}>
           PACE CONTROL
         </div>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
           Random distances, scored on proximity to the hole
         </div>
       </div>
@@ -18553,7 +18106,7 @@ function PuttingPaceSetupScreen({ selectedDistances, onToggleDistance, puttsPerD
                 border: selectedDistances.includes(ft) ? `2px solid ${COLORS.fairwayLight}` : `1px solid ${COLORS.creamDim}33`,
                 background: selectedDistances.includes(ft) ? COLORS.fairway : "transparent",
                 color: COLORS.cream,
-                fontFamily: "'Bebas Neue', sans-serif",
+                fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                 fontSize: 16,
                 cursor: "pointer",
               }}
@@ -18584,7 +18137,7 @@ function PuttingPaceSetupScreen({ selectedDistances, onToggleDistance, puttsPerD
                 justifyContent: "space-between",
                 padding: "5px 0",
                 borderTop: i > 0 ? `1px solid ${COLORS.creamDim}15` : "none",
-                fontFamily: "'JetBrains Mono', monospace",
+                fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                 fontSize: 12,
               }}
             >
@@ -18596,7 +18149,7 @@ function PuttingPaceSetupScreen({ selectedDistances, onToggleDistance, puttsPerD
       </Card>
 
       {canStart && (
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 10, textAlign: "center" }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, marginTop: 10, textAlign: "center" }}>
           {totalPutts} putt{totalPutts === 1 ? "" : "s"} total · {maxPoints} max points
         </div>
       )}
@@ -18612,7 +18165,7 @@ function PuttingPaceSetupScreen({ selectedDistances, onToggleDistance, puttsPerD
           border: "none",
           background: !canStart ? `${COLORS.fairway}66` : COLORS.flag,
           color: COLORS.cream,
-          fontFamily: "'Bebas Neue', sans-serif",
+          fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
           fontSize: 22,
           letterSpacing: 2,
           cursor: !canStart ? "not-allowed" : "pointer",
@@ -18621,7 +18174,7 @@ function PuttingPaceSetupScreen({ selectedDistances, onToggleDistance, puttsPerD
         START DRILL
       </button>
       {!canStart && (
-        <div style={{ color: COLORS.creamDim, fontSize: 11, marginTop: 8, fontFamily: "'JetBrains Mono', monospace", textAlign: "center" }}>
+        <div style={{ color: COLORS.creamDim, fontSize: 11, marginTop: 8, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", textAlign: "center" }}>
           Select at least one distance.
         </div>
       )}
@@ -18633,7 +18186,7 @@ function PuttingPaceSetupScreen({ selectedDistances, onToggleDistance, puttsPerD
             textAlign: "center",
             marginTop: 12,
             color: COLORS.creamDim,
-            fontFamily: "'JetBrains Mono', monospace",
+            fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
             fontSize: 11,
             cursor: "pointer",
             textDecoration: "underline",
@@ -18654,13 +18207,13 @@ function PuttingPacePlayScreen({ putts, currentIndex, onRecordPoints, onExit, un
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim }}>
           PUTT {currentIndex + 1} OF {putts.length}
         </div>
         <div
           onClick={onExit}
           style={{
-            fontFamily: "'JetBrains Mono', monospace",
+            fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
             fontSize: 10,
             color: COLORS.creamDim,
             cursor: "pointer",
@@ -18674,17 +18227,17 @@ function PuttingPacePlayScreen({ putts, currentIndex, onRecordPoints, onExit, un
 
       <Card>
         <div style={{ textAlign: "center" }}>
-          <div style={{ fontSize: 12, color: COLORS.sand, fontFamily: "'JetBrains Mono', monospace", letterSpacing: 2 }}>
+          <div style={{ fontSize: 12, color: COLORS.sand, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", letterSpacing: 2 }}>
             PUTT FROM
           </div>
-          <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 56, lineHeight: 1, color: COLORS.cream, marginTop: 2 }}>
+          <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 56, lineHeight: 1, color: COLORS.cream, marginTop: 2 }}>
             {ftToUnitRound(current.targetFt, units)}
             <span style={{ fontSize: 20, marginLeft: 6, color: COLORS.creamDim }}>{unitLabel}</span>
           </div>
         </div>
 
         <div style={{ marginTop: 18 }}>
-          <div style={{ fontSize: 10, color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", marginBottom: 8, textAlign: "center" }}>
+          <div style={{ fontSize: 10, color: COLORS.creamDim, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", marginBottom: 8, textAlign: "center" }}>
             HOW CLOSE DID IT FINISH?
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
@@ -18698,7 +18251,7 @@ function PuttingPacePlayScreen({ putts, currentIndex, onRecordPoints, onExit, un
                   border: `2px solid ${pacePointColor(o.points)}`,
                   background: "transparent",
                   color: COLORS.cream,
-                  fontFamily: "'Bebas Neue', sans-serif",
+                  fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                   fontSize: 18,
                   letterSpacing: 1,
                   cursor: "pointer",
@@ -18711,7 +18264,7 @@ function PuttingPacePlayScreen({ putts, currentIndex, onRecordPoints, onExit, un
           <div
             style={{
               marginTop: 10,
-              fontFamily: "'JetBrains Mono', monospace",
+              fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
               fontSize: 10,
               color: COLORS.creamDim,
               textAlign: "center",
@@ -18740,7 +18293,7 @@ function PaceLog({ putts, units, onEditPoints }) {
         border: `1px solid ${COLORS.creamDim}22`,
         borderRadius: 10,
         overflow: "hidden",
-        fontFamily: "'JetBrains Mono', monospace",
+        fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
         fontSize: 12,
       }}
     >
@@ -18774,8 +18327,7 @@ function PaceLog({ putts, units, onEditPoints }) {
   );
 }
 
-function PuttingPaceSummaryScreen({ session, onPlayAgain, onExit, storageError, units, history }) {
-  const bestLabels = paceBestLabels(session, history || []);
+function PuttingPaceSummaryScreen({ session, onPlayAgain, onExit, storageError, units }) {
   const { pct, avgPoints } = paceRoundStats(session);
   const perfect = session.totalPoints === session.maxPoints;
   const unitLabel = shortUnitLabel(units);
@@ -18796,12 +18348,12 @@ function PuttingPaceSummaryScreen({ session, onPlayAgain, onExit, storageError, 
     <div>
       <Card>
         <div style={{ textAlign: "center", marginBottom: 4 }}>
-          <div style={{ fontSize: 11, color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", letterSpacing: 2 }}>
+          <div style={{ fontSize: 11, color: COLORS.creamDim, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", letterSpacing: 2 }}>
             {perfect ? "PERFECT ROUND!" : "DRILL COMPLETE"}
           </div>
           <div
             style={{
-              fontFamily: "'Bebas Neue', sans-serif",
+              fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
               fontSize: 56,
               lineHeight: 1,
               color: perfect ? COLORS.fairwayLight : COLORS.cream,
@@ -18811,7 +18363,7 @@ function PuttingPaceSummaryScreen({ session, onPlayAgain, onExit, storageError, 
             {session.totalPoints}
             <span style={{ fontSize: 22, color: COLORS.creamDim }}> / {session.maxPoints}</span>
           </div>
-          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: COLORS.creamDim, marginTop: 4 }}>
+          <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 12, color: COLORS.creamDim, marginTop: 4 }}>
             {pct}% of max points
           </div>
         </div>
@@ -18833,7 +18385,7 @@ function PuttingPaceSummaryScreen({ session, onPlayAgain, onExit, storageError, 
                 justifyContent: "space-between",
                 padding: "6px 0",
                 borderTop: i > 0 ? `1px solid ${COLORS.creamDim}15` : "none",
-                fontFamily: "'JetBrains Mono', monospace",
+                fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                 fontSize: 12,
               }}
             >
@@ -18857,14 +18409,13 @@ function PuttingPaceSummaryScreen({ session, onPlayAgain, onExit, storageError, 
       </div>
 
       {storageError && (
-        <div style={{ color: COLORS.flag, fontSize: 11, marginTop: 8, fontFamily: "'JetBrains Mono', monospace" }}>
+        <div style={{ color: COLORS.flag, fontSize: 11, marginTop: 8, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" }}>
           Couldn't save this round to history — it's still shown above.
         </div>
       )}
 
       <ShareResultButton
         badge="PUTTING SESSION"
-        bestLabels={bestLabels}
         hero={`${pct}%`}
         heroLabel="OF MAX PACE POINTS"
         heroGood={pct >= 60}
@@ -18893,7 +18444,7 @@ function PuttingPaceSummaryScreen({ session, onPlayAgain, onExit, storageError, 
           border: "none",
           background: COLORS.flag,
           color: COLORS.cream,
-          fontFamily: "'Bebas Neue', sans-serif",
+          fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
           fontSize: 20,
           letterSpacing: 1,
           cursor: "pointer",
@@ -18908,7 +18459,7 @@ function PuttingPaceSummaryScreen({ session, onPlayAgain, onExit, storageError, 
           textAlign: "center",
           marginTop: 12,
           color: COLORS.creamDim,
-          fontFamily: "'JetBrains Mono', monospace",
+          fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
           fontSize: 11,
           cursor: "pointer",
           textDecoration: "underline",
@@ -18921,473 +18472,6 @@ function PuttingPaceSummaryScreen({ session, onPlayAgain, onExit, storageError, 
   );
 }
 
-// ===== On-course hole-by-hole review (grid, editor, and the pure helpers behind them) =====
-//
-// A saved on-course round stores one `putts` entry per hole PUTTED ({hole, targetFt, strokes,
-// holedFromFt}) plus `chipInHoles` (hole numbers chipped in, no putt). Rounds saved before this
-// existed have no `hole` on their entries and no `chipInHoles` — those are "legacy": their entries
-// are simply numbered in the order they appear (1, 2, 3 ...), since the original hole numbers were
-// never stored.
-function isLegacyCourseSession(session) {
-  return session.putts.some((p) => p.hole == null);
-}
-
-// Turns a saved round into an 18-slot view: which holes are putted, chipped in, or not logged.
-function courseSessionHoleView(session) {
-  const legacy = isLegacyCourseSession(session);
-  const byHole = {};
-  session.putts.forEach((p, i) => {
-    const n = legacy ? i + 1 : p.hole;
-    byHole[n] = { ...p, hole: n };
-  });
-  const chipSet = new Set(legacy ? [] : session.chipInHoles || []);
-  const holes = Array.from({ length: 18 }, (_, i) => {
-    const n = i + 1;
-    if (byHole[n]) return { hole: n, status: "putted", strokes: byHole[n].strokes, entry: byHole[n] };
-    if (chipSet.has(n)) return { hole: n, status: "chip" };
-    return { hole: n, status: "empty" };
-  });
-  return { holes, legacy };
-}
-
-// Applies ONE hole change to a saved on-course round and rebuilds every cached field on it
-// (puttCount, min/max, totalStrokes, avgStrokes, chipIns, holesPlayed) — same "don't let cached
-// fields go stale after an edit" rule as every other historical-edit handler in this file.
-//   change = { type: "save", noPutt, distancesFt, insert }  |  { type: "remove" }
-// `insert` only matters for a legacy round: the new hole is slotted in at that number and every
-// existing hole from there on moves up by one (which is exactly right for "I'm missing hole 12").
-// Returns null if the change isn't allowed (no putted holes left, or a hole would pass 18).
-function applyCourseHoleChange(session, holeNumber, change) {
-  const legacy = isLegacyCourseSession(session);
-  let entries = session.putts.map((p, i) => ({ ...p, hole: legacy ? i + 1 : p.hole }));
-  let chipHoles = legacy ? [] : [...(session.chipInHoles || [])];
-  // Chip-ins from a legacy round have no known hole number — keep their COUNT so it isn't lost.
-  const unplaced = legacy ? session.chipIns || 0 : session.unplacedChipIns || 0;
-  if (legacy && change.type === "save" && change.insert) {
-    entries = entries.map((e) => (e.hole >= holeNumber ? { ...e, hole: e.hole + 1 } : e));
-  }
-  entries = entries.filter((e) => e.hole !== holeNumber);
-  chipHoles = chipHoles.filter((h) => h !== holeNumber);
-  if (change.type === "save") {
-    if (change.noPutt) {
-      chipHoles.push(holeNumber);
-    } else {
-      const d = change.distancesFt;
-      entries.push({ hole: holeNumber, targetFt: d[0], strokes: d.length, holedFromFt: d[d.length - 1] });
-    }
-  }
-  if (entries.length === 0) return null;
-  if (entries.some((e) => e.hole > 18 || e.hole < 1)) return null;
-  entries.sort((a, b) => a.hole - b.hole);
-  chipHoles.sort((a, b) => a - b);
-  return {
-    ...session,
-    putts: entries,
-    chipInHoles: chipHoles,
-    unplacedChipIns: unplaced,
-    chipIns: chipHoles.length + unplaced,
-    holesPlayed: entries.length + chipHoles.length + unplaced,
-    puttCount: entries.length,
-    puttMinFt: Math.min(...entries.map((e) => e.targetFt)),
-    puttMaxFt: Math.max(...entries.map((e) => e.targetFt)),
-    totalStrokes: entries.reduce((a, e) => a + e.strokes, 0),
-    avgStrokes: avg(entries.map((e) => e.strokes)),
-  };
-}
-
-// [12, 13, 14, 18] -> "12–14, 18"
-function formatHoleRanges(nums) {
-  const out = [];
-  let start = null;
-  let prev = null;
-  const flush = () => out.push(start === prev ? `${start}` : `${start}–${prev}`);
-  nums.forEach((n) => {
-    if (start === null) {
-      start = prev = n;
-    } else if (n === prev + 1) {
-      prev = n;
-    } else {
-      flush();
-      start = prev = n;
-    }
-  });
-  if (start !== null) flush();
-  return out.join(", ");
-}
-
-// 6-across grid of all 18 holes. cells: [{ hole, status: "putted"|"chip"|"partial"|"empty", strokes, current }]
-function CourseHoleGrid({ cells, onTapHole }) {
-  return (
-    <div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 6 }}>
-        {cells.map((c) => {
-          let border = `1px dashed ${COLORS.creamDim}55`;
-          let bg = "transparent";
-          let label = "–";
-          let labelColor = COLORS.creamDim;
-          if (c.status === "putted") {
-            const col = ragColor(ragStatusForPutts(c.strokes));
-            border = `1px solid ${col}`;
-            bg = `${col}22`;
-            label = String(c.strokes);
-            labelColor = col;
-          } else if (c.status === "chip") {
-            border = `1px solid ${COLORS.sand}`;
-            bg = `${COLORS.sand}22`;
-            label = "CI";
-            labelColor = COLORS.sand;
-          } else if (c.status === "partial") {
-            border = `1px dashed ${COLORS.sand}`;
-            label = String(c.strokes);
-            labelColor = COLORS.sand;
-          }
-          if (c.current) border = `2px solid ${COLORS.fairwayLight}`;
-          return (
-            <button
-              key={c.hole}
-              onClick={() => onTapHole(c.hole)}
-              style={{
-                position: "relative",
-                height: 48,
-                padding: 0,
-                borderRadius: 8,
-                border,
-                background: bg,
-                cursor: "pointer",
-              }}
-            >
-              <span
-                style={{
-                  position: "absolute",
-                  top: 3,
-                  left: 5,
-                  fontFamily: "'JetBrains Mono', monospace",
-                  fontSize: 9,
-                  color: COLORS.creamDim,
-                }}
-              >
-                {c.hole}
-              </span>
-              <span style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 20, color: labelColor, lineHeight: "54px" }}>
-                {label}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-      <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: COLORS.creamDim, marginTop: 8, lineHeight: 1.5 }}>
-        Tap any hole to check or fix it. Number = putts taken · CI = chipped in · dashed = not logged.
-      </div>
-    </div>
-  );
-}
-
-// Add / correct one on-course hole. Used live (On Course screen) and on saved rounds. Only the
-// FIRST putt's distance and the distance the ball was HOLED from are ever stored/used, so those
-// are the only two distances asked for. `holeChoices` ({ options, defaultHole }) turns the header
-// into a hole-number picker (for "Add missing hole"). onSave/onRemove may be async; returning
-// false shows an error and keeps the modal open.
-// initial = { noPutt, strokes, firstFt, lastFt }
-function CourseHoleEditModal({ holeNumber, initial, units, holeChoices, note, onSave, onRemove, removeLabel, onCancel }) {
-  const unitLabel = shortUnitLabel(units);
-  const init = initial || { noPutt: false, strokes: 1, firstFt: null, lastFt: null };
-  const [hole, setHole] = useState(holeChoices ? holeChoices.defaultHole : holeNumber);
-  const [chip, setChip] = useState(!!init.noPutt);
-  const [strokes, setStrokes] = useState(Math.min(Math.max(init.strokes || 1, 1), 6));
-  const [firstInput, setFirstInput] = useState(init.firstFt != null ? String(fmt1(ftToUnit(init.firstFt, units))) : "");
-  const [lastInput, setLastInput] = useState(init.lastFt != null ? String(fmt1(ftToUnit(init.lastFt, units))) : "");
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
-
-  const labelStyle = { fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginBottom: 6 };
-  const inputStyle = {
-    width: "100%",
-    background: COLORS.turfDark,
-    border: `1px solid ${COLORS.creamDim}33`,
-    borderRadius: 8,
-    color: COLORS.cream,
-    fontFamily: "'Bebas Neue', sans-serif",
-    fontSize: 20,
-    padding: "8px 12px",
-    boxSizing: "border-box",
-  };
-
-  async function handleSave() {
-    setError("");
-    let result;
-    if (chip) {
-      result = { hole, noPutt: true };
-    } else {
-      const first = parseFloat(firstInput);
-      const last = strokes > 1 ? parseFloat(lastInput) : first;
-      if (isNaN(first) || first < 0 || isNaN(last) || last < 0) {
-        setError(strokes > 1 ? "Enter the first putt's distance and the distance of the putt that went in." : "Enter the putt distance.");
-        return;
-      }
-      const firstFt = unitToFt(first, units);
-      const lastFt = unitToFt(last, units);
-      const distancesFt = [firstFt];
-      for (let i = 1; i < strokes; i++) distancesFt.push(lastFt);
-      result = { hole, noPutt: false, distancesFt };
-    }
-    setBusy(true);
-    const ok = await onSave(result);
-    setBusy(false);
-    if (ok === false) setError("Couldn't save that — a round needs at least one putted hole, and holes can't go past 18.");
-  }
-
-  async function handleRemove() {
-    setError("");
-    setBusy(true);
-    const ok = await onRemove(hole);
-    setBusy(false);
-    if (ok === false) setError("Couldn't remove that — a round needs at least one putted hole.");
-  }
-
-  return (
-    <div
-      onClick={onCancel}
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(10,22,15,0.75)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: 24,
-        zIndex: 60,
-      }}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          background: COLORS.turf,
-          border: `1px solid ${COLORS.creamDim}33`,
-          borderRadius: 14,
-          padding: 20,
-          maxWidth: 360,
-          width: "100%",
-          maxHeight: "85vh",
-          overflowY: "auto",
-        }}
-      >
-        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 20, letterSpacing: 1, color: COLORS.cream }}>
-          {holeChoices ? "ADD MISSING HOLE" : `HOLE ${holeNumber}`}
-        </div>
-
-        {note && (
-          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.sand, marginTop: 6, lineHeight: 1.5 }}>{note}</div>
-        )}
-
-        {holeChoices && (
-          <div style={{ marginTop: 14 }}>
-            <div style={labelStyle}>WHICH HOLE?</div>
-            <select
-              value={hole}
-              onChange={(e) => setHole(parseInt(e.target.value, 10))}
-              style={{ ...inputStyle, appearance: "auto" }}
-            >
-              {holeChoices.options.map((n) => (
-                <option key={n} value={n}>
-                  Hole {n}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
-
-        <div style={{ marginTop: 14 }}>
-          <div style={labelStyle}>PUTTS TAKEN</div>
-          <div style={{ display: "flex", gap: 6 }}>
-            {[1, 2, 3, 4, 5, 6].map((n) => (
-              <button
-                key={n}
-                onClick={() => {
-                  setChip(false);
-                  setStrokes(n);
-                }}
-                style={{
-                  flex: 1,
-                  padding: "10px 0",
-                  borderRadius: 8,
-                  border: !chip && strokes === n ? `2px solid ${COLORS.fairwayLight}` : `1px solid ${COLORS.creamDim}33`,
-                  background: !chip && strokes === n ? COLORS.fairway : "transparent",
-                  color: COLORS.cream,
-                  fontFamily: "'Bebas Neue', sans-serif",
-                  fontSize: 16,
-                  cursor: "pointer",
-                }}
-              >
-                {n}
-              </button>
-            ))}
-          </div>
-          <button
-            onClick={() => setChip(!chip)}
-            style={{
-              width: "100%",
-              marginTop: 6,
-              padding: "9px 0",
-              borderRadius: 8,
-              border: chip ? `2px solid ${COLORS.sand}` : `1px solid ${COLORS.creamDim}33`,
-              background: chip ? `${COLORS.sand}22` : "transparent",
-              color: chip ? COLORS.sand : COLORS.creamDim,
-              fontFamily: "'JetBrains Mono', monospace",
-              fontSize: 11,
-              cursor: "pointer",
-            }}
-          >
-            CHIPPED IN — NO PUTT TAKEN
-          </button>
-        </div>
-
-        {!chip && (
-          <>
-            <div style={{ marginTop: 14 }}>
-              <div style={labelStyle}>
-                {strokes > 1 ? "FIRST PUTT DISTANCE" : "PUTT DISTANCE"} ({unitLabel.toUpperCase()})
-              </div>
-              <input
-                type="number"
-                inputMode="decimal"
-                value={firstInput}
-                onChange={(e) => setFirstInput(e.target.value)}
-                placeholder="0"
-                style={inputStyle}
-              />
-            </div>
-            {strokes > 1 && (
-              <div style={{ marginTop: 14 }}>
-                <div style={labelStyle}>DISTANCE OF THE PUTT THAT WENT IN ({unitLabel.toUpperCase()})</div>
-                <input
-                  type="number"
-                  inputMode="decimal"
-                  value={lastInput}
-                  onChange={(e) => setLastInput(e.target.value)}
-                  placeholder="0"
-                  style={inputStyle}
-                />
-              </div>
-            )}
-          </>
-        )}
-
-        {error && (
-          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.flag, marginTop: 12 }}>{error}</div>
-        )}
-
-        <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
-          <button
-            onClick={onCancel}
-            style={{
-              flex: 1,
-              padding: "11px 0",
-              borderRadius: 10,
-              border: `1px solid ${COLORS.creamDim}33`,
-              background: "transparent",
-              color: COLORS.creamDim,
-              fontFamily: "'Bebas Neue', sans-serif",
-              fontSize: 15,
-              cursor: "pointer",
-            }}
-          >
-            CANCEL
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={busy}
-            style={{
-              flex: 1,
-              padding: "11px 0",
-              borderRadius: 10,
-              border: "none",
-              background: COLORS.fairway,
-              color: COLORS.cream,
-              fontFamily: "'Bebas Neue', sans-serif",
-              fontSize: 15,
-              cursor: busy ? "not-allowed" : "pointer",
-              opacity: busy ? 0.6 : 1,
-            }}
-          >
-            SAVE
-          </button>
-        </div>
-        {onRemove && (
-          <div
-            onClick={busy ? undefined : handleRemove}
-            style={{
-              textAlign: "center",
-              marginTop: 12,
-              fontFamily: "'JetBrains Mono', monospace",
-              fontSize: 10,
-              color: COLORS.flag,
-              cursor: "pointer",
-              textDecoration: "underline",
-              textUnderlineOffset: 3,
-            }}
-          >
-            {removeLabel || "REMOVE HOLE"}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// Hole-numbered detail table for a SAVED on-course round (rows = holes that were logged).
-function CourseHoleTable({ view, units, onTapHole }) {
-  const unitLabel = shortUnitLabel(units);
-  const rows = view.holes.filter((c) => c.status !== "empty");
-  return (
-    <div
-      style={{
-        border: `1px solid ${COLORS.creamDim}22`,
-        borderRadius: 10,
-        overflow: "hidden",
-        fontFamily: "'JetBrains Mono', monospace",
-        fontSize: 12,
-      }}
-    >
-      <div style={{ display: "flex", padding: "8px 12px", background: `${COLORS.turf}aa`, color: COLORS.creamDim }}>
-        <div style={{ width: 40 }}>HOLE</div>
-        <div style={{ flex: 1 }}>DIST</div>
-        <div style={{ width: 55, textAlign: "right" }}>PUTTS</div>
-        <div style={{ width: 55, textAlign: "right" }}>SG</div>
-      </div>
-      {rows.map((c, i) => {
-        const rowStyle = {
-          display: "flex",
-          padding: "7px 12px",
-          borderTop: i > 0 ? `1px solid ${COLORS.creamDim}11` : "none",
-          cursor: "pointer",
-        };
-        if (c.status === "chip") {
-          return (
-            <div key={c.hole} onClick={() => onTapHole(c.hole)} style={{ ...rowStyle, color: COLORS.creamDim }}>
-              <div style={{ width: 40 }}>{c.hole}</div>
-              <div style={{ flex: 1, fontStyle: "italic" }}>Chipped in</div>
-              <div style={{ width: 55, textAlign: "right" }}>—</div>
-              <div style={{ width: 55, textAlign: "right" }}>—</div>
-            </div>
-          );
-        }
-        const sg = sgForPutt(c.entry.targetFt, c.entry.strokes);
-        return (
-          <div key={c.hole} onClick={() => onTapHole(c.hole)} style={{ ...rowStyle, color: COLORS.cream }}>
-            <div style={{ width: 40, color: COLORS.creamDim }}>{c.hole}</div>
-            <div style={{ flex: 1 }}>
-              {fmt1(ftToUnit(c.entry.targetFt, units))}
-              {unitLabel}
-            </div>
-            <div style={{ width: 55, textAlign: "right", color: ragColor(ragStatusForPutts(c.entry.strokes)) }}>{c.entry.strokes}</div>
-            <div style={{ width: 55, textAlign: "right", color: sgRagColor(sg) }}>{formatSG(sg)}</div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
 function PuttLog({ putts, units, onEditShot }) {
   const unitLabel = shortUnitLabel(units);
   return (
@@ -19396,7 +18480,7 @@ function PuttLog({ putts, units, onEditShot }) {
         border: `1px solid ${COLORS.creamDim}22`,
         borderRadius: 10,
         overflow: "hidden",
-        fontFamily: "'JetBrains Mono', monospace",
+        fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
         fontSize: 12,
       }}
     >
@@ -19469,13 +18553,13 @@ function PuttingPracticeScreen({
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 5 }}>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim }}>
           PUTT {puttNum} OF {puttCount}
         </div>
         <div
           onClick={onExit}
           style={{
-            fontFamily: "'JetBrains Mono', monospace",
+            fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
             fontSize: 10,
             color: COLORS.creamDim,
             cursor: "pointer",
@@ -19489,10 +18573,10 @@ function PuttingPracticeScreen({
 
       <Card>
         <div style={{ textAlign: "center" }}>
-          <div style={{ fontSize: 12, color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", letterSpacing: 2 }}>
+          <div style={{ fontSize: 12, color: COLORS.creamDim, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", letterSpacing: 2 }}>
             DISTANCE
           </div>
-          <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 56, lineHeight: 1, color: COLORS.flag }}>
+          <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 56, lineHeight: 1, color: COLORS.flag }}>
             {ftToUnitRound(currentTarget, units)}
             <span style={{ fontSize: 20, marginLeft: 6, color: COLORS.creamDim }}>{unitLabel}</span>
           </div>
@@ -19508,7 +18592,7 @@ function PuttingPracticeScreen({
 
         {includeBreak && (
           <div style={{ marginTop: 14 }}>
-            <div style={{ fontSize: 10, color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", marginBottom: 6 }}>
+            <div style={{ fontSize: 10, color: COLORS.creamDim, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", marginBottom: 6 }}>
               BREAK
             </div>
             <div style={{ display: "flex", gap: 6 }}>
@@ -19523,7 +18607,7 @@ function PuttingPracticeScreen({
                     border: currentBreak === o.key ? `2px solid ${COLORS.fairwayLight}` : `1px solid ${COLORS.creamDim}33`,
                     background: currentBreak === o.key ? COLORS.fairway : "transparent",
                     color: currentBreak === o.key ? COLORS.cream : COLORS.creamDim,
-                    fontFamily: "'Bebas Neue', sans-serif",
+                    fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                     fontSize: 12,
                     letterSpacing: 0.3,
                     cursor: "pointer",
@@ -19537,7 +18621,7 @@ function PuttingPracticeScreen({
         )}
 
         <div style={{ marginTop: 14 }}>
-          <div style={{ fontSize: 10, color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", marginBottom: 6 }}>
+          <div style={{ fontSize: 10, color: COLORS.creamDim, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", marginBottom: 6 }}>
             PUTTS TAKEN
           </div>
           <div style={{ display: "flex", gap: 8 }}>
@@ -19553,7 +18637,7 @@ function PuttingPracticeScreen({
                   border: `2px solid ${canSubmitPutt ? ragColor(ragStatusForPutts(n)) : COLORS.creamDim + "33"}`,
                   background: "transparent",
                   color: canSubmitPutt ? COLORS.cream : COLORS.creamDim,
-                  fontFamily: "'Bebas Neue', sans-serif",
+                  fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                   fontSize: 24,
                   cursor: canSubmitPutt ? "pointer" : "not-allowed",
                   opacity: canSubmitPutt ? 1 : 0.6,
@@ -19564,7 +18648,7 @@ function PuttingPracticeScreen({
             ))}
           </div>
           {includeBreak && !canSubmitPutt && (
-            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginTop: 6 }}>
+            <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.creamDim, marginTop: 6 }}>
               Pick a break direction above first.
             </div>
           )}
@@ -19636,12 +18720,12 @@ function PuttShotEditModal({ shot, units, onSave, onCancel }) {
           width: "100%",
         }}
       >
-        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 20, letterSpacing: 1, color: COLORS.cream }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 20, letterSpacing: 1, color: COLORS.cream }}>
           EDIT PUTT
         </div>
 
         <div style={{ marginTop: 14 }}>
-          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginBottom: 6 }}>
+          <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.creamDim, marginBottom: 6 }}>
             DISTANCE ({unitLabel.toUpperCase()})
           </div>
           <input
@@ -19655,7 +18739,7 @@ function PuttShotEditModal({ shot, units, onSave, onCancel }) {
               border: `1px solid ${COLORS.creamDim}33`,
               borderRadius: 8,
               color: COLORS.cream,
-              fontFamily: "'Bebas Neue', sans-serif",
+              fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
               fontSize: 20,
               padding: "8px 12px",
               boxSizing: "border-box",
@@ -19664,7 +18748,7 @@ function PuttShotEditModal({ shot, units, onSave, onCancel }) {
         </div>
 
         <div style={{ marginTop: 14 }}>
-          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginBottom: 6 }}>
+          <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.creamDim, marginBottom: 6 }}>
             PUTTS TAKEN
           </div>
           <div style={{ display: "flex", gap: 6 }}>
@@ -19679,7 +18763,7 @@ function PuttShotEditModal({ shot, units, onSave, onCancel }) {
                   border: strokes === n ? `2px solid ${COLORS.fairwayLight}` : `1px solid ${COLORS.creamDim}33`,
                   background: strokes === n ? COLORS.fairway : "transparent",
                   color: COLORS.cream,
-                  fontFamily: "'Bebas Neue', sans-serif",
+                  fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                   fontSize: 16,
                   cursor: "pointer",
                 }}
@@ -19692,7 +18776,7 @@ function PuttShotEditModal({ shot, units, onSave, onCancel }) {
 
         {hasBreak && (
           <div style={{ marginTop: 14 }}>
-            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginBottom: 6 }}>
+            <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.creamDim, marginBottom: 6 }}>
               BREAK
             </div>
             <div style={{ display: "flex", gap: 6 }}>
@@ -19707,7 +18791,7 @@ function PuttShotEditModal({ shot, units, onSave, onCancel }) {
                     border: breakVal === o.key ? `2px solid ${COLORS.fairwayLight}` : `1px solid ${COLORS.creamDim}33`,
                     background: breakVal === o.key ? COLORS.fairway : "transparent",
                     color: breakVal === o.key ? COLORS.cream : COLORS.creamDim,
-                    fontFamily: "'Bebas Neue', sans-serif",
+                    fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                     fontSize: 11,
                     letterSpacing: 0.3,
                     cursor: "pointer",
@@ -19730,7 +18814,7 @@ function PuttShotEditModal({ shot, units, onSave, onCancel }) {
               border: `1px solid ${COLORS.creamDim}33`,
               background: "transparent",
               color: COLORS.creamDim,
-              fontFamily: "'Bebas Neue', sans-serif",
+              fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
               fontSize: 15,
               cursor: "pointer",
             }}
@@ -19746,7 +18830,7 @@ function PuttShotEditModal({ shot, units, onSave, onCancel }) {
               border: "none",
               background: COLORS.fairway,
               color: COLORS.cream,
-              fontFamily: "'Bebas Neue', sans-serif",
+              fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
               fontSize: 15,
               cursor: "pointer",
             }}
@@ -19797,10 +18881,10 @@ function PuttingSessionDetailModal({ session, units, onEditShot, onClose }) {
           overflowY: "auto",
         }}
       >
-        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 20, letterSpacing: 1, color: COLORS.cream }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 20, letterSpacing: 1, color: COLORS.cream }}>
           SESSION DETAIL
         </div>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 4 }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, marginTop: 4 }}>
           {new Date(session.date).toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" })}
           {"  ·  "}
           {session.puttCount} putts · {session.puttMinFt}-{session.puttMaxFt}ft
@@ -19828,7 +18912,7 @@ function PuttingSessionDetailModal({ session, units, onEditShot, onClose }) {
             border: `1px solid ${COLORS.creamDim}33`,
             background: "transparent",
             color: COLORS.creamDim,
-            fontFamily: "'Bebas Neue', sans-serif",
+            fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
             fontSize: 15,
             cursor: "pointer",
           }}
@@ -19851,15 +18935,10 @@ function PuttingSessionDetailModal({ session, units, onEditShot, onClose }) {
   );
 }
 
-function PuttingSummaryScreen({ putts, onNewSession, storageError, units, feedback, isOnCourse, chipIns, history }) {
-  const bestLabels = history && history[0] ? puttingBestLabels(history[0], history, units) : [];
-  const totalPutts = putts.reduce((a, p) => a + p.strokes, 0);
+function PuttingSummaryScreen({ putts, onNewSession, storageError, units, feedback, isOnCourse, chipIns }) {
   const avgStrokes = avg(putts.map((p) => p.strokes));
+  const avgSG = avg(putts.map((p) => sgForPutt(p.targetFt, p.strokes)));
   const totalSG = putts.reduce((a, p) => a + sgForPutt(p.targetFt, p.strokes), 0);
-  // On-course, `putts` has one entry PER HOLE, so SG *per putt* is total SG over total putts (same as
-  // courseRoundStats and the Analysis tab) — not an average over holes. Practice entries are single
-  // putt attempts, so the plain average is right there.
-  const avgSG = isOnCourse ? (totalPutts ? totalSG / totalPutts : 0) : avg(putts.map((p) => sgForPutt(p.targetFt, p.strokes)));
   const onePutts = putts.filter((p) => p.strokes <= 1).length;
   const onePuttPct = (onePutts / putts.length) * 100;
   const threePutts = putts.filter((p) => p.strokes >= 3).length;
@@ -19870,19 +18949,14 @@ function PuttingSummaryScreen({ putts, onNewSession, storageError, units, feedba
   const distMin = Math.min(...putts.map((p) => p.targetFt));
   const distMax = Math.max(...putts.map((p) => p.targetFt));
   const unitLabel = shortUnitLabel(units);
-  // For an on-course round, putts.length is holes putted, not putts — the real putt count is
-  // totalPutts (above). For practice sessions each entry is a single putt attempt, so the entry
-  // count is what's always been shown.
-  const puttsDisplayed = isOnCourse ? totalPutts : putts.length;
 
   return (
     <div>
       <SessionFeedbackBanner feedback={feedback} />
       <Card>
         <div style={{ textAlign: "center", marginBottom: 4 }}>
-          <div style={{ fontSize: 11, color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", letterSpacing: 2 }}>
-            {isOnCourse ? "ROUND COMPLETE" : "SESSION COMPLETE"} — {puttsDisplayed} PUTTS
-            {isOnCourse ? ` · ${putts.length} HOLES` : ""} · {ftToUnitRound(distMin, units)}-{ftToUnitRound(distMax, units)}
+          <div style={{ fontSize: 11, color: COLORS.creamDim, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", letterSpacing: 2 }}>
+            {isOnCourse ? "ROUND COMPLETE" : "SESSION COMPLETE"} — {putts.length} PUTTS · {ftToUnitRound(distMin, units)}-{ftToUnitRound(distMax, units)}
             {unitLabel.toUpperCase()}
           </div>
         </div>
@@ -19894,7 +18968,7 @@ function PuttingSummaryScreen({ putts, onNewSession, storageError, units, feedba
           <>
             <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
               <StatBox label="AVG PUTTS" value={avgStrokes.toFixed(2)} />
-              <StatBox label="TOTAL PUTTS" value={totalPutts} />
+              <StatBox label="TOTAL PUTTS" value={putts.reduce((a, p) => a + p.strokes, 0)} />
             </div>
             <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
               <StatBox label="1-PUTTS" value={`${onePutts} (${onePuttPct.toFixed(0)}%)`} valueColor={COLORS.fairwayLight} />
@@ -19904,7 +18978,7 @@ function PuttingSummaryScreen({ putts, onNewSession, storageError, units, feedba
               <StatBox label="FT MADE" value={`${fmt1(ftToUnit(ftMade, units))}${unitLabel}`} valueColor={COLORS.sand} />
             </div>
             {chipIns > 0 && (
-              <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginTop: 8 }}>
+              <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.creamDim, marginTop: 8 }}>
                 + {chipIns} hole{chipIns === 1 ? "" : "s"} chipped in, no putt taken
               </div>
             )}
@@ -19931,21 +19005,20 @@ function PuttingSummaryScreen({ putts, onNewSession, storageError, units, feedba
       </div>
 
       {storageError && (
-        <div style={{ color: COLORS.flag, fontSize: 11, marginTop: 8, fontFamily: "'JetBrains Mono', monospace" }}>
+        <div style={{ color: COLORS.flag, fontSize: 11, marginTop: 8, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" }}>
           Couldn't save this session to history — it's still shown above.
         </div>
       )}
 
       <ShareResultButton
         badge="PUTTING SESSION"
-        bestLabels={bestLabels}
-        hero={shareFtHero(ftToUnit(ftMade, units))}
-        heroLabel={`${unitLabel.toUpperCase()} MADE`}
-        heroGood
+        hero={`${onePuttPct.toFixed(0)}%`}
+        heroLabel="ONE-PUTT PERCENTAGE"
+        heroGood={onePuttPct >= 50}
         stats={
           isOnCourse
             ? [
-                ["PUTTS", String(totalPutts)],
+                ["PUTTS", String(putts.length)],
                 ["AVG SG/PUTT", formatSG(avgSG)],
                 ["3+ PUTTS", String(threePutts)],
               ]
@@ -19956,9 +19029,9 @@ function PuttingSummaryScreen({ putts, onNewSession, storageError, units, feedba
               ]
         }
         caption={
-          avgSG >= 0
-            ? `Holed ${shareFtHero(ftToUnit(ftMade, units))}${unitLabel} of putts today ${isOnCourse ? "out on the course" : "on the practice green"}. Putting is starting to click. @The_golfpracticeapp`
-            : `Holed ${shareFtHero(ftToUnit(ftMade, units))}${unitLabel} of putts today ${isOnCourse ? "out on the course" : "on the practice green"}. Logging every round — the reps are what count. @The_golfpracticeapp`
+          onePuttPct >= 50
+            ? `${onePuttPct.toFixed(0)}% one-putts today on the practice green. Putting is finally starting to click. @The_golfpracticeapp`
+            : `Rough day on the greens today. Logging it anyway — the only way through is more reps. @The_golfpracticeapp`
         }
         hashtags={["#golf", "#putting", "#golfpractice", "#strokesgained", "#golftips", "#ThePracticeApp"]}
       />
@@ -19973,7 +19046,7 @@ function PuttingSummaryScreen({ putts, onNewSession, storageError, units, feedba
           border: "none",
           background: COLORS.flag,
           color: COLORS.cream,
-          fontFamily: "'Bebas Neue', sans-serif",
+          fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
           fontSize: 20,
           letterSpacing: 2,
           cursor: "pointer",
@@ -20000,7 +19073,7 @@ function CollapsibleSection({ title, count, children }) {
           onClick={() => setExpanded(!expanded)}
           className="no-print"
           style={{
-            fontFamily: "'JetBrains Mono', monospace",
+            fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
             fontSize: 11,
             color: COLORS.sand,
             cursor: "pointer",
@@ -20032,7 +19105,7 @@ function SendReportButton({ onClick }) {
         border: `1px solid ${COLORS.sand}66`,
         background: "transparent",
         color: COLORS.sand,
-        fontFamily: "'Bebas Neue', sans-serif",
+        fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
         fontSize: 18,
         letterSpacing: 1.5,
         cursor: "pointer",
@@ -20047,8 +19120,8 @@ function PrintHeader({ title, timescale }) {
   const scaleLabel = TIMESCALES.find((t) => t.key === timescale)?.label || "ALL";
   return (
     <div className="print-only" style={{ marginBottom: 16 }}>
-      <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 24 }}>THE PRACTICE APP</div>
-      <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, marginTop: 2 }}>
+      <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 24 }}>THE PRACTICE APP</div>
+      <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 12, marginTop: 2 }}>
         {title} — {new Date().toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" })} — Period: {scaleLabel}
       </div>
     </div>
@@ -20095,7 +19168,7 @@ function DeleteConfirmBar({ onConfirm, onCancel, style }) {
         ...style,
       }}
     >
-      <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: COLORS.cream }}>Delete this session?</div>
+      <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 12, color: COLORS.cream }}>Delete this session?</div>
       <div style={{ display: "flex", gap: 8 }}>
         <button
           onClick={onConfirm}
@@ -20105,7 +19178,7 @@ function DeleteConfirmBar({ onConfirm, onCancel, style }) {
             border: "none",
             background: COLORS.flag,
             color: COLORS.cream,
-            fontFamily: "'JetBrains Mono', monospace",
+            fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
             fontSize: 11,
             cursor: "pointer",
           }}
@@ -20120,7 +19193,7 @@ function DeleteConfirmBar({ onConfirm, onCancel, style }) {
             border: `1px solid ${COLORS.creamDim}33`,
             background: "transparent",
             color: COLORS.creamDim,
-            fontFamily: "'JetBrains Mono', monospace",
+            fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
             fontSize: 11,
             cursor: "pointer",
           }}
@@ -20180,7 +19253,7 @@ function SwipeToDelete({ onDelete, children, style }) {
           justifyContent: "center",
           cursor: "pointer",
           color: COLORS.creamDim,
-          fontFamily: "'JetBrains Mono', monospace",
+          fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
           fontSize: 14,
           lineHeight: 1,
         }}
@@ -20266,19 +19339,19 @@ function PuttBucketRow({ bucket }) {
   return (
     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0" }}>
       <div>
-        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 20, color: COLORS.cream }}>{bucket.label}ft</div>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 20, color: COLORS.cream }}>{bucket.label}ft</div>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim }}>
           {bucket.count} putts · {bucket.avgStrokes.toFixed(2)} avg
         </div>
       </div>
       <div style={{ textAlign: "right" }}>
-        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 22, color: sgRagColor(bucket.avgSG) }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 22, color: sgRagColor(bucket.avgSG) }}>
           {formatSG(bucket.avgSG)}
         </div>
         {bucket.improvement !== null && bucket.improvement !== undefined && (
           <div
             style={{
-              fontFamily: "'JetBrains Mono', monospace",
+              fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
               fontSize: 11,
               color: bucket.improvement > 0 ? COLORS.fairwayLight : COLORS.flag,
             }}
@@ -20296,13 +19369,13 @@ function PuttInsightCard({ title, subtitle, items, emptyText }) {
     <Card style={{ marginBottom: 14 }}>
       <SectionLabel>{title}</SectionLabel>
       {subtitle && (
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
           {subtitle}
         </div>
       )}
       <div style={{ marginTop: 8 }}>
         {items.length === 0 ? (
-          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: COLORS.creamDim, padding: "6px 0" }}>
+          <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 12, color: COLORS.creamDim, padding: "6px 0" }}>
             {emptyText}
           </div>
         ) : (
@@ -20324,13 +19397,13 @@ function PuttBreakBucketRow({ bucket }) {
   return (
     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0" }}>
       <div>
-        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 20, color: COLORS.cream }}>{bucket.label}</div>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 20, color: COLORS.cream }}>{bucket.label}</div>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim }}>
           {bucket.count} putts · {bucket.avgStrokes.toFixed(2)} avg
         </div>
       </div>
       <div style={{ textAlign: "right" }}>
-        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 22, color: sgRagColor(bucket.avgSG) }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 22, color: sgRagColor(bucket.avgSG) }}>
           {formatSG(bucket.avgSG)}
         </div>
       </div>
@@ -20343,13 +19416,13 @@ function PuttBreakInsightCard({ title, subtitle, items, emptyText }) {
     <Card style={{ marginBottom: 14 }}>
       <SectionLabel>{title}</SectionLabel>
       {subtitle && (
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
           {subtitle}
         </div>
       )}
       <div style={{ marginTop: 8 }}>
         {items.length === 0 ? (
-          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: COLORS.creamDim, padding: "6px 0" }}>
+          <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 12, color: COLORS.creamDim, padding: "6px 0" }}>
             {emptyText}
           </div>
         ) : (
@@ -20378,7 +19451,7 @@ function FeetPicker({ min, max, onMin, onMax, onPreset, activePresetLabel }) {
               border: activePresetLabel === p.label ? `1px solid ${COLORS.fairwayLight}` : `1px solid ${COLORS.creamDim}33`,
               background: activePresetLabel === p.label ? COLORS.fairway : "transparent",
               color: activePresetLabel === p.label ? COLORS.cream : COLORS.creamDim,
-              fontFamily: "'JetBrains Mono', monospace",
+              fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
               fontSize: 11,
               cursor: "pointer",
             }}
@@ -20389,7 +19462,7 @@ function FeetPicker({ min, max, onMin, onMax, onPreset, activePresetLabel }) {
       </div>
       <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
         <NumberField label="MIN FT" value={min} onChange={onMin} />
-        <div style={{ color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", paddingTop: 14 }}>—</div>
+        <div style={{ color: COLORS.creamDim, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", paddingTop: 14 }}>—</div>
         <NumberField label="MAX FT" value={max} onChange={onMax} />
       </div>
     </div>
@@ -20451,14 +19524,14 @@ function PuttingOverviewAnalysisBody({
   const [timescale, setTimescale] = useState("all");
 
   if (!allLoaded) {
-    return <div style={{ color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace" }}>Loading putting data…</div>;
+    return <div style={{ color: COLORS.creamDim, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" }}>Loading putting data…</div>;
   }
 
   const everLogged =
     practiceHistory.length + clockHistory.length + startLineHistory.length + paceHistory.length + courseHistory.length;
   if (everLogged === 0) {
     return (
-      <div style={{ color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", fontSize: 13, marginTop: 10 }}>
+      <div style={{ color: COLORS.creamDim, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 13, marginTop: 10 }}>
         No putting sessions logged yet across any drill. Play one to see your combined summary here.
       </div>
     );
@@ -20594,7 +19667,7 @@ function PuttingOverviewAnalysisBody({
 
       <Card style={{ marginBottom: 14, marginTop: 12 }}>
         <SectionLabel>Overview</SectionLabel>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginTop: 2 }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.creamDim, marginTop: 2 }}>
           Every putting drill, combined
         </div>
         <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
@@ -20608,12 +19681,12 @@ function PuttingOverviewAnalysisBody({
             valueColor={blendedAvgSG !== null ? sgRagColor(blendedAvgSG) : COLORS.cream}
           />
         </div>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginTop: 8, lineHeight: 1.5 }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.creamDim, marginTop: 8, lineHeight: 1.5 }}>
           Blended across Random Practice, Around the Clock &amp; On Course — the three drills that
           score in strokes gained. Start Line and Pace Control use their own scoring, shown below.
         </div>
         {combinedSessionSG.length >= 4 && (
-          <div style={{ marginTop: 10, fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}>
+          <div style={{ marginTop: 10, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 12 }}>
             {Math.abs(blendedTrendDelta) < 0.03 ? (
               <span style={{ color: COLORS.creamDim }}>◆ Steady across this period</span>
             ) : blendedTrendDelta > 0 ? (
@@ -20647,7 +19720,7 @@ function PuttingOverviewAnalysisBody({
             </div>
           )}
           {neverTried.length > 0 && (
-            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 8 }}>
+            <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, marginTop: 8 }}>
               Haven't tried yet: {neverTried.map((r) => r.label).join(", ")}
             </div>
           )}
@@ -20680,14 +19753,14 @@ function PuttingOverviewAnalysisBody({
                 }}
               />
               <div>
-                <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 18, color: COLORS.cream }}>{r.label}</div>
-                <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim }}>
+                <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 18, color: COLORS.cream }}>{r.label}</div>
+                <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim }}>
                   {r.sub} · {puttingRecencyLabel(r.lastPlayed)}
                 </div>
               </div>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 22, color: r.color }}>{r.value}</div>
+              <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 22, color: r.color }}>{r.value}</div>
               <div style={{ color: COLORS.creamDim, fontSize: 14 }}>›</div>
             </div>
           </div>
@@ -20702,7 +19775,6 @@ function PuttingAnalysisHub({
   loaded,
   onDeleteSession,
   onEditSessionShot,
-  onEditCourseHole,
   clockHistory,
   clockLoaded,
   onDeleteClockSession,
@@ -20739,7 +19811,7 @@ function PuttingAnalysisHub({
               border: subTab === t.key ? `1px solid ${COLORS.fairwayLight}` : `1px solid ${COLORS.creamDim}33`,
               background: subTab === t.key ? COLORS.fairway : "transparent",
               color: subTab === t.key ? COLORS.cream : COLORS.creamDim,
-              fontFamily: "'JetBrains Mono', monospace",
+              fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
               fontSize: 11,
               letterSpacing: 0.5,
               cursor: "pointer",
@@ -20802,7 +19874,7 @@ function PuttingAnalysisHub({
           history={courseHistory}
           loaded={loaded}
           onDeleteSession={onDeleteSession}
-          onEditCourseHole={onEditCourseHole}
+          onEditSessionShot={onEditSessionShot}
           units={units}
         />
       )}
@@ -20830,7 +19902,7 @@ function PuttingClockAnalysisBody({ history, loaded, onDeleteSession, onEditSess
   const selectedRound = selectedRoundId ? history.find((s) => s.id === selectedRoundId) : null;
 
   if (!loaded) {
-    return <div style={{ color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace" }}>Loading rounds…</div>;
+    return <div style={{ color: COLORS.creamDim, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" }}>Loading rounds…</div>;
   }
 
   const filtered = filterByTimescale(history, timescale);
@@ -20839,7 +19911,7 @@ function PuttingClockAnalysisBody({ history, loaded, onDeleteSession, onEditSess
     return (
       <div>
         <TimescalePicker value={timescale} onChange={setTimescale} />
-        <div style={{ color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", fontSize: 13, marginTop: 10 }}>
+        <div style={{ color: COLORS.creamDim, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 13, marginTop: 10 }}>
           No Around the Clock rounds in this window yet. Play a round to see it here.
         </div>
       </div>
@@ -20858,7 +19930,7 @@ function PuttingClockAnalysisBody({ history, loaded, onDeleteSession, onEditSess
 
       <Card style={{ marginBottom: 14, marginTop: 12 }}>
         <SectionLabel>Overview</SectionLabel>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginTop: 2 }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.creamDim, marginTop: 2 }}>
           One putt from every distance, 3-10ft
         </div>
         <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
@@ -20870,7 +19942,7 @@ function PuttingClockAnalysisBody({ history, loaded, onDeleteSession, onEditSess
           <StatBox label="AVG SG / PUTT" value={formatSG(avgSG)} valueColor={sgRagColor(avgSG)} />
         </div>
         {perfectRounds > 0 && (
-          <div style={{ marginTop: 10, fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: COLORS.fairwayLight }}>
+          <div style={{ marginTop: 10, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 12, color: COLORS.fairwayLight }}>
             ★ {perfectRounds} perfect round{perfectRounds === 1 ? "" : "s"} (8/8)
           </div>
         )}
@@ -20882,7 +19954,7 @@ function PuttingClockAnalysisBody({ history, loaded, onDeleteSession, onEditSess
             border: `1px solid ${COLORS.creamDim}22`,
             borderRadius: 10,
             overflow: "hidden",
-            fontFamily: "'JetBrains Mono', monospace",
+            fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
             fontSize: 12,
           }}
         >
@@ -21016,12 +20088,12 @@ function StartLineEditModal({ session, onSave, onCancel }) {
           width: "100%",
         }}
       >
-        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 20, letterSpacing: 1, color: COLORS.cream }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 20, letterSpacing: 1, color: COLORS.cream }}>
           EDIT SCORE
         </div>
 
         <div style={{ marginTop: 14 }}>
-          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginBottom: 6 }}>
+          <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.creamDim, marginBottom: 6 }}>
             PUTTS THROUGH THE GATE (OF 10)
           </div>
           <input
@@ -21036,7 +20108,7 @@ function StartLineEditModal({ session, onSave, onCancel }) {
               border: `1px solid ${COLORS.creamDim}33`,
               borderRadius: 8,
               color: COLORS.cream,
-              fontFamily: "'Bebas Neue', sans-serif",
+              fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
               fontSize: 24,
               padding: "8px 12px",
               boxSizing: "border-box",
@@ -21054,7 +20126,7 @@ function StartLineEditModal({ session, onSave, onCancel }) {
               border: `1px solid ${COLORS.creamDim}33`,
               background: "transparent",
               color: COLORS.creamDim,
-              fontFamily: "'Bebas Neue', sans-serif",
+              fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
               fontSize: 15,
               cursor: "pointer",
             }}
@@ -21071,7 +20143,7 @@ function StartLineEditModal({ session, onSave, onCancel }) {
               border: "none",
               background: valid ? COLORS.fairway : `${COLORS.fairway}66`,
               color: COLORS.cream,
-              fontFamily: "'Bebas Neue', sans-serif",
+              fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
               fontSize: 15,
               cursor: valid ? "pointer" : "not-allowed",
             }}
@@ -21152,7 +20224,7 @@ function PuttingStartLineAnalysisBody({ history, loaded, onDeleteSession, onEdit
   const editingSession = editingId ? history.find((s) => s.id === editingId) : null;
 
   if (!loaded) {
-    return <div style={{ color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace" }}>Loading rounds…</div>;
+    return <div style={{ color: COLORS.creamDim, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" }}>Loading rounds…</div>;
   }
 
   const filtered = filterByTimescale(history, timescale);
@@ -21161,7 +20233,7 @@ function PuttingStartLineAnalysisBody({ history, loaded, onDeleteSession, onEdit
     return (
       <div>
         <TimescalePicker value={timescale} onChange={setTimescale} />
-        <div style={{ color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", fontSize: 13, marginTop: 10 }}>
+        <div style={{ color: COLORS.creamDim, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 13, marginTop: 10 }}>
           No Start Line rounds in this window yet. Play the drill to see it here.
         </div>
       </div>
@@ -21184,7 +20256,7 @@ function PuttingStartLineAnalysisBody({ history, loaded, onDeleteSession, onEdit
 
       <Card style={{ marginBottom: 14, marginTop: 12 }}>
         <SectionLabel>Overview</SectionLabel>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginTop: 2 }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.creamDim, marginTop: 2 }}>
           10 putts through a gate
         </div>
         <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
@@ -21196,7 +20268,7 @@ function PuttingStartLineAnalysisBody({ history, loaded, onDeleteSession, onEdit
           <StatBox label="AVG %" value={`${Math.round((avgScore / 10) * 100)}%`} />
         </div>
         {perfectRounds > 0 && (
-          <div style={{ marginTop: 10, fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: COLORS.fairwayLight }}>
+          <div style={{ marginTop: 10, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 12, color: COLORS.fairwayLight }}>
             ★ {perfectRounds} perfect round{perfectRounds === 1 ? "" : "s"} (10/10)
           </div>
         )}
@@ -21211,13 +20283,13 @@ function PuttingStartLineAnalysisBody({ history, loaded, onDeleteSession, onEdit
                 <CartesianGrid vertical={false} stroke={`${COLORS.creamDim}22`} />
                 <XAxis
                   dataKey="dateLabel"
-                  tick={{ fill: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", fontSize: 9 }}
+                  tick={{ fill: COLORS.creamDim, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 9 }}
                   axisLine={{ stroke: `${COLORS.creamDim}33` }}
                   tickLine={false}
                 />
                 <YAxis
                   domain={[0, 10]}
-                  tick={{ fill: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", fontSize: 9 }}
+                  tick={{ fill: COLORS.creamDim, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 9 }}
                   axisLine={false}
                   tickLine={false}
                   width={26}
@@ -21227,7 +20299,7 @@ function PuttingStartLineAnalysisBody({ history, loaded, onDeleteSession, onEdit
                     background: COLORS.turfDark,
                     border: `1px solid ${COLORS.creamDim}33`,
                     borderRadius: 8,
-                    fontFamily: "'JetBrains Mono', monospace",
+                    fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                     fontSize: 11,
                   }}
                   labelStyle={{ color: COLORS.creamDim }}
@@ -21246,7 +20318,7 @@ function PuttingStartLineAnalysisBody({ history, loaded, onDeleteSession, onEdit
             border: `1px solid ${COLORS.creamDim}22`,
             borderRadius: 10,
             overflow: "hidden",
-            fontFamily: "'JetBrains Mono', monospace",
+            fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
             fontSize: 12,
           }}
         >
@@ -21315,16 +20387,16 @@ function PacePuttEditModal({ putt, units, onSave, onCancel }) {
           width: "100%",
         }}
       >
-        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 20, letterSpacing: 1, color: COLORS.cream }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 20, letterSpacing: 1, color: COLORS.cream }}>
           EDIT PUTT
         </div>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 4 }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, marginTop: 4 }}>
           From {ftToUnitRound(putt.targetFt, units)}
           {unitLabel}
         </div>
 
         <div style={{ marginTop: 14 }}>
-          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginBottom: 6 }}>
+          <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.creamDim, marginBottom: 6 }}>
             POINTS
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
@@ -21338,7 +20410,7 @@ function PacePuttEditModal({ putt, units, onSave, onCancel }) {
                   border: points === o.points ? `2px solid ${COLORS.fairwayLight}` : `1px solid ${COLORS.creamDim}33`,
                   background: points === o.points ? COLORS.fairway : "transparent",
                   color: COLORS.cream,
-                  fontFamily: "'Bebas Neue', sans-serif",
+                  fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                   fontSize: 14,
                   cursor: "pointer",
                 }}
@@ -21359,7 +20431,7 @@ function PacePuttEditModal({ putt, units, onSave, onCancel }) {
               border: `1px solid ${COLORS.creamDim}33`,
               background: "transparent",
               color: COLORS.creamDim,
-              fontFamily: "'Bebas Neue', sans-serif",
+              fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
               fontSize: 15,
               cursor: "pointer",
             }}
@@ -21375,7 +20447,7 @@ function PacePuttEditModal({ putt, units, onSave, onCancel }) {
               border: "none",
               background: COLORS.fairway,
               color: COLORS.cream,
-              fontFamily: "'Bebas Neue', sans-serif",
+              fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
               fontSize: 15,
               cursor: "pointer",
             }}
@@ -21491,10 +20563,10 @@ function PaceRoundDetailModal({ session, units, onEditPutt, onClose }) {
           overflowY: "auto",
         }}
       >
-        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 20, letterSpacing: 1, color: COLORS.cream }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 20, letterSpacing: 1, color: COLORS.cream }}>
           ROUND DETAIL
         </div>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 4 }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, marginTop: 4 }}>
           {new Date(session.date).toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" })}
           {"  ·  "}
           {session.distances.map((d) => `${d}ft`).join("/")} · {session.puttsPerDistance}/distance
@@ -21522,7 +20594,7 @@ function PaceRoundDetailModal({ session, units, onEditPutt, onClose }) {
             border: `1px solid ${COLORS.creamDim}33`,
             background: "transparent",
             color: COLORS.creamDim,
-            fontFamily: "'Bebas Neue', sans-serif",
+            fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
             fontSize: 15,
             cursor: "pointer",
           }}
@@ -21552,7 +20624,7 @@ function PuttingPaceAnalysisBody({ history, loaded, onDeleteSession, onEditPutt,
   const unitLabel = shortUnitLabel(units);
 
   if (!loaded) {
-    return <div style={{ color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace" }}>Loading rounds…</div>;
+    return <div style={{ color: COLORS.creamDim, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" }}>Loading rounds…</div>;
   }
 
   const filtered = filterByTimescale(history, timescale);
@@ -21561,7 +20633,7 @@ function PuttingPaceAnalysisBody({ history, loaded, onDeleteSession, onEditPutt,
     return (
       <div>
         <TimescalePicker value={timescale} onChange={setTimescale} />
-        <div style={{ color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", fontSize: 13, marginTop: 10 }}>
+        <div style={{ color: COLORS.creamDim, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 13, marginTop: 10 }}>
           No Pace Control rounds in this window yet. Play the drill to see it here.
         </div>
       </div>
@@ -21601,7 +20673,7 @@ function PuttingPaceAnalysisBody({ history, loaded, onDeleteSession, onEditPutt,
       {distanceBuckets.length > 0 && (
         <Card style={{ marginBottom: 14 }}>
           <SectionLabel>By distance</SectionLabel>
-          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginTop: 2 }}>
+          <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.creamDim, marginTop: 2 }}>
             Across every round in this window
           </div>
           <div style={{ marginTop: 8 }}>
@@ -21617,15 +20689,15 @@ function PuttingPaceAnalysisBody({ history, loaded, onDeleteSession, onEditPutt,
                 }}
               >
                 <div>
-                  <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 20, color: COLORS.cream }}>
+                  <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 20, color: COLORS.cream }}>
                     {ftToUnitRound(b.targetFt, units)}
                     {unitLabel}
                   </div>
-                  <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim }}>
+                  <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim }}>
                     {b.count} putts
                   </div>
                 </div>
-                <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 22, color: paceRagColor(b.pct) }}>
+                <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 22, color: paceRagColor(b.pct) }}>
                   {b.total}/{b.max}
                 </div>
               </div>
@@ -21640,7 +20712,7 @@ function PuttingPaceAnalysisBody({ history, loaded, onDeleteSession, onEditPutt,
             border: `1px solid ${COLORS.creamDim}22`,
             borderRadius: 10,
             overflow: "hidden",
-            fontFamily: "'JetBrains Mono', monospace",
+            fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
             fontSize: 12,
           }}
         >
@@ -21678,7 +20750,7 @@ function PuttingPaceAnalysisBody({ history, loaded, onDeleteSession, onEditPutt,
   );
 }
 
-function OnCourseAnalysisBody({ history, loaded, onDeleteSession, onEditCourseHole, units }) {
+function OnCourseAnalysisBody({ history, loaded, onDeleteSession, onEditSessionShot, units }) {
   const [timescale, setTimescale] = useState("all");
   const [printMode, triggerPrint] = usePrintMode();
   const [selectedRoundId, setSelectedRoundId] = useState(null);
@@ -21687,7 +20759,7 @@ function OnCourseAnalysisBody({ history, loaded, onDeleteSession, onEditCourseHo
   const selectedRound = selectedRoundId ? history.find((s) => s.id === selectedRoundId) : null;
 
   if (!loaded) {
-    return <div style={{ color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace" }}>Loading rounds…</div>;
+    return <div style={{ color: COLORS.creamDim, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" }}>Loading rounds…</div>;
   }
 
   const filtered = filterByTimescale(history, timescale);
@@ -21696,7 +20768,7 @@ function OnCourseAnalysisBody({ history, loaded, onDeleteSession, onEditCourseHo
     return (
       <div>
         <TimescalePicker value={timescale} onChange={setTimescale} />
-        <div style={{ color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", fontSize: 13, marginTop: 10 }}>
+        <div style={{ color: COLORS.creamDim, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 13, marginTop: 10 }}>
           No on-course rounds in this window yet. Track a round to see it here.
         </div>
       </div>
@@ -21718,7 +20790,7 @@ function OnCourseAnalysisBody({ history, loaded, onDeleteSession, onEditCourseHo
 
       <Card style={{ marginBottom: 14 }}>
         <SectionLabel>Overview</SectionLabel>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginTop: 2 }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.creamDim, marginTop: 2 }}>
           vs PGA Tour baseline
         </div>
         <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
@@ -21733,7 +20805,7 @@ function OnCourseAnalysisBody({ history, loaded, onDeleteSession, onEditCourseHo
           <StatBox label="AVG FT MADE / ROUND" value={`${(totalFtMade / trend.length).toFixed(0)}ft`} />
         </div>
         {analysis && (
-          <div style={{ marginTop: 12, fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}>
+          <div style={{ marginTop: 12, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 12 }}>
             {Math.abs(analysis.trendDelta) < 0.03 ? (
               <span style={{ color: COLORS.creamDim }}>◆ Steady across this period</span>
             ) : analysis.trendDelta > 0 ? (
@@ -21785,7 +20857,7 @@ function OnCourseAnalysisBody({ history, loaded, onDeleteSession, onEditCourseHo
 
       <Card style={{ marginBottom: 14 }}>
         <SectionLabel>Strokes gained per round</SectionLabel>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
           Total SG for each round, vs PGA Tour baseline
         </div>
         <div style={{ height: 200, marginTop: 12 }}>
@@ -21794,12 +20866,12 @@ function OnCourseAnalysisBody({ history, loaded, onDeleteSession, onEditCourseHo
               <CartesianGrid stroke={`${COLORS.creamDim}22`} vertical={false} />
               <XAxis
                 dataKey="dateLabel"
-                tick={{ fill: COLORS.creamDim, fontSize: 10, fontFamily: "JetBrains Mono, monospace" }}
+                tick={{ fill: COLORS.creamDim, fontSize: 10, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" }}
                 axisLine={{ stroke: `${COLORS.creamDim}33` }}
                 tickLine={false}
               />
               <YAxis
-                tick={{ fill: COLORS.creamDim, fontSize: 10, fontFamily: "JetBrains Mono, monospace" }}
+                tick={{ fill: COLORS.creamDim, fontSize: 10, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" }}
                 axisLine={{ stroke: `${COLORS.creamDim}33` }}
                 tickLine={false}
               />
@@ -21820,7 +20892,7 @@ function OnCourseAnalysisBody({ history, loaded, onDeleteSession, onEditCourseHo
 
       <Card style={{ marginBottom: 14 }}>
         <SectionLabel>Feet of putts made per round</SectionLabel>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
           Combined distance of every putt holed
         </div>
         <div style={{ height: 200, marginTop: 12 }}>
@@ -21829,12 +20901,12 @@ function OnCourseAnalysisBody({ history, loaded, onDeleteSession, onEditCourseHo
               <CartesianGrid stroke={`${COLORS.creamDim}22`} vertical={false} />
               <XAxis
                 dataKey="dateLabel"
-                tick={{ fill: COLORS.creamDim, fontSize: 10, fontFamily: "JetBrains Mono, monospace" }}
+                tick={{ fill: COLORS.creamDim, fontSize: 10, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" }}
                 axisLine={{ stroke: `${COLORS.creamDim}33` }}
                 tickLine={false}
               />
               <YAxis
-                tick={{ fill: COLORS.creamDim, fontSize: 10, fontFamily: "JetBrains Mono, monospace" }}
+                tick={{ fill: COLORS.creamDim, fontSize: 10, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" }}
                 axisLine={{ stroke: `${COLORS.creamDim}33` }}
                 tickLine={false}
               />
@@ -21851,7 +20923,7 @@ function OnCourseAnalysisBody({ history, loaded, onDeleteSession, onEditCourseHo
             border: `1px solid ${COLORS.creamDim}22`,
             borderRadius: 10,
             overflow: "hidden",
-            fontFamily: "'JetBrains Mono', monospace",
+            fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
             fontSize: 12,
           }}
         >
@@ -21877,9 +20949,8 @@ function OnCourseAnalysisBody({ history, loaded, onDeleteSession, onEditCourseHo
       {selectedRound && (
         <RoundSummaryModal
           session={selectedRound}
-          allRounds={history}
           units={units}
-          onEditHole={(action) => onEditCourseHole(selectedRound.id, action)}
+          onEditShot={(holeIndex, updatedHole) => onEditSessionShot(selectedRound.id, holeIndex, updatedHole)}
           onClose={() => setSelectedRoundId(null)}
         />
       )}
@@ -21898,7 +20969,7 @@ function PuttingAnalysisBody({ history, loaded, onDeleteSession, onEditSessionSh
   const [activePreset, setActivePreset] = useState("All");
 
   if (!loaded) {
-    return <div style={{ color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace" }}>Loading sessions…</div>;
+    return <div style={{ color: COLORS.creamDim, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" }}>Loading sessions…</div>;
   }
 
   const filtered = filterByTimescale(history, timescale);
@@ -21934,7 +21005,7 @@ function PuttingAnalysisBody({ history, loaded, onDeleteSession, onEditSessionSh
             border: tab === "insights" ? `1px solid ${COLORS.fairwayLight}` : `1px solid ${COLORS.creamDim}33`,
             background: tab === "insights" ? COLORS.fairway : "transparent",
             color: tab === "insights" ? COLORS.cream : COLORS.creamDim,
-            fontFamily: "'JetBrains Mono', monospace",
+            fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
             fontSize: 11,
             letterSpacing: 0.5,
             cursor: "pointer",
@@ -21951,7 +21022,7 @@ function PuttingAnalysisBody({ history, loaded, onDeleteSession, onEditSessionSh
             border: tab === "graphs" ? `1px solid ${COLORS.fairwayLight}` : `1px solid ${COLORS.creamDim}33`,
             background: tab === "graphs" ? COLORS.fairway : "transparent",
             color: tab === "graphs" ? COLORS.cream : COLORS.creamDim,
-            fontFamily: "'JetBrains Mono', monospace",
+            fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
             fontSize: 11,
             letterSpacing: 0.5,
             cursor: "pointer",
@@ -21965,7 +21036,7 @@ function PuttingAnalysisBody({ history, loaded, onDeleteSession, onEditSessionSh
 
 
       {!analysis && (
-        <div style={{ color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", fontSize: 13, marginTop: 10 }}>
+        <div style={{ color: COLORS.creamDim, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 13, marginTop: 10 }}>
           No sessions in this window yet. Log a putting session to see your analysis here.
         </div>
       )}
@@ -21974,7 +21045,7 @@ function PuttingAnalysisBody({ history, loaded, onDeleteSession, onEditSessionSh
         <>
           <Card style={{ marginBottom: 14 }}>
             <SectionLabel>Overview</SectionLabel>
-            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginTop: 2 }}>
+            <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.creamDim, marginTop: 2 }}>
               vs PGA Tour baseline
             </div>
             <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
@@ -21989,7 +21060,7 @@ function PuttingAnalysisBody({ history, loaded, onDeleteSession, onEditSessionSh
               <StatBox label="1-PUTT %" value={`${analysis.onePuttPct.toFixed(0)}%`} />
               <StatBox label="3+ PUTT %" value={`${analysis.threePuttPct.toFixed(0)}%`} valueColor={analysis.threePuttPct > 0 ? COLORS.flag : COLORS.cream} />
             </div>
-            <div style={{ marginTop: 12, fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}>
+            <div style={{ marginTop: 12, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 12 }}>
               {Math.abs(analysis.trendDelta) < 0.03 ? (
                 <span style={{ color: COLORS.creamDim }}>◆ Steady across this period</span>
               ) : analysis.trendDelta > 0 ? (
@@ -22054,7 +21125,7 @@ function PuttingAnalysisBody({ history, loaded, onDeleteSession, onEditSessionSh
 
           <CollapsibleSection title="All sessions" count={filtered.length}>
             {filtered.length === 0 ? (
-              <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: COLORS.creamDim }}>
+              <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 12, color: COLORS.creamDim }}>
                 No sessions in this window.
               </div>
             ) : (
@@ -22063,7 +21134,7 @@ function PuttingAnalysisBody({ history, loaded, onDeleteSession, onEditSessionSh
                 return (
                   <SwipeToDelete key={s.id} onDelete={() => onDeleteSession(s.id)}>
                     <Card style={{ marginBottom: 12, cursor: "pointer" }} onClick={() => setViewingSessionId(s.id)}>
-                      <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, paddingRight: 20 }}>
+                      <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, paddingRight: 20 }}>
                         {new Date(s.date).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
                         {"  ·  "}
                         {s.puttCount} putts · {s.puttMinFt}-{s.puttMaxFt}ft
@@ -22102,7 +21173,7 @@ function PuttingAnalysisBody({ history, loaded, onDeleteSession, onEditSessionSh
           />
 
           {!hasGraphData && (
-            <div style={{ color: COLORS.creamDim, fontFamily: "'JetBrains Mono', monospace", fontSize: 13 }}>
+            <div style={{ color: COLORS.creamDim, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 13 }}>
               No putts match this timescale + distance combination yet.
             </div>
           )}
@@ -22111,7 +21182,7 @@ function PuttingAnalysisBody({ history, loaded, onDeleteSession, onEditSessionSh
             <>
               <Card style={{ marginBottom: 14 }}>
                 <SectionLabel>Strokes gained over time</SectionLabel>
-                <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
+                <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
                   Average SG per putt per session, vs PGA Tour baseline, {minFt}-{maxFt}ft putts only
                 </div>
                 <div style={{ height: 200, marginTop: 12 }}>
@@ -22120,12 +21191,12 @@ function PuttingAnalysisBody({ history, loaded, onDeleteSession, onEditSessionSh
                       <CartesianGrid stroke={`${COLORS.creamDim}22`} vertical={false} />
                       <XAxis
                         dataKey="dateLabel"
-                        tick={{ fill: COLORS.creamDim, fontSize: 10, fontFamily: "JetBrains Mono, monospace" }}
+                        tick={{ fill: COLORS.creamDim, fontSize: 10, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" }}
                         axisLine={{ stroke: `${COLORS.creamDim}33` }}
                         tickLine={false}
                       />
                       <YAxis
-                        tick={{ fill: COLORS.creamDim, fontSize: 10, fontFamily: "JetBrains Mono, monospace" }}
+                        tick={{ fill: COLORS.creamDim, fontSize: 10, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" }}
                         axisLine={{ stroke: `${COLORS.creamDim}33` }}
                         tickLine={false}
                       />
@@ -22146,7 +21217,7 @@ function PuttingAnalysisBody({ history, loaded, onDeleteSession, onEditSessionSh
 
               <Card>
                 <SectionLabel>Strokes gained by distance band</SectionLabel>
-                <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
+                <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, marginTop: 2 }}>
                   Bands within {minFt}-{maxFt}ft, this timescale
                 </div>
                 <div style={{ height: 220, marginTop: 12 }}>
@@ -22155,12 +21226,12 @@ function PuttingAnalysisBody({ history, loaded, onDeleteSession, onEditSessionSh
                       <CartesianGrid stroke={`${COLORS.creamDim}22`} vertical={false} />
                       <XAxis
                         dataKey="label"
-                        tick={{ fill: COLORS.creamDim, fontSize: 10, fontFamily: "JetBrains Mono, monospace" }}
+                        tick={{ fill: COLORS.creamDim, fontSize: 10, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" }}
                         axisLine={{ stroke: `${COLORS.creamDim}33` }}
                         tickLine={false}
                       />
                       <YAxis
-                        tick={{ fill: COLORS.creamDim, fontSize: 10, fontFamily: "JetBrains Mono, monospace" }}
+                        tick={{ fill: COLORS.creamDim, fontSize: 10, fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" }}
                         axisLine={{ stroke: `${COLORS.creamDim}33` }}
                         tickLine={false}
                       />
@@ -22168,7 +21239,7 @@ function PuttingAnalysisBody({ history, loaded, onDeleteSession, onEditSessionSh
                       <Tooltip content={<ChartTooltip suffix=" SG" />} />
                       <Bar dataKey="avgSG" radius={[4, 4, 0, 0]}>
                         {graphBuckets.map((b, i) => (
-                          <Cell key={i} fill={sgBarColor(b.avgSG)} />
+                          <Cell key={i} fill={sgRagColor(b.avgSG)} />
                         ))}
                       </Bar>
                     </BarChart>
@@ -22179,16 +21250,19 @@ function PuttingAnalysisBody({ history, loaded, onDeleteSession, onEditSessionSh
                     display: "flex",
                     gap: 14,
                     marginTop: 10,
-                    fontFamily: "'JetBrains Mono', monospace",
+                    fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                     fontSize: 10,
                     color: COLORS.creamDim,
                   }}
                 >
                   <span>
-                    <span style={{ color: COLORS.fairwayLight }}>●</span> positive (at or above baseline)
+                    <span style={{ color: COLORS.fairwayLight }}>●</span> ≥0 (tour avg or better)
                   </span>
                   <span>
-                    <span style={{ color: COLORS.flag }}>●</span> negative (below baseline)
+                    <span style={{ color: COLORS.sand }}>●</span> ≥-0.15
+                  </span>
+                  <span>
+                    <span style={{ color: COLORS.flag }}>●</span> &lt;-0.15
                   </span>
                 </div>
               </Card>
@@ -22209,7 +21283,7 @@ function InfoToggle({ label, text }) {
       <div
         onClick={() => setOpen(!open)}
         style={{
-          fontFamily: "'JetBrains Mono', monospace",
+          fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
           fontSize: 11,
           color: COLORS.sand,
           cursor: "pointer",
@@ -22223,7 +21297,7 @@ function InfoToggle({ label, text }) {
       {open && (
         <div
           style={{
-            fontFamily: "'JetBrains Mono', monospace",
+            fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
             fontSize: 11,
             color: COLORS.creamDim,
             marginTop: 6,
@@ -22377,7 +21451,7 @@ export function ProfileSetupWizard({ onComplete, initialFirstName = "", initialS
     border: "none",
     background: enabled ? COLORS.fairway : `${COLORS.fairway}66`,
     color: COLORS.cream,
-    fontFamily: "'Bebas Neue', sans-serif",
+    fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
     fontSize: 18,
     letterSpacing: 1,
     cursor: enabled ? "pointer" : "not-allowed",
@@ -22391,7 +21465,7 @@ export function ProfileSetupWizard({ onComplete, initialFirstName = "", initialS
     border: "none",
     background: COLORS.flag,
     color: COLORS.cream,
-    fontFamily: "'Bebas Neue', sans-serif",
+    fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
     fontSize: 18,
     letterSpacing: 1,
     cursor: "pointer",
@@ -22404,7 +21478,7 @@ export function ProfileSetupWizard({ onComplete, initialFirstName = "", initialS
     border: `1px solid ${COLORS.creamDim}33`,
     background: "transparent",
     color: COLORS.cream,
-    fontFamily: "'Bebas Neue', sans-serif",
+    fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
     fontSize: 18,
     letterSpacing: 1,
     cursor: "pointer",
@@ -22417,7 +21491,7 @@ export function ProfileSetupWizard({ onComplete, initialFirstName = "", initialS
     border: "none",
     background: COLORS.flag,
     color: COLORS.cream,
-    fontFamily: "'Bebas Neue', sans-serif",
+    fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
     fontSize: 18,
     letterSpacing: 1,
     cursor: "pointer",
@@ -22436,14 +21510,14 @@ export function ProfileSetupWizard({ onComplete, initialFirstName = "", initialS
     >
       <style>{FONT_IMPORT}</style>
       <div style={cardStyle}>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginBottom: 14 }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.creamDim, marginBottom: 14 }}>
           {stepLabel}
         </div>
 
         {step === "handicap" && (
           <Card>
             <SectionLabel>{firstName ? `Hi ${firstName}, let's set a few things up` : "What's your handicap?"}</SectionLabel>
-            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.creamDim, marginTop: 4 }}>
+            <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, marginTop: 4 }}>
               First, what's your handicap? Helps suggest a sensible starting point on the next screen — you can leave this blank.
             </div>
             <input
@@ -22461,13 +21535,13 @@ export function ProfileSetupWizard({ onComplete, initialFirstName = "", initialS
                 border: `1px solid ${COLORS.creamDim}33`,
                 borderRadius: 8,
                 color: COLORS.cream,
-                fontFamily: "'Bebas Neue', sans-serif",
+                fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                 fontSize: 20,
                 padding: "10px 12px",
                 boxSizing: "border-box",
               }}
             />
-            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginTop: 16 }}>
+            <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.creamDim, marginTop: 16 }}>
               UNITS
             </div>
             <div style={{ display: "flex", marginTop: 8, borderRadius: 8, overflow: "hidden", border: `1px solid ${COLORS.creamDim}33` }}>
@@ -22482,7 +21556,7 @@ export function ProfileSetupWizard({ onComplete, initialFirstName = "", initialS
                     flex: 1,
                     textAlign: "center",
                     padding: "9px 0",
-                    fontFamily: "'JetBrains Mono', monospace",
+                    fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                     fontSize: 11,
                     cursor: "pointer",
                     background: units === u.key ? COLORS.fairway : "transparent",
@@ -22510,7 +21584,7 @@ export function ProfileSetupWizard({ onComplete, initialFirstName = "", initialS
               text="Strokes gained measures each shot against how a player at your chosen level would be expected to do from the same spot. Pick PGA Tour to compare yourself against professionals, or a handicap level to compare against golfers closer to your own game — your numbers will look very different depending on which you pick, but neither is 'more correct,' just a different yardstick."
             />
             {handicap.trim() && (
-              <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: COLORS.sand, marginTop: 10 }}>
+              <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.sand, marginTop: 10 }}>
                 Based on the handicap you entered, we've suggested {BASELINE_OPTIONS.find((b) => b.key === baseline)?.label} below — tap any option to change it, then confirm.
               </div>
             )}
@@ -22525,7 +21599,7 @@ export function ProfileSetupWizard({ onComplete, initialFirstName = "", initialS
                     border: baseline === b.key ? `2px solid ${COLORS.fairwayLight}` : `1px solid ${COLORS.creamDim}33`,
                     background: baseline === b.key ? COLORS.fairway : "transparent",
                     color: baseline === b.key ? COLORS.cream : COLORS.creamDim,
-                    fontFamily: "'JetBrains Mono', monospace",
+                    fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                     fontSize: 10,
                     letterSpacing: 0.3,
                     cursor: "pointer",
@@ -22573,12 +21647,12 @@ export function ProfileSetupWizard({ onComplete, initialFirstName = "", initialS
                   cursor: "pointer",
                 }}
               >
-                <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 18, letterSpacing: 0.5, color: COLORS.cream, display: "flex", alignItems: "center", gap: 8 }}>
+                <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 18, letterSpacing: 0.5, color: COLORS.cream, display: "flex", alignItems: "center", gap: 8 }}>
                   {opt.title}
                   {opt.badge && (
                     <span
                       style={{
-                        fontFamily: "'JetBrains Mono', monospace",
+                        fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                         fontSize: 9,
                         letterSpacing: 0.5,
                         background: COLORS.sand,
@@ -22639,7 +21713,7 @@ export function ProfileSetupWizard({ onComplete, initialFirstName = "", initialS
                   border: `1px solid ${COLORS.creamDim}33`,
                   background: "transparent",
                   color: COLORS.cream,
-                  fontFamily: "'Bebas Neue', sans-serif",
+                  fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                   fontSize: 16,
                   letterSpacing: 1,
                   cursor: "pointer",
@@ -22655,7 +21729,7 @@ export function ProfileSetupWizard({ onComplete, initialFirstName = "", initialS
                   border: "none",
                   background: COLORS.flag,
                   color: COLORS.cream,
-                  fontFamily: "'Bebas Neue', sans-serif",
+                  fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                   fontSize: 16,
                   letterSpacing: 1,
                   cursor: "pointer",
@@ -22670,7 +21744,7 @@ export function ProfileSetupWizard({ onComplete, initialFirstName = "", initialS
                 textAlign: "center",
                 marginTop: 12,
                 color: COLORS.creamDim,
-                fontFamily: "'JetBrains Mono', monospace",
+                fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                 fontSize: 10,
                 cursor: "pointer",
                 textDecoration: "underline",
@@ -22701,7 +21775,7 @@ export function ProfileSetupWizard({ onComplete, initialFirstName = "", initialS
             </div>
             {hasCoach === "yes" && (
               <>
-                <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginTop: 14 }}>
+                <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.creamDim, marginTop: 14 }}>
                   COACH'S EMAIL OR INVITE CODE
                 </div>
                 <input
@@ -22717,7 +21791,7 @@ export function ProfileSetupWizard({ onComplete, initialFirstName = "", initialS
                 </button>
               </>
             )}
-            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginTop: 12, textAlign: "center", lineHeight: 1.5 }}>
+            <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.creamDim, marginTop: 12, textAlign: "center", lineHeight: 1.5 }}>
               You can add or change this anytime in Settings → Coaches.
             </div>
           </Card>
@@ -22781,7 +21855,7 @@ export function ProfileSetupWizard({ onComplete, initialFirstName = "", initialS
                     fontSize: 13,
                   }}
                 >
-                  <span style={{ fontFamily: "'JetBrains Mono', monospace", color: COLORS.creamDim, fontSize: 11, letterSpacing: 0.3 }}>
+                  <span style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", color: COLORS.creamDim, fontSize: 11, letterSpacing: 0.3 }}>
                     {k}
                   </span>
                   <span style={{ fontFamily: "'Inter', sans-serif", color: COLORS.cream, fontWeight: 600, textAlign: "right" }}>
@@ -22796,7 +21870,7 @@ export function ProfileSetupWizard({ onComplete, initialFirstName = "", initialS
           </Card>
         )}
 
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: COLORS.creamDim, marginTop: 12, lineHeight: 1.5 }}>
+        <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.creamDim, marginTop: 12, lineHeight: 1.5 }}>
           Everything here can be changed later in Settings.
         </div>
       </div>
