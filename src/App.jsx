@@ -10124,6 +10124,151 @@ function ManualYardagesIllustration() {
 }
 
 // Order here is the home page's section order: Range, Yardages, Short Game, Putting, Compete, Analysis.
+// ---------------------------------------------------------------------------
+// TILE ICONS — replace the old full-bleed Illustration artwork on every
+// "Choose" screen (Home, Range, Yardages, Putting, Compete). Small, single
+// -color stroke icons using COLORS.fairway, rather than the multi-gradient
+// illustrated backgrounds these tiles used to render.
+// ---------------------------------------------------------------------------
+function RangeIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={COLORS.fairway} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10" />
+      <circle cx="12" cy="12" r="6" />
+      <circle cx="12" cy="12" r="2" />
+    </svg>
+  );
+}
+function YardagesIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={COLORS.fairway} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="3" y1="12" x2="21" y2="12" />
+      <line x1="3" y1="8" x2="3" y2="16" />
+      <line x1="8" y1="9" x2="8" y2="15" />
+      <line x1="13" y1="9" x2="13" y2="15" />
+      <line x1="18" y1="8" x2="18" y2="16" />
+      <line x1="21" y1="8" x2="21" y2="16" />
+    </svg>
+  );
+}
+function ShortGameIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={COLORS.fairway} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 20 L17 5" />
+      <path d="M17 5 L21 3 L19 7 Z" fill={COLORS.fairway} stroke="none" />
+      <circle cx="6" cy="19" r="1.4" fill={COLORS.fairway} stroke="none" />
+    </svg>
+  );
+}
+function PuttingIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={COLORS.fairway} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="12" y1="3" x2="12" y2="21" />
+      <path d="M12 3 L19 6 L12 9 Z" fill={COLORS.fairway} stroke="none" />
+      <ellipse cx="12" cy="21" rx="7" ry="1.6" />
+    </svg>
+  );
+}
+function CompeteIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={COLORS.fairway} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 18 L9 21 L15 21 L15 18" />
+      <path d="M6 4 L18 4 L18 10 A6 6 0 0 1 6 10 Z" />
+      <path d="M6 6 L3 6 L3 8 A3 3 0 0 0 6 11" />
+      <path d="M18 6 L21 6 L21 8 A3 3 0 0 1 18 11" />
+    </svg>
+  );
+}
+function AnalysisIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={COLORS.fairway} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 19 L4 13" />
+      <path d="M10 19 L10 8" />
+      <path d="M16 19 L16 4" />
+    </svg>
+  );
+}
+function TeeAccuracyIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={COLORS.fairway} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="12" y1="2" x2="12" y2="22" />
+      <circle cx="12" cy="8" r="5" />
+    </svg>
+  );
+}
+function GappingIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={COLORS.fairway} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="3" y1="6" x2="9" y2="6" />
+      <line x1="3" y1="12" x2="14" y2="12" />
+      <line x1="3" y1="18" x2="19" y2="18" />
+    </svg>
+  );
+}
+function ManualYardagesIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={COLORS.fairway} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4Z" />
+    </svg>
+  );
+}
+function WedgeMatrixIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={COLORS.fairway} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="3" width="7" height="7" rx="1" />
+      <rect x="14" y="3" width="7" height="7" rx="1" />
+      <rect x="3" y="14" width="7" height="7" rx="1" />
+      <rect x="14" y="14" width="7" height="7" rx="1" />
+    </svg>
+  );
+}
+function CompareIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={COLORS.fairway} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="6" y1="20" x2="6" y2="10" />
+      <line x1="12" y1="20" x2="12" y2="4" />
+      <line x1="18" y1="20" x2="18" y2="14" />
+    </svg>
+  );
+}
+function PuttingClockIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={COLORS.fairway} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7 L12 12 L16 14" />
+    </svg>
+  );
+}
+function PuttingStartLineIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={COLORS.fairway} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="7" y1="4" x2="7" y2="20" />
+      <line x1="17" y1="4" x2="17" y2="20" />
+      <line x1="7" y1="12" x2="17" y2="12" strokeDasharray="2 2" />
+    </svg>
+  );
+}
+function PuttingPaceIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={COLORS.fairway} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="9" />
+      <circle cx="12" cy="12" r="5" />
+      <circle cx="12" cy="12" r="1.4" fill={COLORS.fairway} stroke="none" />
+    </svg>
+  );
+}
+function OnCourseIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={COLORS.fairway} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="4" y="3" width="16" height="18" rx="2" />
+      <line x1="8" y1="8" x2="16" y2="8" />
+      <line x1="8" y1="12" x2="16" y2="12" />
+      <path d="M8 16 L10 18 L16 15" />
+    </svg>
+  );
+}
+
 const TILE_META = [
   {
     key: "range",
@@ -10131,7 +10276,7 @@ const TILE_META = [
     subtitle: "Distance control & tee accuracy",
     screen: "rangeChoose",
     available: true,
-    Illustration: RangeIllustration,
+    Icon: RangeIcon,
   },
   {
     key: "yardages",
@@ -10139,7 +10284,7 @@ const TILE_META = [
     subtitle: "Gapping & Wedge Matrix",
     screen: "yardagesChoose",
     available: true,
-    Illustration: YardagesIllustration,
+    Icon: YardagesIcon,
   },
   {
     key: "shortgame",
@@ -10147,18 +10292,18 @@ const TILE_META = [
     subtitle: "Chipping & pitching",
     screen: "shortgame",
     available: true,
-    Illustration: ShortGameIllustration,
+    Icon: ShortGameIcon,
   },
-  { key: "putting", label: "PUTTING", subtitle: "5 drills + on-course", screen: "puttingChoose", available: true, Illustration: PuttingIllustration },
+  { key: "putting", label: "PUTTING", subtitle: "5 drills + on-course", screen: "puttingChoose", available: true, Icon: PuttingIcon },
   {
     key: "compete",
     label: "COMPETE",
     subtitle: "Head-to-head — Range, Putting, Short Game",
     screen: "competeChoose",
     available: true,
-    Illustration: CompeteIllustration,
+    Icon: CompeteIcon,
   },
-  { key: "analysis", label: "ANALYSIS", subtitle: "Track your progress", screen: "analysis", available: true, Illustration: AnalysisIllustration },
+  { key: "analysis", label: "ANALYSIS", subtitle: "Track your progress", screen: "analysis", available: true, Icon: AnalysisIcon },
 ];
 
 const HOME_INFO = {
@@ -10948,21 +11093,31 @@ function HomeScreen({ onNavigate }) {
             onClick={() => onNavigate(t.screen)}
             style={{
               position: "relative",
-              height: 140,
               borderRadius: 14,
-              overflow: "hidden",
+              padding: 12,
+              boxSizing: "border-box",
               cursor: "pointer",
               border: `1px solid ${COLORS.creamDim}22`,
+              background: `${COLORS.turf}66`,
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "space-between",
+              minHeight: 108,
             }}
           >
-            <t.Illustration />
             <div
               style={{
-                position: "absolute",
-                inset: 0,
-                background: `linear-gradient(180deg, transparent 25%, ${COLORS.turfDark}dd 100%)`,
+                width: 32,
+                height: 32,
+                borderRadius: 9,
+                background: `${COLORS.fairway}26`,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
               }}
-            />
+            >
+              <t.Icon />
+            </div>
             {!t.available && (
               <div
                 style={{
@@ -10987,15 +11142,15 @@ function HomeScreen({ onNavigate }) {
               style={{ top: 8, right: 8 }}
               tooltipText={HOME_INFO[t.key]?.short}
             />
-            <div style={{ position: "absolute", left: 10, bottom: 8, right: 10 }}>
+            <div style={{ marginTop: 10 }}>
               <div
                 style={{
                   fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
-                  fontSize: 20,
+                  fontWeight: 700,
+                  fontSize: 15,
                   letterSpacing: 0.5,
-                  lineHeight: 1.05,
+                  lineHeight: 1.15,
                   color: COLORS.cream,
-                  textShadow: "0 2px 6px rgba(0,0,0,0.5)",
                 }}
               >
                 {t.label}
@@ -11005,7 +11160,7 @@ function HomeScreen({ onNavigate }) {
                   fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
                   fontSize: 9,
                   color: COLORS.creamDim,
-                  marginTop: 2,
+                  marginTop: 3,
                   lineHeight: 1.35,
                   display: "-webkit-box",
                   WebkitLineClamp: 2,
@@ -14028,14 +14183,14 @@ function RangeChooseScreen({ onNavigate }) {
       label: "DISTANCE CONTROL",
       subtitle: "Hit a random target distance, track how close you get",
       screen: "setup",
-      Illustration: RangeIllustration,
+      Icon: RangeIcon,
     },
     {
       key: "teeaccuracy",
       label: "TEE ACCURACY",
       subtitle: "Fairways found off the tee, by club",
       screen: "teeaccuracy",
-      Illustration: TeeAccuracyIllustration,
+      Icon: TeeAccuracyIcon,
     },
   ];
   return (
@@ -14053,35 +14208,41 @@ function RangeChooseScreen({ onNavigate }) {
             onClick={() => onNavigate(o.screen)}
             style={{
               position: "relative",
-              height: 120,
               borderRadius: 14,
-              overflow: "hidden",
+              padding: 14,
+              boxSizing: "border-box",
               cursor: "pointer",
               border: `1px solid ${COLORS.creamDim}22`,
+              background: `${COLORS.turf}66`,
             }}
           >
-            <o.Illustration />
             <div
               style={{
-                position: "absolute",
-                inset: 0,
-                background: `linear-gradient(180deg, transparent 20%, ${COLORS.turfDark}dd 100%)`,
+                width: 36,
+                height: 36,
+                borderRadius: 10,
+                background: `${COLORS.fairway}26`,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
               }}
-            />
-            <div style={{ position: "absolute", left: 12, bottom: 10, right: 12 }}>
+            >
+              <o.Icon />
+            </div>
+            <div style={{ marginTop: 10 }}>
               <div
                 style={{
                   fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
-                  fontSize: 22,
+                  fontWeight: 700,
+                  fontSize: 18,
                   letterSpacing: 0.5,
-                  lineHeight: 1.05,
+                  lineHeight: 1.1,
                   color: COLORS.cream,
-                  textShadow: "0 2px 6px rgba(0,0,0,0.5)",
                 }}
               >
                 {o.label}
               </div>
-              <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.creamDim, marginTop: 2 }}>
+              <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.creamDim, marginTop: 3 }}>
                 {o.subtitle}
               </div>
             </div>
@@ -14100,7 +14261,7 @@ function YardagesChooseScreen({ onNavigate }) {
       subtitle: "Full-swing yardage chart, club by club",
       screen: "gappingSetup",
       available: true,
-      Illustration: GappingIllustration,
+      Icon: GappingIcon,
     },
     {
       key: "manual",
@@ -14108,7 +14269,7 @@ function YardagesChooseScreen({ onNavigate }) {
       subtitle: "Already know your numbers? Type them straight in",
       screen: "gappingManualClubs",
       available: true,
-      Illustration: ManualYardagesIllustration,
+      Icon: ManualYardagesIcon,
     },
     {
       key: "wedgematrix",
@@ -14116,7 +14277,7 @@ function YardagesChooseScreen({ onNavigate }) {
       subtitle: "Build your own yardage chart, club by club",
       screen: "wedgeMatrixSetup",
       available: true,
-      Illustration: WedgeMatrixIllustration,
+      Icon: WedgeMatrixIcon,
     },
   ];
   return (
@@ -14134,22 +14295,28 @@ function YardagesChooseScreen({ onNavigate }) {
             onClick={() => o.available && onNavigate(o.screen)}
             style={{
               position: "relative",
-              height: 120,
               borderRadius: 14,
-              overflow: "hidden",
+              padding: 14,
+              boxSizing: "border-box",
               cursor: o.available ? "pointer" : "default",
               border: `1px solid ${COLORS.creamDim}22`,
+              background: `${COLORS.turf}66`,
               opacity: o.available ? 1 : 0.6,
             }}
           >
-            <o.Illustration />
             <div
               style={{
-                position: "absolute",
-                inset: 0,
-                background: `linear-gradient(180deg, transparent 20%, ${COLORS.turfDark}dd 100%)`,
+                width: 36,
+                height: 36,
+                borderRadius: 10,
+                background: `${COLORS.fairway}26`,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
               }}
-            />
+            >
+              <o.Icon />
+            </div>
             {!o.available && (
               <div
                 style={{
@@ -14169,20 +14336,20 @@ function YardagesChooseScreen({ onNavigate }) {
                 SOON
               </div>
             )}
-            <div style={{ position: "absolute", left: 12, bottom: 10, right: 12 }}>
+            <div style={{ marginTop: 10 }}>
               <div
                 style={{
                   fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
-                  fontSize: 22,
+                  fontWeight: 700,
+                  fontSize: 18,
                   letterSpacing: 0.5,
-                  lineHeight: 1.05,
+                  lineHeight: 1.1,
                   color: COLORS.cream,
-                  textShadow: "0 2px 6px rgba(0,0,0,0.5)",
                 }}
               >
                 {o.label}
               </div>
-              <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.creamDim, marginTop: 2 }}>
+              <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.creamDim, marginTop: 3 }}>
                 {o.subtitle}
               </div>
             </div>
@@ -14200,28 +14367,28 @@ function CompeteChooseScreen({ onNavigate }) {
       label: "RANGE",
       subtitle: "Closest to target wins each round",
       screen: "competeSetup",
-      Illustration: RangeIllustration,
+      Icon: RangeIcon,
     },
     {
       key: "putting",
       label: "PUTTING",
       subtitle: "Fewest putts across the round wins",
       screen: "competePuttingSetup",
-      Illustration: PuttingIllustration,
+      Icon: PuttingIcon,
     },
     {
       key: "shortgame",
       label: "SHORT GAME",
       subtitle: "Closest to the hole wins each round",
       screen: "competeShortGameSetup",
-      Illustration: ShortGameIllustration,
+      Icon: ShortGameIcon,
     },
     {
       key: "compare",
       label: "COMPARE",
       subtitle: "See how your stats stack up against friends",
       screen: "compareFriends",
-      Illustration: CompareIllustration,
+      Icon: CompareIcon,
     },
   ];
   return (
@@ -14244,35 +14411,41 @@ function CompeteChooseScreen({ onNavigate }) {
             onClick={() => onNavigate(o.screen)}
             style={{
               position: "relative",
-              height: 120,
               borderRadius: 14,
-              overflow: "hidden",
+              padding: 14,
+              boxSizing: "border-box",
               cursor: "pointer",
               border: `1px solid ${COLORS.creamDim}22`,
+              background: `${COLORS.turf}66`,
             }}
           >
-            <o.Illustration />
             <div
               style={{
-                position: "absolute",
-                inset: 0,
-                background: `linear-gradient(180deg, transparent 20%, ${COLORS.turfDark}dd 100%)`,
+                width: 36,
+                height: 36,
+                borderRadius: 10,
+                background: `${COLORS.fairway}26`,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
               }}
-            />
-            <div style={{ position: "absolute", left: 12, bottom: 10, right: 12 }}>
+            >
+              <o.Icon />
+            </div>
+            <div style={{ marginTop: 10 }}>
               <div
                 style={{
                   fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
-                  fontSize: 22,
+                  fontWeight: 700,
+                  fontSize: 18,
                   letterSpacing: 0.5,
-                  lineHeight: 1.05,
+                  lineHeight: 1.1,
                   color: COLORS.cream,
-                  textShadow: "0 2px 6px rgba(0,0,0,0.5)",
                 }}
               >
                 {o.label}
               </div>
-              <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.creamDim, marginTop: 2 }}>
+              <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.creamDim, marginTop: 3 }}>
                 {o.subtitle}
               </div>
             </div>
@@ -16902,35 +17075,35 @@ function PuttingChooseScreen({ onNavigate }) {
       label: "RANDOM PRACTICE",
       subtitle: "Random distances in a range you set — track how many you hole",
       screen: "puttingRandomSetup",
-      Illustration: PuttingRandomIllustration,
+      Icon: PuttingIcon,
     },
     {
       key: "clock",
       label: "AROUND THE CLOCK",
       subtitle: "One putt from every distance, 3-10ft",
       screen: "puttingClockIntro",
-      Illustration: PuttingClockIllustration,
+      Icon: PuttingClockIcon,
     },
     {
       key: "startline",
       label: "START LINE",
       subtitle: "10 putts through a gate — how many get through clean",
       screen: "puttingStartLineIntro",
-      Illustration: PuttingStartLineIllustration,
+      Icon: PuttingStartLineIcon,
     },
     {
       key: "pace",
       label: "PACE CONTROL",
       subtitle: "Random distances, scored on proximity to the hole",
       screen: "puttingPaceSetup",
-      Illustration: PuttingPaceIllustration,
+      Icon: PuttingPaceIcon,
     },
     {
       key: "course",
       label: "ON COURSE",
       subtitle: "Track a real round, hole by hole — you enter every putt",
       screen: "puttingCourseSetup",
-      Illustration: OnCourseIllustration,
+      Icon: OnCourseIcon,
     },
   ];
   return (
@@ -16948,35 +17121,41 @@ function PuttingChooseScreen({ onNavigate }) {
             onClick={() => onNavigate(o.screen)}
             style={{
               position: "relative",
-              height: 120,
               borderRadius: 14,
-              overflow: "hidden",
+              padding: 14,
+              boxSizing: "border-box",
               cursor: "pointer",
               border: `1px solid ${COLORS.creamDim}22`,
+              background: `${COLORS.turf}66`,
             }}
           >
-            <o.Illustration />
             <div
               style={{
-                position: "absolute",
-                inset: 0,
-                background: `linear-gradient(180deg, transparent 20%, ${COLORS.turfDark}dd 100%)`,
+                width: 36,
+                height: 36,
+                borderRadius: 10,
+                background: `${COLORS.fairway}26`,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
               }}
-            />
-            <div style={{ position: "absolute", left: 12, bottom: 10, right: 12 }}>
+            >
+              <o.Icon />
+            </div>
+            <div style={{ marginTop: 10 }}>
               <div
                 style={{
                   fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
-                  fontSize: 22,
+                  fontWeight: 700,
+                  fontSize: 18,
                   letterSpacing: 0.5,
-                  lineHeight: 1.05,
+                  lineHeight: 1.1,
                   color: COLORS.cream,
-                  textShadow: "0 2px 6px rgba(0,0,0,0.5)",
                 }}
               >
                 {o.label}
               </div>
-              <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.creamDim, marginTop: 2 }}>
+              <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.creamDim, marginTop: 3 }}>
                 {o.subtitle}
               </div>
             </div>
