@@ -12,8 +12,8 @@ export default defineConfig({
         name: "The Practice App",
         short_name: "Practice App",
         description: "Golf practice tracker with strokes gained analysis",
-        theme_color: "#14291F",
-        background_color: "#14291F",
+        theme_color: "#1C1C1A",
+        background_color: "#1C1C1A",
         display: "standalone",
         start_url: "/",
         icons: [
