@@ -34,6 +34,9 @@ import {
 } from "./storage.js";
 
 export const FONT_IMPORT = `@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
+input, select, textarea { min-width: 0; box-sizing: border-box; }
+input:focus, select:focus, textarea:focus { outline: 2px solid #3FA377; outline-offset: 0; }
+button { font-family: inherit; }
 @media print {
   .no-print { display: none !important; }
   .print-only { display: block !important; }
@@ -6934,7 +6937,7 @@ function SummaryScreen({ shots, minDist, maxDist, onNewSession, storageError, un
         ]}
         caption={
           avgSG >= 0
-            ? `${formatSG(avgSG)} strokes gained per shot on the range today. Dialling in the distance control, one shot at a time. @The_golfpracticeapp`
+            ? `${formatSG(avgSG)} strokes gained per shot on the range today. Dialing in the distance control, one shot at a time. @The_golfpracticeapp`
             : `Grinding through a tricky range session today. Numbers weren't pretty, but the reps count. @The_golfpracticeapp`
         }
         hashtags={["#golf", "#golfpractice", "#strokesgained", "#golfswing", "#golftraining", "#ThePracticeApp"]}
@@ -10324,7 +10327,7 @@ const HOME_INFO = {
   },
   putting: {
     title: "PUTTING",
-    short: "Practise random distances, or track a full round on the course.",
+    short: "Practice random distances, or track a full round on the course.",
     body: "Practice mode gives you random distances and logs putts taken, with strokes gained per putt. On-Course mode walks you through an 18-hole round, hole by hole, so your real-round putting gets tracked the same way as practice.",
   },
   analysis: {
@@ -16463,7 +16466,7 @@ function ShortGameSetupScreen({
       </Card>
 
       <Card style={{ marginTop: 10 }}>
-        <SectionLabel>Lies to practise</SectionLabel>
+        <SectionLabel>Lies to practice</SectionLabel>
         <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
           <LieToggle lie="fairway" active={shortLies.includes("fairway")} onClick={() => onToggleLie("fairway")} />
           <LieToggle lie="rough" active={shortLies.includes("rough")} onClick={() => onToggleLie("rough")} />
@@ -17035,7 +17038,7 @@ function ShortGameSummaryScreen({ shots, onNewSession, storageError, units, feed
         caption={
           avgSG >= 0
             ? `${formatSG(avgSG)} strokes gained per shot around the greens today. Short game is starting to click. @The_golfpracticeapp`
-            : `Short game needed some work today. Back on the practice green until it's dialled back in. @The_golfpracticeapp`
+            : `Short game needed some work today. Back on the practice green until it's dialed back in. @The_golfpracticeapp`
         }
         hashtags={["#golf", "#shortgame", "#golfpractice", "#upanddown", "#golfer", "#ThePracticeApp"]}
       />
