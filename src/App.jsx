@@ -31,6 +31,9 @@ import {
   withdrawFriendRequest,
   removeFriend,
   getPlayerSectionHistories,
+  shareCompeteWithFriend,
+  loadCompeteInbox,
+  clearCompeteInboxItems,
 } from "./storage.js";
 
 export const FONT_IMPORT = `@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
@@ -333,7 +336,8 @@ export function PlayerBadge({ style }) {
         color: COLORS.turfDark,
         background: COLORS.sand,
         borderRadius: 5,
-        padding: "2px 7px",
+        padding: "3px 7px",
+        lineHeight: 1,
         ...style,
       }}
     >
@@ -2625,10 +2629,56 @@ function sgForPuttTourOnly(targetFt, strokes) {
 
 // Ranks a round's entries by proximity (ascending = better) and assigns Compete's scaled points:
 // with N players, 1st gets (N-1) points, 2nd gets (N-2), ..., last gets 0.
+// Ties share the average of the points for the positions they occupy (two players tied for 1st
+// of 2 get 0.5 each, not 1 + 0), and share the same rank.
+function assignTiedPoints(sortedEntries, diffOf) {
+  const n = sortedEntries.length;
+  const out = [];
+  let i = 0;
+  while (i < n) {
+    let j = i;
+    const key = Math.round(diffOf(sortedEntries[i]) * 100);
+    while (j + 1 < n && Math.round(diffOf(sortedEntries[j + 1]) * 100) === key) j++;
+    let sum = 0;
+    for (let k = i; k <= j; k++) sum += n - 1 - k;
+    const pts = sum / (j - i + 1);
+    for (let k = i; k <= j; k++) out.push({ ...sortedEntries[k], rank: i + 1, points: pts });
+    i = j + 1;
+  }
+  return out;
+}
+
 function rankCompeteByProximity(entries, valueKey) {
   const sorted = [...entries].sort((a, b) => a[valueKey] - b[valueKey]);
-  const n = sorted.length;
-  return sorted.map((e, i) => ({ ...e, rank: i + 1, points: n - 1 - i }));
+  return assignTiedPoints(sorted, (e) => e[valueKey]);
+}
+
+// "Closest" mode has no measured distances, so a tie splits the single point equally.
+// Previous round's winner(s) tee off first; everyone else keeps their existing order.
+function winnersFirst(order, winners) {
+  return [...order.filter((p) => winners.includes(p)), ...order.filter((p) => !winners.includes(p))];
+}
+// Range Compete scores a round by how far each shot finished from the target (not by how far it
+// flew). Rounds saved by an older edit flow were ranked by raw distance, so recompute from the
+// stored entries whenever distances exist.
+function recomputeRangeRounds(rounds, mode) {
+  if (mode !== "distance") return rounds;
+  return rounds.map((r) => {
+    if (!r.entries || !r.entries.length || r.target == null) return r;
+    const sorted = r.entries
+      .map((e) => ({ ...e, diff: Math.abs(e.distance - r.target) }))
+      .sort((a, b) => a.diff - b.diff);
+    return { ...r, standings: assignTiedPoints(sorted, (e) => e.diff) };
+  });
+}
+const CLOSEST_TIE = "__tie__";
+function closestStandings(players, winner) {
+  if (winner === CLOSEST_TIE) return closestTieStandings(players);
+  return players.map((p) => ({ player: p, points: p === winner ? 1 : 0, rank: p === winner ? 1 : null }));
+}
+function closestTieStandings(players) {
+  const share = 1 / players.length;
+  return players.map((p) => ({ player: p, points: share, rank: 1 }));
 }
 
 // Sums each player's total putts across all holes of a Putting Compete session (lower is better).
@@ -2669,6 +2719,7 @@ export default function GolfPracticeApp({ onSwitchProfile, onCreateProfile, prof
   const [competeRoundResults, setCompeteRoundResults] = useState([]); // completed rounds this competition
   const [competeCurrentTarget, setCompeteCurrentTarget] = useState(null);
   const [competeCurrentPlayerIdx, setCompeteCurrentPlayerIdx] = useState(0);
+  const [competeTurnOrder, setCompeteTurnOrder] = useState([]); // who plays first this round (previous round's winner leads)
   const [competeRoundEntries, setCompeteRoundEntries] = useState([]); // {player, distance} — distance mode only
   const [competeDistanceInput, setCompeteDistanceInput] = useState("");
   const [competeRoundComplete, setCompeteRoundComplete] = useState(false);
@@ -2692,6 +2743,7 @@ export default function GolfPracticeApp({ onSwitchProfile, onCreateProfile, prof
   const [sgCompeteRoundResults, setSgCompeteRoundResults] = useState([]);
   const [sgCompeteCurrentShot, setSgCompeteCurrentShot] = useState(null); // {lie, target}
   const [sgCompeteCurrentPlayerIdx, setSgCompeteCurrentPlayerIdx] = useState(0);
+  const [sgCompeteTurnOrder, setSgCompeteTurnOrder] = useState([]);
   const [sgCompeteResultInput, setSgCompeteResultInput] = useState("");
   const [sgCompeteRoundEntries, setSgCompeteRoundEntries] = useState([]); // {player, resultFt}
   const [sgCompeteRoundComplete, setSgCompeteRoundComplete] = useState(false);
@@ -2710,6 +2762,7 @@ export default function GolfPracticeApp({ onSwitchProfile, onCreateProfile, prof
   const [puttCompeteHoleResults, setPuttCompeteHoleResults] = useState([]); // [{target, putts:[{player,strokes}]}]
   const [puttCompeteCurrentTarget, setPuttCompeteCurrentTarget] = useState(null);
   const [puttCompeteCurrentPlayerIdx, setPuttCompeteCurrentPlayerIdx] = useState(0);
+  const [puttCompeteTurnOrder, setPuttCompeteTurnOrder] = useState([]);
   const [puttCompeteHoleEntries, setPuttCompeteHoleEntries] = useState([]); // {player, strokes} — this hole in progress
   const [puttCompeteHoleComplete, setPuttCompeteHoleComplete] = useState(false);
   const [puttCompeteHistory, setPuttCompeteHistory] = useState([]);
@@ -3027,6 +3080,34 @@ export default function GolfPracticeApp({ onSwitchProfile, onCreateProfile, prof
         } catch (e) {}
       }
       setPuttCompeteLoaded(true);
+
+      // Games friends recorded with me in them land in my compete inbox (see storage.js) — fold
+      // them into my own history so the result shows up in my account too.
+      try {
+        const inbox = profileId ? await loadCompeteInbox(profileId) : [];
+        if (inbox.length) {
+          const targets = {
+            "compete:sessions": setCompeteHistory,
+            "compete:shortgame:sessions": setSgCompeteHistory,
+            "compete:putting:sessions": setPuttCompeteHistory,
+          };
+          for (const [key, setter] of Object.entries(targets)) {
+            let existing = [];
+            try {
+              existing = data[key] ? JSON.parse(data[key]) : [];
+            } catch (e) {}
+            const have = new Set(existing.map((x) => x.id));
+            const incoming = inbox.filter((i) => i.key === key && i.session && !have.has(i.session.id)).map((i) => i.session);
+            if (!incoming.length) continue;
+            const merged = [...incoming, ...existing].sort((a, b) => String(b.date).localeCompare(String(a.date)));
+            setter(merged);
+            await window.storage.set(key, JSON.stringify(merged), false);
+          }
+          await clearCompeteInboxItems(profileId, inbox.map((i) => i.id));
+        }
+      } catch (e) {
+        // non-fatal — inbox items stay put and are retried next launch
+      }
     })();
   }, []);
 
@@ -3985,12 +4066,74 @@ export default function GolfPracticeApp({ onSwitchProfile, onCreateProfile, prof
     setCompetePlayers((prev) => (prev.length > 2 ? prev.filter((_, i) => i !== idx) : prev));
   }
 
+  // ----- Reopen a past competition's full results -----
+  function openPastCompete(sess) {
+    setCompetePlayers(sess.players);
+    setCompeteMode(sess.mode);
+    setCompeteMinDist(sess.minDist);
+    setCompeteMaxDist(sess.maxDist);
+    setCompeteRoundResults(recomputeRangeRounds(sess.rounds, sess.mode));
+    setCompeteSummarySessionId(sess.id);
+    setCompeteSummaryEditingIndex(null);
+    setScreen("competeSummary");
+  }
+  function openPastSgCompete(sess) {
+    setSgCompetePlayers(sess.players);
+    setSgCompeteMode(sess.mode);
+    setSgCompeteRoundResults(sess.rounds);
+    setSgCompeteSummarySessionId(sess.id);
+    setSgCompeteSummaryEditingIndex(null);
+    setScreen("competeShortGameSummary");
+  }
+  function openPastPuttCompete(sess) {
+    setPuttCompetePlayers(sess.players);
+    setPuttCompeteHoleResults(sess.holes);
+    setPuttCompeteSummarySessionId(sess.id);
+    setPuttCompeteSummaryEditingIndex(null);
+    setScreen("competePuttingSummary");
+  }
+
+  // ----- Friends in Compete games -----
+  // linkedFriends maps the player name used in a game -> that friend's profile id, so finished
+  // games can be copied into the friend's account. Matching is by exact name at finish time, so
+  // editing a picked friend's name by hand simply unlinks them.
+  const approvedFriends = myFriendLinks.filter((l) => l.status === "approved");
+  const [linkedFriends, setLinkedFriends] = useState({});
+
+  // Incoming friend requests pop up as soon as the app opens (and whenever a new one arrives).
+  // Dismissing ("LATER") hides them for this session only; they stay in Compete > Friends.
+  const [dismissedRequestIds, setDismissedRequestIds] = useState([]);
+  const pendingFriendRequests = myFriendLinks.filter(
+    (l) => l.status === "pending" && l.direction === "received" && !dismissedRequestIds.includes(l.id)
+  );
+  function pickFriendInto(setPlayers, friend) {
+    setLinkedFriends((prev) => ({ ...prev, [friend.friendName]: friend.friendId }));
+    setPlayers((prev) => {
+      if (prev.some((p) => p.trim() === friend.friendName)) return prev;
+      const idx = prev.findIndex((p) => !p.trim());
+      if (idx >= 0) return prev.map((p, i) => (i === idx ? friend.friendName : p));
+      return prev.length < 4 ? [...prev, friend.friendName] : prev;
+    });
+  }
+  async function shareSessionWithFriends(storageKey, session) {
+    const targets = session.players
+      .filter((name) => linkedFriends[name])
+      .map((name) => ({ name, friendId: linkedFriends[name] }));
+    if (!targets.length) return;
+    const shared = { ...session, sharedFrom: profileName || "" };
+    await Promise.all(
+      targets.map((t) => shareCompeteWithFriend(profileId, t.friendId, storageKey, shared).catch(() => {}))
+    );
+  }
+
   // Points per round: with N players, 1st gets (N-1) points, 2nd gets (N-2), ..., last gets 0.
   // Only meaningful in distance mode, where every player's proximity is actually measured.
   function rankCompeteEntries(entries, target) {
     const sorted = [...entries].sort((a, b) => Math.abs(a.distance - target) - Math.abs(b.distance - target));
-    const n = sorted.length;
-    return sorted.map((e, i) => ({ ...e, diff: Math.abs(e.distance - target), rank: i + 1, points: n - 1 - i }));
+    return assignTiedPoints(
+      sorted.map((e) => ({ ...e, diff: Math.abs(e.distance - target) })),
+      (e) => e.diff
+    );
   }
 
   function startCompete() {
@@ -3998,6 +4141,7 @@ export default function GolfPracticeApp({ onSwitchProfile, onCreateProfile, prof
     if (validPlayers.length < 2) return;
     const target = randomTarget(competeMinDist, competeMaxDist);
     setCompetePlayers(validPlayers);
+    setCompeteTurnOrder(validPlayers);
     setCompeteRoundResults([]);
     setCompeteCurrentTarget(target);
     setCompeteCurrentPlayerIdx(0);
@@ -4011,12 +4155,12 @@ export default function GolfPracticeApp({ onSwitchProfile, onCreateProfile, prof
   function submitCompeteDistance() {
     const val = unitToYds(parseFloat(competeDistanceInput), units);
     if (isNaN(val) || val < 0) return;
-    const player = competePlayers[competeCurrentPlayerIdx];
+    const player = competeTurnOrder[competeCurrentPlayerIdx];
     const newEntries = [...competeRoundEntries, { player, distance: val }];
     setCompeteRoundEntries(newEntries);
     setCompeteDistanceInput("");
 
-    if (competeCurrentPlayerIdx + 1 < competePlayers.length) {
+    if (competeCurrentPlayerIdx + 1 < competeTurnOrder.length) {
       setCompeteCurrentPlayerIdx(competeCurrentPlayerIdx + 1);
     } else {
       const standings = rankCompeteEntries(newEntries, competeCurrentTarget);
@@ -4029,7 +4173,7 @@ export default function GolfPracticeApp({ onSwitchProfile, onCreateProfile, prof
   function selectClosestPlayer(player) {
     // Closest-only mode: no distances entered, so only a flat 1pt to the tapped player is possible —
     // there's no data to rank 2nd/3rd/4th the way distance mode can.
-    const standings = competePlayers.map((p) => ({ player: p, points: p === player ? 1 : 0, rank: p === player ? 1 : null }));
+    const standings = closestStandings(competePlayers, player);
     setCompeteRoundResults((prev) => [...prev, { target: competeCurrentTarget, winner: player, standings }]);
     setCompeteRoundStandings(standings);
     setCompeteRoundComplete(true);
@@ -4041,6 +4185,7 @@ export default function GolfPracticeApp({ onSwitchProfile, onCreateProfile, prof
       return;
     }
     const target = randomTarget(competeMinDist, competeMaxDist);
+    setCompeteTurnOrder((prev) => winnersFirst(prev, competeRoundStandings.filter((x) => x.rank === 1).map((x) => x.player)));
     setCompeteCurrentTarget(target);
     setCompeteCurrentPlayerIdx(0);
     setCompeteRoundEntries([]);
@@ -4063,6 +4208,7 @@ export default function GolfPracticeApp({ onSwitchProfile, onCreateProfile, prof
     setCompeteHistory(newHistory);
     setCompeteSummarySessionId(session.id);
     setScreen("competeSummary");
+    shareSessionWithFriends("compete:sessions", session);
     try {
       await window.storage.set("compete:sessions", JSON.stringify(newHistory), false);
     } catch (e) {
@@ -4135,6 +4281,7 @@ export default function GolfPracticeApp({ onSwitchProfile, onCreateProfile, prof
     const validPlayers = sgCompetePlayers.map((p) => p.trim()).filter(Boolean);
     if (validPlayers.length < 2) return;
     setSgCompetePlayers(validPlayers);
+    setSgCompeteTurnOrder(validPlayers);
     setSgCompeteRoundResults([]);
     setSgCompeteCurrentShot(randomSgCompeteShot());
     setSgCompeteCurrentPlayerIdx(0);
@@ -4148,12 +4295,12 @@ export default function GolfPracticeApp({ onSwitchProfile, onCreateProfile, prof
   function submitSgCompeteDistance() {
     const val = unitToFt(parseFloat(sgCompeteResultInput), units);
     if (isNaN(val) || val < 0) return;
-    const player = sgCompetePlayers[sgCompeteCurrentPlayerIdx];
+    const player = sgCompeteTurnOrder[sgCompeteCurrentPlayerIdx];
     const newEntries = [...sgCompeteRoundEntries, { player, resultFt: val }];
     setSgCompeteRoundEntries(newEntries);
     setSgCompeteResultInput("");
 
-    if (sgCompeteCurrentPlayerIdx + 1 < sgCompetePlayers.length) {
+    if (sgCompeteCurrentPlayerIdx + 1 < sgCompeteTurnOrder.length) {
       setSgCompeteCurrentPlayerIdx(sgCompeteCurrentPlayerIdx + 1);
     } else {
       const standings = rankCompeteByProximity(newEntries, "resultFt");
@@ -4164,7 +4311,7 @@ export default function GolfPracticeApp({ onSwitchProfile, onCreateProfile, prof
   }
 
   function selectSgCompeteClosest(player) {
-    const standings = sgCompetePlayers.map((p) => ({ player: p, points: p === player ? 1 : 0, rank: p === player ? 1 : null }));
+    const standings = closestStandings(sgCompetePlayers, player);
     setSgCompeteRoundResults((prev) => [...prev, { lie: sgCompeteCurrentShot.lie, target: sgCompeteCurrentShot.target, winner: player, standings }]);
     setSgCompeteRoundStandings(standings);
     setSgCompeteRoundComplete(true);
@@ -4175,6 +4322,7 @@ export default function GolfPracticeApp({ onSwitchProfile, onCreateProfile, prof
       finishSgCompete();
       return;
     }
+    setSgCompeteTurnOrder((prev) => winnersFirst(prev, sgCompeteRoundStandings.filter((x) => x.rank === 1).map((x) => x.player)));
     setSgCompeteCurrentShot(randomSgCompeteShot());
     setSgCompeteCurrentPlayerIdx(0);
     setSgCompeteRoundEntries([]);
@@ -4198,6 +4346,7 @@ export default function GolfPracticeApp({ onSwitchProfile, onCreateProfile, prof
     setSgCompeteHistory(newHistory);
     setSgCompeteSummarySessionId(session.id);
     setScreen("competeShortGameSummary");
+    shareSessionWithFriends("compete:shortgame:sessions", session);
     try {
       await window.storage.set("compete:shortgame:sessions", JSON.stringify(newHistory), false);
     } catch (e) {
@@ -4259,6 +4408,7 @@ export default function GolfPracticeApp({ onSwitchProfile, onCreateProfile, prof
     const validPlayers = puttCompetePlayers.map((p) => p.trim()).filter(Boolean);
     if (validPlayers.length < 2) return;
     setPuttCompetePlayers(validPlayers);
+    setPuttCompeteTurnOrder(validPlayers);
     setPuttCompeteHoleResults([]);
     setPuttCompeteCurrentTarget(randomTarget(puttCompeteMinFt, puttCompeteMaxFt));
     setPuttCompeteCurrentPlayerIdx(0);
@@ -4268,11 +4418,11 @@ export default function GolfPracticeApp({ onSwitchProfile, onCreateProfile, prof
   }
 
   function submitPuttCompeteStrokes(n) {
-    const player = puttCompetePlayers[puttCompeteCurrentPlayerIdx];
+    const player = puttCompeteTurnOrder[puttCompeteCurrentPlayerIdx];
     const newEntries = [...puttCompeteHoleEntries, { player, strokes: n }];
     setPuttCompeteHoleEntries(newEntries);
 
-    if (puttCompeteCurrentPlayerIdx + 1 < puttCompetePlayers.length) {
+    if (puttCompeteCurrentPlayerIdx + 1 < puttCompeteTurnOrder.length) {
       setPuttCompeteCurrentPlayerIdx(puttCompeteCurrentPlayerIdx + 1);
     } else {
       setPuttCompeteHoleResults((prev) => [...prev, { target: puttCompeteCurrentTarget, putts: newEntries }]);
@@ -4284,6 +4434,12 @@ export default function GolfPracticeApp({ onSwitchProfile, onCreateProfile, prof
     if (puttCompeteHoleResults.length >= puttCompeteHoles) {
       finishPuttCompete();
       return;
+    }
+    const lastHole = puttCompeteHoleResults[puttCompeteHoleResults.length - 1];
+    if (lastHole && lastHole.putts.length) {
+      const fewest = Math.min(...lastHole.putts.map((x) => x.strokes));
+      const winners = lastHole.putts.filter((x) => x.strokes === fewest).map((x) => x.player);
+      setPuttCompeteTurnOrder((prev) => winnersFirst(prev, winners));
     }
     setPuttCompeteCurrentTarget(randomTarget(puttCompeteMinFt, puttCompeteMaxFt));
     setPuttCompeteCurrentPlayerIdx(0);
@@ -4304,6 +4460,7 @@ export default function GolfPracticeApp({ onSwitchProfile, onCreateProfile, prof
     setPuttCompeteHistory(newHistory);
     setPuttCompeteSummarySessionId(session.id);
     setScreen("competePuttingSummary");
+    shareSessionWithFriends("compete:putting:sessions", session);
     try {
       await window.storage.set("compete:putting:sessions", JSON.stringify(newHistory), false);
     } catch (e) {
@@ -5162,6 +5319,11 @@ export default function GolfPracticeApp({ onSwitchProfile, onCreateProfile, prof
     >
       <style>{FONT_IMPORT}</style>
       <div style={{ width: "100%", maxWidth: 420 }}>
+        <FriendRequestPopup
+          links={pendingFriendRequests}
+          onDismiss={(ids) => setDismissedRequestIds((prev) => [...prev, ...ids])}
+        />
+
         <Header
           screen={screen}
           onSettings={() => setScreen("settings")}
@@ -5569,6 +5731,9 @@ export default function GolfPracticeApp({ onSwitchProfile, onCreateProfile, prof
 
         {screen === "competeSetup" && (
           <CompeteSetupScreen
+            onOpenSession={openPastCompete}
+            friends={approvedFriends}
+            onPickFriend={(f) => pickFriendInto(setCompetePlayers, f)}
             players={competePlayers}
             onUpdatePlayerName={updateCompetePlayerName}
             onAddPlayer={addCompetePlayer}
@@ -5591,7 +5756,7 @@ export default function GolfPracticeApp({ onSwitchProfile, onCreateProfile, prof
 
         {screen === "competePlay" && competeCurrentTarget !== null && (
           <CompetePlayScreen
-            players={competePlayers}
+            players={competeTurnOrder}
             roundResults={competeRoundResults}
             totalRounds={competeRounds}
             target={competeCurrentTarget}
@@ -5631,6 +5796,9 @@ export default function GolfPracticeApp({ onSwitchProfile, onCreateProfile, prof
 
         {screen === "competeShortGameSetup" && (
           <ShortGameCompeteSetupScreen
+            onOpenSession={openPastSgCompete}
+            friends={approvedFriends}
+            onPickFriend={(f) => pickFriendInto(setSgCompetePlayers, f)}
             players={sgCompetePlayers}
             onUpdatePlayerName={updateSgCompetePlayerName}
             onAddPlayer={addSgCompetePlayer}
@@ -5655,7 +5823,7 @@ export default function GolfPracticeApp({ onSwitchProfile, onCreateProfile, prof
 
         {screen === "competeShortGamePlay" && sgCompeteCurrentShot !== null && (
           <ShortGameCompetePlayScreen
-            players={sgCompetePlayers}
+            players={sgCompeteTurnOrder}
             roundResults={sgCompeteRoundResults}
             totalRounds={sgCompeteRounds}
             currentShot={sgCompeteCurrentShot}
@@ -5693,6 +5861,9 @@ export default function GolfPracticeApp({ onSwitchProfile, onCreateProfile, prof
 
         {screen === "competePuttingSetup" && (
           <PuttingCompeteSetupScreen
+            onOpenSession={openPastPuttCompete}
+            friends={approvedFriends}
+            onPickFriend={(f) => pickFriendInto(setPuttCompetePlayers, f)}
             players={puttCompetePlayers}
             onUpdatePlayerName={updatePuttCompetePlayerName}
             onAddPlayer={addPuttCompetePlayer}
@@ -5713,7 +5884,7 @@ export default function GolfPracticeApp({ onSwitchProfile, onCreateProfile, prof
 
         {screen === "competePuttingPlay" && puttCompeteCurrentTarget !== null && (
           <PuttingCompetePlayScreen
-            players={puttCompetePlayers}
+            players={puttCompeteTurnOrder}
             holeResults={puttCompeteHoleResults}
             totalHoles={puttCompeteHoles}
             target={puttCompeteCurrentTarget}
@@ -5953,11 +6124,28 @@ export default function GolfPracticeApp({ onSwitchProfile, onCreateProfile, prof
   );
 }
 
+const headerPillStyle = {
+  background: "none",
+  border: `1px solid ${COLORS.creamDim}55`,
+  color: COLORS.creamDim,
+  fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
+  fontSize: 10,
+  lineHeight: 1,
+  height: 24,
+  padding: "0 8px",
+  boxSizing: "border-box",
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  borderRadius: 6,
+  cursor: "pointer",
+};
+
 function Header({ screen, onSettings, onHome, onBack, backDestination }) {
   return (
     <div
       className="no-print"
-      style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 14, gap: 8 }}
+      style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14, gap: 8 }}
     >
       <div
         onClick={onHome}
@@ -5969,7 +6157,7 @@ function Header({ screen, onSettings, onHome, onBack, backDestination }) {
         }}
       >
         <img src={LOGO_SRC} alt="" style={{ width: 20, height: 20, flexShrink: 0 }} />
-        <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <div
             style={{
               fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
@@ -5984,20 +6172,11 @@ function Header({ screen, onSettings, onHome, onBack, backDestination }) {
           <PlayerBadge />
         </div>
       </div>
-      <div style={{ display: "flex", gap: 5 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
         {screen !== "home" && backDestination !== "home" && (
           <button
             onClick={onBack}
-            style={{
-              background: "none",
-              border: `1px solid ${COLORS.creamDim}55`,
-              color: COLORS.creamDim,
-              fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
-              fontSize: 10,
-              padding: "4px 7px",
-              borderRadius: 6,
-              cursor: "pointer",
-            }}
+            style={headerPillStyle}
           >
             BACK
           </button>
@@ -6005,16 +6184,7 @@ function Header({ screen, onSettings, onHome, onBack, backDestination }) {
         {screen !== "home" && (
           <button
             onClick={onHome}
-            style={{
-              background: "none",
-              border: `1px solid ${COLORS.creamDim}55`,
-              color: COLORS.creamDim,
-              fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
-              fontSize: 10,
-              padding: "4px 7px",
-              borderRadius: 6,
-              cursor: "pointer",
-            }}
+            style={headerPillStyle}
           >
             HOME
           </button>
@@ -6022,20 +6192,125 @@ function Header({ screen, onSettings, onHome, onBack, backDestination }) {
         {screen === "home" && (
           <button
             onClick={onSettings}
-            style={{
-              background: "none",
-              border: `1px solid ${COLORS.creamDim}55`,
-              color: COLORS.creamDim,
-              fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
-              fontSize: 10,
-              padding: "4px 7px",
-              borderRadius: 6,
-              cursor: "pointer",
-            }}
+            style={headerPillStyle}
           >
             SETTINGS
           </button>
         )}
+      </div>
+    </div>
+  );
+}
+
+function FriendRequestPopup({ links, onDismiss }) {
+  const [busyId, setBusyId] = useState(null);
+  const [error, setError] = useState(null);
+  if (!links || links.length === 0) return null;
+  const link = links[0];
+  const font = "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
+
+  async function act(fn, msg) {
+    setBusyId(link.id);
+    setError(null);
+    try {
+      await fn(link.id);
+    } catch (e) {
+      setError(msg);
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  return (
+    <div
+      className="no-print"
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(10,10,9,0.75)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 24,
+        zIndex: 60,
+      }}
+    >
+      <div
+        style={{
+          width: "100%",
+          maxWidth: 340,
+          background: COLORS.turf,
+          border: `1px solid ${COLORS.creamDim}33`,
+          borderRadius: 14,
+          padding: 20,
+          textAlign: "center",
+        }}
+      >
+        <div style={{ fontFamily: font, fontSize: 11, color: COLORS.creamDim, letterSpacing: 1.5 }}>
+          FRIEND REQUEST{links.length > 1 ? ` · 1 OF ${links.length}` : ""}
+        </div>
+        <div style={{ fontFamily: font, fontSize: 24, letterSpacing: 1, lineHeight: 1.1, marginTop: 8, color: COLORS.cream }}>
+          {(link.friendName || "A player").toUpperCase()}
+        </div>
+        <div style={{ fontFamily: font, fontSize: 12, color: COLORS.creamDim, marginTop: 6, lineHeight: 1.5 }}>
+          wants to be friends — compare stats and play Compete games together.
+        </div>
+        {error && <div style={{ fontFamily: font, fontSize: 11, color: COLORS.flag, marginTop: 10 }}>{error}</div>}
+        <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
+          <button
+            onClick={() => act(declineFriendRequest, "Couldn't decline that request — try again.")}
+            disabled={busyId === link.id}
+            style={{
+              flex: 1,
+              padding: "12px 0",
+              borderRadius: 10,
+              border: `1px solid ${COLORS.creamDim}33`,
+              background: "transparent",
+              color: COLORS.creamDim,
+              fontFamily: font,
+              fontSize: 14,
+              letterSpacing: 1,
+              cursor: "pointer",
+            }}
+          >
+            DECLINE
+          </button>
+          <button
+            onClick={() => act(acceptFriendRequest, "Couldn't accept that request — try again.")}
+            disabled={busyId === link.id}
+            style={{
+              flex: 1,
+              padding: "12px 0",
+              borderRadius: 10,
+              border: "none",
+              background: COLORS.fairway,
+              color: COLORS.cream,
+              fontFamily: font,
+              fontSize: 14,
+              letterSpacing: 1,
+              cursor: "pointer",
+            }}
+          >
+            ACCEPT
+          </button>
+        </div>
+        <button
+          onClick={() => onDismiss(links.map((l) => l.id))}
+          style={{
+            marginTop: 12,
+            background: "none",
+            border: "none",
+            color: COLORS.creamDim,
+            fontFamily: font,
+            fontSize: 11,
+            letterSpacing: 1,
+            textDecoration: "underline",
+            textUnderlineOffset: 3,
+            cursor: "pointer",
+          }}
+        >
+          LATER
+        </button>
       </div>
     </div>
   );
@@ -10480,10 +10755,16 @@ function CompeteRoundEditModal({ round, players, mode, units, valueKind, onSave,
         player: p,
         [valueKey]: isYds ? unitToYds(parseFloat(values[p]) || 0, units) : unitToFt(parseFloat(values[p]) || 0, units),
       }));
-      const standings = rankCompeteByProximity(entries, valueKey);
+      // Range: rank by distance from the target. Short Game: the entry already IS the miss distance.
+      const standings = isYds
+        ? assignTiedPoints(
+            entries.map((e) => ({ ...e, diff: Math.abs(e.distance - round.target) })).sort((a, b) => a.diff - b.diff),
+            (e) => e.diff
+          )
+        : rankCompeteByProximity(entries, valueKey);
       onSave({ ...round, entries, standings });
     } else {
-      const standings = players.map((p) => ({ player: p, points: p === winner ? 1 : 0, rank: p === winner ? 1 : null }));
+      const standings = closestStandings(players, winner);
       onSave({ ...round, winner, standings });
     }
   }
@@ -10565,6 +10846,23 @@ function CompeteRoundEditModal({ round, players, mode, units, valueKind, onSave,
                   {p}
                 </button>
               ))}
+          {mode !== "distance" && (
+            <button
+              onClick={() => setWinner(CLOSEST_TIE)}
+              style={{
+                padding: "10px 0",
+                borderRadius: 8,
+                border: winner === CLOSEST_TIE ? `2px solid ${COLORS.fairwayLight}` : `1px solid ${COLORS.creamDim}33`,
+                background: winner === CLOSEST_TIE ? COLORS.fairway : "transparent",
+                color: COLORS.cream,
+                fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
+                fontSize: 14,
+                cursor: "pointer",
+              }}
+            >
+              TIE
+            </button>
+          )}
         </div>
 
         <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
@@ -13550,9 +13848,52 @@ function GappingManualEntryScreen({ sequence, values, onChangeValue, onSave, onE
   );
 }
 
+// ===== Friend picker for Compete setup — tap a friend to drop them into the next free player slot.
+// Friends picked this way also receive a copy of the finished game in their own account. =====
+function FriendPicker({ friends, players, onPickFriend }) {
+  if (!friends || friends.length === 0) return null;
+  return (
+    <div style={{ marginTop: 8 }}>
+      <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.creamDim, letterSpacing: 1 }}>
+        ADD FROM FRIENDS — THEY GET THE RESULT TOO
+      </div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 6 }}>
+        {friends.map((f) => {
+          const added = players.some((p) => p.trim() === f.friendName);
+          const full = !added && players.filter((p) => p.trim()).length >= 4;
+          return (
+            <button
+              key={f.friendId}
+              onClick={() => !added && !full && onPickFriend(f)}
+              disabled={added || full}
+              style={{
+                padding: "7px 12px",
+                borderRadius: 10,
+                border: `1px solid ${added ? COLORS.fairway : COLORS.creamDim + "33"}`,
+                background: added ? `${COLORS.fairway}26` : "transparent",
+                color: added ? COLORS.fairway : COLORS.cream,
+                fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
+                fontSize: 12,
+                opacity: full ? 0.4 : 1,
+                cursor: added || full ? "default" : "pointer",
+              }}
+            >
+              {added ? "✓ " : "+ "}
+              {f.friendName}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ===== Compete (Range) screens =====
 
 function CompeteSetupScreen({
+  onOpenSession,
+  friends,
+  onPickFriend,
   players,
   onUpdatePlayerName,
   onAddPlayer,
@@ -13587,7 +13928,8 @@ function CompeteSetupScreen({
 
       <Card>
         <SectionLabel>Players</SectionLabel>
-        <div style={{ marginTop: 8 }}>
+        <FriendPicker friends={friends} players={players} onPickFriend={onPickFriend} />
+        <div style={{ marginTop: 10 }}>
           {players.map((p, i) => (
             <div key={i} style={{ display: "flex", gap: 8, marginBottom: 8 }}>
               <input
@@ -13708,7 +14050,7 @@ function CompeteSetupScreen({
             </div>
             <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.creamDim, marginTop: 2 }}>
               No distances needed — just tap whoever was closest each round. Flat 1pt to the winner,
-              0 to everyone else.
+              0 to everyone else (or split it on a tie).
             </div>
           </div>
         </div>
@@ -13742,11 +14084,12 @@ function CompeteSetupScreen({
       {loaded && history.length > 0 && (
         <CollapsibleSection title="Past competitions" count={history.length}>
           {history.map((s) => {
-            const totals = computeCompeteTotals(s.players, s.rounds);
-            const winner = Object.entries(totals).sort((a, b) => b[1] - a[1])[0];
+            const totals = computeCompeteTotals(s.players, s.mode === "distance" && s.minDist !== undefined ? recomputeRangeRounds(s.rounds, s.mode) : s.rounds);
+            const ranked = Object.entries(totals).sort((a, b) => b[1] - a[1]);
+            const winner = ranked[0];
             return (
               <SwipeToDelete key={s.id} onDelete={() => onDeleteSession(s.id)}>
-                <Card style={{ marginBottom: 12 }}>
+                <Card style={{ marginBottom: 12, cursor: "pointer" }} onClick={() => onOpenSession(s)}>
                   <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, paddingRight: 20 }}>
                     {new Date(s.date).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
                     {"  ·  "}
@@ -13754,6 +14097,17 @@ function CompeteSetupScreen({
                   </div>
                   <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 18, marginTop: 6, color: COLORS.sand }}>
                     ★ {winner ? winner[0] : "—"} won
+                  </div>
+                  <div style={{ marginTop: 8 }}>
+                    {ranked.map(([name, pts]) => (
+                      <div key={name} style={{ display: "flex", justifyContent: "space-between", fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 12, color: COLORS.cream, padding: "3px 0" }}>
+                        <span>{name}</span>
+                        <span style={{ color: COLORS.creamDim }}>{pts} pts</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.fairway, letterSpacing: 1, marginTop: 8 }}>
+                    VIEW ROUND-BY-ROUND ›
                   </div>
                 </Card>
               </SwipeToDelete>
@@ -13928,6 +14282,22 @@ function CompetePlayScreen({
                     {p}
                   </button>
                 ))}
+                <button
+                  onClick={() => onSelectClosest(CLOSEST_TIE)}
+                  style={{
+                    padding: "12px 0",
+                    borderRadius: 10,
+                    border: `1px solid ${COLORS.fairway}`,
+                    background: "transparent",
+                    color: COLORS.fairway,
+                    fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
+                    fontSize: 14,
+                    letterSpacing: 1,
+                    cursor: "pointer",
+                  }}
+                >
+                  TIE — SPLIT THE POINT
+                </button>
               </div>
             </div>
           )}
@@ -15199,6 +15569,9 @@ function CompareResultsScreen({ profileId, profileName, entries, myHistories, on
 // ===== Compete (Short Game) screens =====
 
 function ShortGameCompeteSetupScreen({
+  onOpenSession,
+  friends,
+  onPickFriend,
   players,
   onUpdatePlayerName,
   onAddPlayer,
@@ -15235,7 +15608,8 @@ function ShortGameCompeteSetupScreen({
 
       <Card>
         <SectionLabel>Players</SectionLabel>
-        <div style={{ marginTop: 8 }}>
+        <FriendPicker friends={friends} players={players} onPickFriend={onPickFriend} />
+        <div style={{ marginTop: 10 }}>
           {players.map((p, i) => (
             <div key={i} style={{ display: "flex", gap: 8, marginBottom: 8 }}>
               <input
@@ -15345,7 +15719,7 @@ function ShortGameCompeteSetupScreen({
           >
             <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 16, color: COLORS.cream, letterSpacing: 0.5 }}>JUST PICK CLOSEST</div>
             <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.creamDim, marginTop: 2 }}>
-              No distances needed — tap whoever finished closest. Flat 1pt to the winner, 0 to everyone else.
+              No distances needed — tap whoever finished closest. Flat 1pt to the winner, 0 to everyone else (or split it on a tie).
             </div>
           </div>
         </div>
@@ -15374,11 +15748,12 @@ function ShortGameCompeteSetupScreen({
       {loaded && history.length > 0 && (
         <CollapsibleSection title="Past competitions" count={history.length}>
           {history.map((s) => {
-            const totals = computeCompeteTotals(s.players, s.rounds);
-            const winner = Object.entries(totals).sort((a, b) => b[1] - a[1])[0];
+            const totals = computeCompeteTotals(s.players, s.mode === "distance" && s.minDist !== undefined ? recomputeRangeRounds(s.rounds, s.mode) : s.rounds);
+            const ranked = Object.entries(totals).sort((a, b) => b[1] - a[1]);
+            const winner = ranked[0];
             return (
               <SwipeToDelete key={s.id} onDelete={() => onDeleteSession(s.id)}>
-                <Card style={{ marginBottom: 12 }}>
+                <Card style={{ marginBottom: 12, cursor: "pointer" }} onClick={() => onOpenSession(s)}>
                   <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, paddingRight: 20 }}>
                     {new Date(s.date).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
                     {"  ·  "}
@@ -15386,6 +15761,17 @@ function ShortGameCompeteSetupScreen({
                   </div>
                   <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 18, marginTop: 6, color: COLORS.sand }}>
                     ★ {winner ? winner[0] : "—"} won
+                  </div>
+                  <div style={{ marginTop: 8 }}>
+                    {ranked.map(([name, pts]) => (
+                      <div key={name} style={{ display: "flex", justifyContent: "space-between", fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 12, color: COLORS.cream, padding: "3px 0" }}>
+                        <span>{name}</span>
+                        <span style={{ color: COLORS.creamDim }}>{pts} pts</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.fairway, letterSpacing: 1, marginTop: 8 }}>
+                    VIEW ROUND-BY-ROUND ›
                   </div>
                 </Card>
               </SwipeToDelete>
@@ -15546,6 +15932,22 @@ function ShortGameCompetePlayScreen({
                     {p}
                   </button>
                 ))}
+                <button
+                  onClick={() => onSelectClosest(CLOSEST_TIE)}
+                  style={{
+                    padding: "12px 0",
+                    borderRadius: 10,
+                    border: `1px solid ${COLORS.fairway}`,
+                    background: "transparent",
+                    color: COLORS.fairway,
+                    fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
+                    fontSize: 14,
+                    letterSpacing: 1,
+                    cursor: "pointer",
+                  }}
+                >
+                  TIE — SPLIT THE POINT
+                </button>
               </div>
             </div>
           )}
@@ -15775,6 +16177,9 @@ function ShortGameCompeteSummaryScreen({
 // ===== Compete (Putting) screens — tally of putts, SG shown only at the end =====
 
 function PuttingCompeteSetupScreen({
+  onOpenSession,
+  friends,
+  onPickFriend,
   players,
   onUpdatePlayerName,
   onAddPlayer,
@@ -15807,7 +16212,8 @@ function PuttingCompeteSetupScreen({
 
       <Card>
         <SectionLabel>Players</SectionLabel>
-        <div style={{ marginTop: 8 }}>
+        <FriendPicker friends={friends} players={players} onPickFriend={onPickFriend} />
+        <div style={{ marginTop: 10 }}>
           {players.map((p, i) => (
             <div key={i} style={{ display: "flex", gap: 8, marginBottom: 8 }}>
               <input
@@ -15907,7 +16313,7 @@ function PuttingCompeteSetupScreen({
             const winner = Object.entries(tallies).sort((a, b) => a[1] - b[1])[0];
             return (
               <SwipeToDelete key={s.id} onDelete={() => onDeleteSession(s.id)}>
-                <Card style={{ marginBottom: 12 }}>
+                <Card style={{ marginBottom: 12, cursor: "pointer" }} onClick={() => onOpenSession(s)}>
                   <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 11, color: COLORS.creamDim, paddingRight: 20 }}>
                     {new Date(s.date).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
                     {"  ·  "}
@@ -15915,6 +16321,17 @@ function PuttingCompeteSetupScreen({
                   </div>
                   <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 18, marginTop: 6, color: COLORS.sand }}>
                     ★ {winner ? winner[0] : "—"} won ({winner ? winner[1] : "—"} putts)
+                  </div>
+                  <div style={{ marginTop: 8 }}>
+                    {Object.entries(tallies).sort((a, b) => a[1] - b[1]).map(([name, n]) => (
+                      <div key={name} style={{ display: "flex", justifyContent: "space-between", fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 12, color: COLORS.cream, padding: "3px 0" }}>
+                        <span>{name}</span>
+                        <span style={{ color: COLORS.creamDim }}>{n} putts</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", fontSize: 10, color: COLORS.fairway, letterSpacing: 1, marginTop: 8 }}>
+                    VIEW HOLE-BY-HOLE ›
                   </div>
                 </Card>
               </SwipeToDelete>
