@@ -460,3 +460,39 @@ export async function getPlayerSectionHistories(uid) {
     putting: raw["putting:sessions"] || [],
   };
 }
+
+// ===== Compete games shared with friends =====
+//
+// A host never writes into a friend's real history (appData/compete:*), which could overwrite it.
+// Instead the finished game is dropped into the friend's users/{friendId}/competeInbox, and the
+// friend's own app merges it into their history the next time it opens, then clears the item.
+// Doc id is `${fromId}_${sessionId}` so re-sharing the same game is idempotent.
+// Needs the competeInbox rule in firestore.rules (it requires an approved friendLinks doc).
+
+// key: "compete:sessions" | "compete:shortgame:sessions" | "compete:putting:sessions"
+export async function shareCompeteWithFriend(fromId, toId, key, session) {
+  await setDoc(doc(db, "users", toId, "competeInbox", `${fromId}_${session.id}`), {
+    fromId,
+    key,
+    session: JSON.stringify(session),
+    createdAt: Date.now(),
+  });
+}
+
+export async function loadCompeteInbox(profileId) {
+  const snap = await getDocs(collection(db, "users", profileId, "competeInbox"));
+  const items = [];
+  snap.forEach((d) => {
+    const data = d.data();
+    try {
+      items.push({ id: d.id, key: data.key, session: JSON.parse(data.session) });
+    } catch (e) {
+      // skip malformed items
+    }
+  });
+  return items;
+}
+
+export async function clearCompeteInboxItems(profileId, ids) {
+  await Promise.all(ids.map((id) => deleteDoc(doc(db, "users", profileId, "competeInbox", id))));
+}
